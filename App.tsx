@@ -9,6 +9,9 @@ import Ethics from './components/Ethics';
 import HelpCenter from './components/HelpCenter';
 import ClientGuide from './components/ClientGuide';
 import SupportModal from './components/SupportModal';
+import SpeedTestSection from './components/SpeedTestSection';
+import ClientArea from './components/ClientArea';
+import NewsSection from './components/NewsSection'; // Import News Component
 import { PLANS, HISTORY_TEXT } from './constants';
 import { MessageCircle } from 'lucide-react';
 
@@ -17,6 +20,11 @@ const App: React.FC = () => {
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
 
   const toggleSupportModal = () => setIsSupportModalOpen(!isSupportModalOpen);
+
+  const handleNavigate = (page: string) => {
+    setCurrentPage(page);
+    setIsSupportModalOpen(false); // Close modal if navigating from it
+  };
 
   return (
     <div className="min-h-screen bg-fiber-dark font-sans text-gray-900 flex flex-col">
@@ -68,6 +76,9 @@ const App: React.FC = () => {
 
             {/* Features / Values Section */}
             <Features />
+
+            {/* Speed Test Section (New) */}
+            <SpeedTestSection />
 
             {/* Why Choose Us Section */}
             <section className="py-16 bg-fiber-dark">
@@ -135,16 +146,20 @@ const App: React.FC = () => {
           </>
         )}
         
+        {currentPage === 'client-area' && <ClientArea />}
+        
         {currentPage === 'ethics' && <Ethics />}
         
         {currentPage === 'help' && <HelpCenter />}
 
         {currentPage === 'client-guide' && <ClientGuide />}
+        
+        {currentPage === 'news' && <NewsSection />}
 
       </main>
 
       <Footer 
-        onNavigate={setCurrentPage}
+        onNavigate={handleNavigate}
         currentPage={currentPage}
         onOpenSupport={() => setIsSupportModalOpen(true)}
       />
@@ -152,6 +167,7 @@ const App: React.FC = () => {
       <SupportModal 
         isOpen={isSupportModalOpen} 
         onClose={() => setIsSupportModalOpen(false)} 
+        onNavigate={handleNavigate}
       />
 
       {/* Floating WhatsApp Button */}

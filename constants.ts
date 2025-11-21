@@ -1,9 +1,10 @@
+
 import { NavItem, Plan } from './types';
 
 export const NAV_ITEMS: NavItem[] = [
   { label: 'Início', href: 'home' },
   { label: 'Serviços', href: '#planos' },
-  { label: 'Sobre', href: '#sobre' },
+  { label: 'Notícias', href: 'news' },
   { label: 'Central de Ajuda', href: 'help' }, // Changed to route identifier
   { label: 'Ética', href: 'ethics' },
 ];

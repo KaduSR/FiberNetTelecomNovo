@@ -27,10 +27,10 @@ const Hero: React.FC = () => {
                 </p>
                 
                 <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-                <Button variant="primary" className="text-base sm:text-lg px-8 py-4 rounded-lg">
+                <Button variant="primary" className="text-base sm:text-lg px-8 py-4 rounded-lg" onClick={() => document.getElementById('planos')?.scrollIntoView({ behavior: 'smooth'})}>
                     Conheça Nossos Planos <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
-                <Button variant="outline" className="text-base sm:text-lg px-8 py-4 rounded-lg">
+                <Button variant="outline" className="text-base sm:text-lg px-8 py-4 rounded-lg" onClick={() => document.getElementById('sobre')?.scrollIntoView({ behavior: 'smooth'})}>
                     Saiba Mais
                 </Button>
                 </div>
@@ -56,16 +56,14 @@ const Hero: React.FC = () => {
             </div>
 
             {/* Image Content */}
-            <div className="relative order-1 lg:order-2 animate-float mb-10 lg:mb-0">
+            <div className="relative order-1 lg:order-2 mb-10 lg:mb-0 flex justify-center">
                 <div className="absolute inset-0 bg-fiber-orange/20 blur-3xl rounded-full transform translate-y-10 opacity-60"></div>
                 <img 
-                    src="https://images.unsplash.com/vector-1763658006582-12eb4f6809c1?q=80&w=1095&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" 
-                    alt="Ilustração de Fibra Óptica" 
-                    className="relative w-full max-w-[1012px] lg:max-w-[1350px] mx-auto object-contain drop-shadow-2xl hover:scale-105 transition-transform duration-500 z-10"
+                    src="https://res.cloudinary.com/dbblxiya7/image/upload/v1763728839/3_wmk7t6.svg"
+                    alt="Mascote Fiber.Net Voando" 
+                    className="relative w-full max-w-[400px] lg:max-w-[500px] mx-auto object-contain drop-shadow-2xl hover:scale-105 transition-transform duration-500 z-10 animate-fly"
                     loading="eager"
                     fetchPriority="high"
-                    width="1295" // Original width from URL
-                    height="1000" // Original height from URL
                 />
             </div>
             

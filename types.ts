@@ -31,3 +31,14 @@ export interface ServiceStatusItem {
   updatedAt: string;
   type: 'social' | 'bank' | 'gaming' | 'streaming';
 }
+
+export interface Invoice {
+  id: string | number;
+  vencimento: string;
+  valor: string | number;
+  status: 'aberto' | 'vencido' | 'pago';
+  linha_digitavel?: string; // Barcode line
+  pix_code?: string; // Pix copy paste
+  link_pdf?: string;
+  descricao?: string;
+}

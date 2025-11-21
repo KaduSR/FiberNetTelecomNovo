@@ -8,9 +8,10 @@ import FiberNetTextLogo from './FiberNetTextLogo';
 interface SupportModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onNavigate?: (page: string) => void;
 }
 
-const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose }) => {
+const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose, onNavigate }) => {
   // Close on Escape key
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -21,6 +22,13 @@ const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose }) => {
   }, [onClose]);
 
   if (!isOpen) return null;
+
+  const handleClientAreaClick = () => {
+      if (onNavigate) {
+          onNavigate('client-area');
+      }
+      onClose();
+  };
 
   return (
     <div 
@@ -83,7 +91,12 @@ const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose }) => {
 
         {/* Footer Actions */}
         <div className="bg-neutral-900 p-6 border-t border-white/5">
-            <Button variant="primary" fullWidth aria-label="Acessar Área do Cliente">
+            <Button 
+                variant="primary" 
+                fullWidth 
+                aria-label="Acessar Área do Cliente"
+                onClick={handleClientAreaClick}
+            >
                 Acessar Área do Cliente
             </Button>
             <div className="mt-4 text-center">

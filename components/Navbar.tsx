@@ -40,7 +40,7 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, onOpenSupport 
         if (element) element.scrollIntoView({ behavior: 'smooth' });
       }
     } else {
-      // It's a page route (home, ethics, help)
+      // It's a page route (home, ethics, help, client-area)
       onNavigate(href);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -49,7 +49,7 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, onOpenSupport 
 
   // Helper to check if a link is active
   const isLinkActive = (href: string) => {
-    if (href.startsWith('#')) return false; // We don't highlight hash links as "active pages" usually, or could do complex scroll spying
+    if (href.startsWith('#')) return false; 
     return currentPage === href;
   };
 
@@ -99,7 +99,11 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, onOpenSupport 
               <Headphones size={20} />
             </button>
 
-            <Button variant="primary" className="!py-2 !px-5 text-xs uppercase tracking-wider">
+            <Button 
+                variant="primary" 
+                className="!py-2 !px-5 text-xs uppercase tracking-wider"
+                onClick={() => onNavigate('client-area')}
+            >
               Área do Cliente
             </Button>
           </div>
@@ -147,7 +151,14 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, onOpenSupport 
                 Suporte / Fale Conosco
             </button>
             <div className="pt-4">
-               <Button variant="primary" fullWidth>
+               <Button 
+                  variant="primary" 
+                  fullWidth
+                  onClick={() => {
+                      setIsOpen(false);
+                      onNavigate('client-area');
+                  }}
+               >
                   Área do Cliente
                </Button>
             </div>

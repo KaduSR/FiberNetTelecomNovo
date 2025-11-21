@@ -52,11 +52,16 @@
             },
             animation: {
               'float': 'float 6s ease-in-out infinite',
+              'fly': 'fly 2s ease-in-out infinite',
             },
             keyframes: {
               float: {
                 '0%, 100%': { transform: 'translateY(0)' },
                 '50%': { transform: 'translateY(-10px)' },
+              },
+              fly: {
+                '0%, 100%': { transform: 'translateY(0) translateX(0) rotate(0deg)' },
+                '50%': { transform: 'translateY(-20px) translateX(5px) rotate(3deg)' },
               }
             }
           }
