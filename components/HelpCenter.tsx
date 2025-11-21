@@ -277,9 +277,19 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ onNavigate }) => {
            </div>
            <div className="flex flex-col items-center p-6 bg-fiber-card rounded-xl border border-white/5">
               <Globe className="w-8 h-8 text-fiber-blue mb-3" aria-hidden="true" />
-              <h4 className="font-bold text-white">Site & Área do Cliente</h4>
+              <h4 className="font-bold text-white">Área do Cliente</h4>
               <p className="text-gray-400 text-sm mt-2">2ª via, contratos e serviços</p>
-              <p className="text-fiber-blue font-mono mt-1">fibernettelecom.com</p>
+              <div className="pt-4">
+               <Button 
+                  variant="primary" 
+                  fullWidth
+                  onClick={() => {
+                      if(onNavigate) onNavigate('client-area');
+                  }}
+               >
+                  Área do Cliente
+               </Button>
+            </div>
            </div>
         </div>
         <div className="mt-12">
@@ -294,3 +304,4 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ onNavigate }) => {
 };
 
 export default HelpCenter;
+    

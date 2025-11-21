@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Menu, X, Headphones } from 'lucide-react';
 import { NAV_ITEMS } from '../constants';
 import Button from './Button';
-import FiberNetLogo from './FiberNetLogo'; // Import the new image logo component
+import FiberNetLogo from './FiberNetLogo';
 
 interface NavbarProps {
   onNavigate: (page: string) => void;
@@ -27,7 +27,6 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, onOpenSupport 
     e.preventDefault();
     
     if (href.startsWith('#')) {
-      // If we are on a sub-page and click a hash link, go home first then scroll
       if (currentPage !== 'home') {
         onNavigate('home');
         setTimeout(() => {
@@ -35,19 +34,16 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, onOpenSupport 
           if (element) element.scrollIntoView({ behavior: 'smooth' });
         }, 100);
       } else {
-        // Just scroll if already on home
         const element = document.querySelector(href);
         if (element) element.scrollIntoView({ behavior: 'smooth' });
       }
     } else {
-      // It's a page route (home, ethics, help, client-area)
       onNavigate(href);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
     setIsOpen(false);
   };
 
-  // Helper to check if a link is active
   const isLinkActive = (href: string) => {
     if (href.startsWith('#')) return false; 
     return currentPage === href;
