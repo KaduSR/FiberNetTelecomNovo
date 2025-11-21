@@ -6,6 +6,10 @@ import ServiceStatus from './ServiceStatus';
 import { CONTACT_INFO } from '../constants';
 import FiberNetTextLogo from './FiberNetTextLogo';
 
+interface HelpCenterProps {
+    onNavigate?: (page: string) => void;
+}
+
 // Data Structure grouped by Category
 const FAQ_DATA: Record<string, { question: string; answer: string }[]> = {
   "Principais temas": [
@@ -89,7 +93,7 @@ const FAQ_DATA: Record<string, { question: string; answer: string }[]> = {
 // All categories for the sidebar
 const CATEGORIES = Object.keys(FAQ_DATA);
 
-const HelpCenter: React.FC = () => {
+const HelpCenter: React.FC<HelpCenterProps> = ({ onNavigate }) => {
   const [activeCategory, setActiveCategory] = useState<string>("Principais temas");
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
@@ -135,7 +139,7 @@ const HelpCenter: React.FC = () => {
           <button 
             className="bg-neutral-900 p-4 rounded-xl border border-white/5 hover:border-fiber-orange/50 transition-all cursor-pointer group flex flex-col items-center text-center focus:outline-none focus:ring-2 focus:ring-fiber-orange"
             aria-label="Realizar teste de velocidade"
-            onClick={() => document.getElementById('speedtest')?.scrollIntoView({ behavior: 'smooth'})}
+            onClick={() => onNavigate ? onNavigate('speedtest') : null}
           >
             <Gauge size={24} className="text-fiber-orange mb-2 group-hover:scale-110 transition-transform" aria-hidden="true" />
             <h3 className="text-white font-bold text-sm">Teste de Velocidade</h3>

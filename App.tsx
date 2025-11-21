@@ -77,9 +77,6 @@ const App: React.FC = () => {
             {/* Features / Values Section */}
             <Features />
 
-            {/* Speed Test Section (New) */}
-            <SpeedTestSection />
-
             {/* Why Choose Us Section */}
             <section className="py-16 bg-fiber-dark">
                 <div className="max-w-7xl mx-auto px-4 text-center">
@@ -150,11 +147,13 @@ const App: React.FC = () => {
         
         {currentPage === 'ethics' && <Ethics />}
         
-        {currentPage === 'help' && <HelpCenter />}
+        {currentPage === 'help' && <HelpCenter onNavigate={handleNavigate} />}
 
         {currentPage === 'client-guide' && <ClientGuide />}
         
         {currentPage === 'news' && <NewsSection />}
+        
+        {currentPage === 'speedtest' && <SpeedTestSection />}
 
       </main>
 

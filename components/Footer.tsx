@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Facebook, Instagram, Linkedin, Twitter, MapPin, MessageCircle } from 'lucide-react'; // Removed Phone, Mail
+import { Instagram, MapPin, MessageCircle } from 'lucide-react'; // Removed Facebook, Linkedin, Twitter
 import { CONTACT_INFO } from '../constants';
 import FiberNetLogo from './FiberNetLogo'; // Import the new image logo component
 
@@ -58,17 +58,14 @@ const Footer: React.FC<FooterProps> = ({ onNavigate, currentPage, onOpenSupport 
               Conectando você ao mundo! Internet de qualidade 100% regional, homologada pela ANATEL.
             </p>
             <div className="flex space-x-4">
-              <a href="#" aria-label="Instagram" className="text-gray-400 hover:text-fiber-orange transition-colors focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded">
+              <a 
+                href="https://www.instagram.com/fibernettelecom_" 
+                target="_blank" 
+                rel="noreferrer" 
+                aria-label="Instagram" 
+                className="text-gray-400 hover:text-fiber-orange transition-colors focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded"
+              >
                 <Instagram size={20} />
-              </a>
-              <a href="#" aria-label="Facebook" className="text-gray-400 hover:text-fiber-orange transition-colors focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded">
-                <Facebook size={20} />
-              </a>
-              <a href="#" aria-label="LinkedIn" className="text-gray-400 hover:text-fiber-orange transition-colors focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded">
-                <Linkedin size={20} />
-              </a>
-              <a href="#" aria-label="Twitter" className="text-gray-400 hover:text-fiber-orange transition-colors focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded">
-                <Twitter size={20} />
               </a>
             </div>
           </div>
