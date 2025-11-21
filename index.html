@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- Primary Meta Tags -->
+    <title>Fiber.Net - A internet que você precisa!</title>
+    <meta name="title" content="Fiber.Net - A internet que você precisa!">
+    <meta name="description" content="Internet de qualidade com o melhor custo x benefício da região. Fiber.Net - 100% regional, homologada pela ANATEL. Planos a partir de R$ 79,90.">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://fibernettelecom.com/">
+    <meta property="og:title" content="Fiber.Net - A internet que você precisa!">
+    <meta property="og:description" content="Internet de qualidade com o melhor custo x benefício da região. Fiber.Net - 100% regional, homologada pela ANATEL.">
+    <meta property="og:image" content="https://fibernettelecom.com/assets/share-image.png">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://fibernettelecom.com/">
+    <meta property="twitter:title" content="Fiber.Net - A internet que você precisa!">
+    <meta property="twitter:description" content="Internet de qualidade com o melhor custo x benefício da região. Fiber.Net - 100% regional, homologada pela ANATEL.">
+    <meta property="twitter:image" content="https://fibernettelecom.com/assets/share-image.png">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Optimization: Preconnect & DNS-Prefetch -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Permanent+Marker&display=swap" rel="stylesheet">
+    
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              marker: ['"Permanent Marker"', 'cursive'],
+            },
+            colors: {
+              fiber: {
+                dark: '#111111', // Main background
+                card: '#1A1A1A', // Card background
+                orange: '#FF6B00', // Fiber.Net Orange
+                green: '#25D366', // WhatsApp Green
+                lime: '#32CD32', // Logo Green
+                blue: '#1E90FF', // Logo Blue
+              }
+            },
+            animation: {
+              'float': 'float 6s ease-in-out infinite',
+            },
+            keyframes: {
+              float: {
+                '0%, 100%': { transform: 'translateY(0)' },
+                '50%': { transform: 'translateY(-10px)' },
+              }
+            }
+          }
+        }
+      }
+    </script>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
+  }
+}
+</script>
+</head>
+  <body class="bg-fiber-dark text-white antialiased">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

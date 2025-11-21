@@ -1,0 +1,71 @@
+import { NavItem, Plan } from './types';
+
+export const NAV_ITEMS: NavItem[] = [
+  { label: 'Início', href: 'home' },
+  { label: 'Serviços', href: '#planos' },
+  { label: 'Sobre', href: '#sobre' },
+  { label: 'Central de Ajuda', href: 'help' }, // Changed to route identifier
+  { label: 'Ética', href: 'ethics' },
+];
+
+export const PLANS: Plan[] = [
+  {
+    id: 1,
+    speed: '300 MEGA',
+    price: '79',
+    cents: '90',
+    period: '/mês',
+    fullPrice: '89,90',
+    description: 'Ideal para famílias pequenas',
+    benefits: [
+      'Instalação Grátis',
+      'Wi-Fi 5 Dual Band',
+      'Acesso a Apps',
+      'Suporte Especializado'
+    ],
+    highlight: false
+  },
+  {
+    id: 2,
+    speed: '500 MEGA',
+    price: '99',
+    cents: '90',
+    period: '/mês',
+    fullPrice: '109,90',
+    description: 'Melhor Custo x Benefício',
+    benefits: [
+      'Instalação Grátis',
+      'Wi-Fi 5 Dual Band',
+      'Upload Turbo',
+      'Suporte Prioritário'
+    ],
+    highlight: true
+  },
+  {
+    id: 3,
+    speed: '600 MEGA',
+    price: '119',
+    cents: '90',
+    period: '/mês',
+    fullPrice: '129,90',
+    description: 'Plano Gamer',
+    benefits: [
+      'Instalação Grátis',
+      'Wi-Fi 6 Mesh',
+      'IP Público Dinâmico',
+      'Baixa Latência'
+    ],
+    highlight: false
+  }
+];
+
+export const CONTACT_INFO = {
+  phone: '(24) 2458-1861',
+  whatsapp: '(24) 2458-1861',
+  email: 'comercial@fibernettelecom.com',
+  address: 'RJ 145, KM 93 - Nº53320, Elizabeth, Rio das Flores - RJ'
+};
+
+export const HISTORY_TEXT = `A Fiber.Net foi fundada em Rio das Flores em 2017. Nessa época, o que levou ao seu surgimento foi a vontade dos donos de ter um acesso de qualidade à internet. Logo viram que as empresas não ligam muito para seus assinantes e surgiu a ideia de montar um provedor diferente, um provedor que além de prestar o serviço de ISP também fosse uma empresa amiga, que além de ver o lado financeiro da coisa vise o lado humano.
+
+Assim surgiu a Fiber.Net, fundada por um Valenciano e um Rio Florense que queriam fazer algo diferente em nossa cidade. Hoje atendemos um grande volume de residências na região com aceitação de 100% dos nossos clientes. Praticamente 90% dos nossos assinantes chegaram pela indicação - um serviço bem prestado se torna de sucesso por si só.`;

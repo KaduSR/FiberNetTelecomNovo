@@ -1,0 +1,170 @@
+
+import React, { useState } from 'react';
+import Navbar from './components/Navbar';
+import Hero from './components/Hero';
+import PlanCard from './components/PlanCard';
+import Features from './components/Features';
+import Footer from './components/Footer';
+import Ethics from './components/Ethics';
+import HelpCenter from './components/HelpCenter';
+import ClientGuide from './components/ClientGuide';
+import SupportModal from './components/SupportModal';
+import { PLANS, HISTORY_TEXT } from './constants';
+import { MessageCircle } from 'lucide-react';
+
+const App: React.FC = () => {
+  const [currentPage, setCurrentPage] = useState('home');
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+
+  const toggleSupportModal = () => setIsSupportModalOpen(!isSupportModalOpen);
+
+  return (
+    <div className="min-h-screen bg-fiber-dark font-sans text-gray-900 flex flex-col">
+      <Navbar 
+        onNavigate={setCurrentPage} 
+        currentPage={currentPage} 
+        onOpenSupport={() => setIsSupportModalOpen(true)}
+      />
+      
+      <main className="flex-grow">
+        {currentPage === 'home' && (
+          <>
+            {/* Hero Section */}
+            <div id="home">
+              <Hero />
+            </div>
+
+            {/* History Section */}
+            <section id="sobre" className="py-20 bg-fiber-card border-y border-white/5">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                 <div className="text-center mb-12">
+                    <h2 className="text-3xl font-bold text-white mb-2">Sobre a <span className="text-fiber-orange">Fiber.Net</span></h2>
+                    <div className="w-20 h-1 bg-fiber-orange mx-auto rounded-full"></div>
+                 </div>
+                 
+                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center bg-white/5 rounded-2xl p-8 md:p-12 border border-white/5">
+                    <div className="text-left order-2 lg:order-1">
+                        <p className="text-gray-300 leading-relaxed text-lg whitespace-pre-line">
+                          {HISTORY_TEXT}
+                        </p>
+                        <p className="mt-8 text-fiber-orange font-bold text-lg">
+                          FIBER.NET - Uma empresa Homologada pela ANATEL! É 100% regional. Conectando você ao mundo!
+                        </p>
+                    </div>
+                    <div className="relative h-full min-h-[300px] order-1 lg:order-2 group">
+                        <div className="absolute inset-0 bg-blue-500/10 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <img 
+                            src="https://images.unsplash.com/photo-1529234774845-b90fd07f1d23?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+                            alt="Sede Fiber.Net"
+                            className="relative w-full h-full object-cover rounded-xl shadow-2xl border border-white/10"
+                            loading="lazy"
+                            width="1000" // Original width from URL
+                            height="667" // Original height from URL (aspect ratio 1.5)
+                        />
+                    </div>
+                 </div>
+              </div>
+            </section>
+
+            {/* Features / Values Section */}
+            <Features />
+
+            {/* Why Choose Us Section */}
+            <section className="py-16 bg-fiber-dark">
+                <div className="max-w-7xl mx-auto px-4 text-center">
+                    <h2 className="text-3xl font-bold text-white">Por que escolher a <span className="text-fiber-orange">Fiber.Net?</span></h2>
+                    <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8">
+                        <div className="p-6 border border-white/10 rounded-xl hover:border-fiber-orange/50 transition-colors">
+                            <div className="w-12 h-12 bg-fiber-orange/10 text-fiber-orange rounded-lg flex items-center justify-center mx-auto mb-4">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M1.42 9a16 16 0 0 1 21.16 0"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
+                            </div>
+                            <h3 className="text-white font-bold mb-2">Internet Ilimitada</h3>
+                            <p className="text-gray-400 text-sm">Sem limite de dados, use à vontade!</p>
+                        </div>
+                        <div className="p-6 border border-white/10 rounded-xl hover:border-fiber-orange/50 transition-colors">
+                            <div className="w-12 h-12 bg-fiber-orange/10 text-fiber-orange rounded-lg flex items-center justify-center mx-auto mb-4">
+                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                            </div>
+                            <h3 className="text-white font-bold mb-2">Suporte Especializado</h3>
+                            <p className="text-gray-400 text-sm">Suporte técnico gratuito e especializado</p>
+                        </div>
+                        <div className="p-6 border border-white/10 rounded-xl hover:border-fiber-orange/50 transition-colors">
+                             <div className="w-12 h-12 bg-fiber-orange/10 text-fiber-orange rounded-lg flex items-center justify-center mx-auto mb-4">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                            </div>
+                            <h3 className="text-white font-bold mb-2">Empresa Local</h3>
+                            <p className="text-gray-400 text-sm">100% regional, perto de você</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* CTA Strip */}
+            <section className="bg-fiber-orange py-16">
+               <div className="max-w-4xl mx-auto px-4 text-center">
+                  <h3 className="text-3xl font-bold text-white mb-4">Pronto para ter a melhor internet da região?</h3>
+                  <p className="text-white/90 text-lg mb-8">Entre em contato conosco e descubra nossos planos</p>
+                  <button 
+                    onClick={() => setIsSupportModalOpen(true)}
+                    className="inline-block bg-fiber-card text-fiber-orange font-bold py-4 px-8 rounded-lg shadow-lg hover:bg-neutral-900 transition-colors cursor-pointer"
+                  >
+                     Fale Conosco Agora
+                  </button>
+               </div>
+            </section>
+
+            {/* Plans Section */}
+            <section id="planos" className="py-24 bg-fiber-dark">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="text-center max-w-3xl mx-auto mb-16">
+                  <h2 className="text-3xl font-bold text-white sm:text-4xl mb-4">
+                    Nossos Planos
+                  </h2>
+                  <p className="text-gray-400 text-lg">
+                    Escolha a velocidade ideal para sua necessidade
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+                  {PLANS.map((plan) => (
+                    <PlanCard key={plan.id} plan={plan} />
+                  ))}
+                </div>
+              </div>
+            </section>
+          </>
+        )}
+        
+        {currentPage === 'ethics' && <Ethics />}
+        
+        {currentPage === 'help' && <HelpCenter />}
+
+        {currentPage === 'client-guide' && <ClientGuide />}
+
+      </main>
+
+      <Footer 
+        onNavigate={setCurrentPage}
+        currentPage={currentPage}
+        onOpenSupport={() => setIsSupportModalOpen(true)}
+      />
+      
+      <SupportModal 
+        isOpen={isSupportModalOpen} 
+        onClose={() => setIsSupportModalOpen(false)} 
+      />
+
+      {/* Floating WhatsApp Button */}
+      <a 
+        href="https://wa.me/552424581861" 
+        target="_blank"
+        rel="noreferrer"
+        className="fixed bottom-6 right-6 z-50 bg-fiber-green text-white p-4 rounded-full shadow-2xl hover:scale-110 transition-transform animate-bounce"
+      >
+        <MessageCircle size={32} fill="white" />
+      </a>
+    </div>
+  );
+};
+
+export default App;
