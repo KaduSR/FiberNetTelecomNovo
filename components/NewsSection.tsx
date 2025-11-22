@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { Calendar, Tag, ExternalLink, Gamepad2, Cpu, ShieldAlert, Tv, Loader2, Newspaper, RefreshCw, Server, Search, X } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Calendar, ExternalLink, Loader2, Newspaper, RefreshCw, Search, X } from 'lucide-react';
 import Button from './Button';
 
 // Interface for our internal news structure
@@ -12,7 +12,6 @@ interface NewsArticle {
   date: string;
   timestamp: number; // For sorting
   imageUrl: string;
-  category: 'Tecnologia' | 'Games' | 'Streaming' | 'Segurança' | 'Telecom/Infra';
   source: string;
 }
 
@@ -31,63 +30,87 @@ const RSS_SOURCES = [
     { url: 'https://adrenaline.com.br/rss', name: 'Adrenaline' }
 ];
 
+const CACHE_KEY = 'fiber_news_cache';
+const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
+
 const NewsSection: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [news, setNews] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [usingFallback, setUsingFallback] = useState(false);
+  
+  // Ref para cancelar requisições anteriores se o componente desmontar ou atualizar rápido
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const determineCategory = (title: string, description: string): NewsArticle['category'] => {
-    const text = (title + ' ' + description).toLowerCase();
-    
-    // Prioridade: Telecom, Infraestrutura, Falhas Globais, IPTV e Anatel
-    if (text.includes('anatel') || text.includes('5g') || text.includes('fibra') || text.includes('internet') || 
-        text.includes('cloudflare') || text.includes('servidor') || text.includes('caiu') || text.includes('instabilidade') || 
-        text.includes('offline') || text.includes('falha global') || text.includes('bloqueio') || text.includes('iptv') ||
-        text.includes('gato net') || text.includes('pirata') || text.includes('tv box') || text.includes('elon musk') || text.includes('starlink')) {
-      return 'Telecom/Infra';
+  const fetchNews = async (forceRefresh = false) => {
+    // Cancela requisições pendentes
+    if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
     }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
-    if (text.includes('golpe') || text.includes('vírus') || text.includes('hacker') || text.includes('segurança') || 
-        text.includes('vazamento') || text.includes('senha') || text.includes('fraude') || text.includes('phishing') || 
-        text.includes('malware') || text.includes('ciber') || text.includes('ataque')) {
-      return 'Segurança';
-    }
-
-    if (text.includes('jogo') || text.includes('game') || text.includes('ps5') || text.includes('xbox') || 
-        text.includes('nintendo') || text.includes('steam') || text.includes('gta') || text.includes('console') || 
-        text.includes('epic') || text.includes('fortnite') || text.includes('roblox')) {
-      return 'Games';
-    }
-
-    if (text.includes('netflix') || text.includes('disney') || text.includes('prime') || text.includes('hbo') || 
-        text.includes('streaming') || text.includes('série') || text.includes('filme') || text.includes('cinema') || 
-        text.includes('trailer') || text.includes('estreia') || text.includes('max')) {
-      return 'Streaming';
-    }
-
-    return 'Tecnologia';
-  };
-
-  const fetchNews = async () => {
     setLoading(true);
+
+    // 1. Check Cache
+    if (!forceRefresh) {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+            try {
+                const { data, timestamp } = JSON.parse(cached);
+                if (Date.now() - timestamp < CACHE_DURATION) {
+                    setNews(data);
+                    setUsingFallback(false);
+                    setLoading(false);
+                    return;
+                }
+            } catch (e) {
+                console.warn('Cache parsing error', e);
+                localStorage.removeItem(CACHE_KEY);
+            }
+        }
+    }
+
     try {
-        // Fetch all feeds in parallel
+        // 2. Fetch all feeds in parallel using allSettled (Resiliency)
         const promises = RSS_SOURCES.map(source => 
-            fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(source.url)}`)
-            .then(res => res.json())
-            .then(data => ({ ...data, sourceName: source.name }))
-            .catch(err => ({ status: 'error', sourceName: source.name }))
+            fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(source.url)}`, {
+                signal: controller.signal
+            })
+            .then(res => {
+                if (!res.ok) throw new Error('Network response was not ok');
+                return res.json();
+            })
+            .then(data => ({ status: 'ok' as const, items: data.items || [], sourceName: source.name }))
+            .catch(err => {
+                if (err.name === 'AbortError') throw err; // Propagar cancelamento
+                return { status: 'error' as const, sourceName: source.name, error: err };
+            })
         );
 
-        const results = await Promise.all(promises);
-        let allArticles: NewsArticle[] = [];
+        const results = await Promise.allSettled(promises);
+        
+        // Verifica se foi abortado durante o await
+        if (controller.signal.aborted) return;
 
-        results.forEach((data: any) => {
-            if (data.status === 'ok' && Array.isArray(data.items)) {
-                const sourceArticles = data.items.map((item: any, index: number) => {
-                    // Filtro de Bloqueio (Cupons, Ads)
-                    const lowerTitle = item.title.toLowerCase();
+        let allArticles: NewsArticle[] = [];
+        let successCount = 0;
+        const processedLinks = new Set<string>(); // Otimização de deduplicação O(1)
+
+        results.forEach((result) => {
+            if (result.status === 'fulfilled' && result.value.status === 'ok') {
+                successCount++;
+                const data = result.value;
+                
+                // OTIMIZAÇÃO CRÍTICA: Processar apenas os 10 primeiros itens de cada feed.
+                // Isso evita rodar Regex pesado em 50+ itens antigos que nem serão exibidos.
+                const recentItems = data.items.slice(0, 10);
+
+                const sourceArticles = recentItems.map((item: any, index: number) => {
+                    // Fail-fast: Deduplicação e Bloqueio
+                    if (processedLinks.has(item.link)) return null;
+                    
+                    const lowerTitle = (item.title || '').toLowerCase();
                     if (BLOCKED_TERMS.some(term => lowerTitle.includes(term))) {
                         return null;
                     }
@@ -95,98 +118,92 @@ const NewsSection: React.FC = () => {
                     // Image Extraction Logic
                     let img = 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=900&auto=format&fit=crop';
                     
-                    if (item.enclosure && item.enclosure.link) {
+                    if (item.enclosure?.link) {
                         img = item.enclosure.link;
                     } else if (item.thumbnail) {
                         img = item.thumbnail;
                     } else {
-                        // Try to find img inside description content
-                        const imgMatch = item.description.match(/src="([^"]+)"/);
-                        if (imgMatch && imgMatch[1]) {
-                            img = imgMatch[1];
-                        }
+                        const imgMatch = item.description?.match(/src="([^"]+)"/);
+                        if (imgMatch?.[1]) img = imgMatch[1];
                     }
 
-                    // Text Cleanup
-                    const tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = item.description;
-                    const plainTextDesc = tempDiv.textContent || tempDiv.innerText || '';
-                    const cleanExcerpt = plainTextDesc.substring(0, 110) + '...';
+                    // Optimization: Regex Strip HTML
+                    const plainTextDesc = (item.description || '').replace(/<[^>]+>/g, '');
+                    const cleanExcerpt = plainTextDesc.substring(0, 110) + (plainTextDesc.length > 110 ? '...' : '');
 
-                    const pubDate = new Date(item.pubDate);
+                    const pubDate = new Date(item.pubDate.replace(/-/g, '/')); 
 
-                    return {
-                        id: `${data.sourceName}-${index}-${Math.random()}`,
+                    const article: NewsArticle = {
+                        id: `${data.sourceName}-${index}-${Math.random().toString(36).substr(2, 9)}`,
                         title: item.title,
                         excerpt: cleanExcerpt,
                         link: item.link,
-                        date: pubDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
-                        timestamp: pubDate.getTime(),
+                        date: isNaN(pubDate.getTime()) ? 'Recente' : pubDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+                        timestamp: isNaN(pubDate.getTime()) ? Date.now() : pubDate.getTime(),
                         imageUrl: img,
-                        category: determineCategory(item.title, plainTextDesc),
                         source: data.sourceName
                     };
-                }).filter((article: any) => article !== null); // Remove blocked items
+
+                    processedLinks.add(item.link);
+                    return article;
+                }).filter((article: any): article is NewsArticle => article !== null);
 
                 allArticles = [...allArticles, ...sourceArticles];
             }
         });
 
-        // Sort by newest first
+        if (successCount === 0 && allArticles.length === 0) {
+            throw new Error('All feeds failed');
+        }
+
+        // 3. Sort by newest first
         allArticles.sort((a, b) => b.timestamp - a.timestamp);
 
-        // Remove duplicates (by title similarity check optional, here just taking unique links)
-        const uniqueArticles = Array.from(new Map(allArticles.map(item => [item.link, item])).values());
-
-        if (uniqueArticles.length > 0) {
-            setNews(uniqueArticles.slice(0, 12)); // Show top 12
+        if (allArticles.length > 0) {
+            const finalNews = allArticles.slice(0, 12);
+            setNews(finalNews);
             setUsingFallback(false);
+            
+            // 5. Save to Cache
+            localStorage.setItem(CACHE_KEY, JSON.stringify({
+                data: finalNews,
+                timestamp: Date.now()
+            }));
         } else {
             throw new Error('No articles found after filtering');
         }
 
-    } catch (error) {
-      console.warn('Failed to fetch RSS feeds, using fallback data.', error);
-      setNews(FALLBACK_NEWS);
-      setUsingFallback(true);
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+          console.warn('Failed to fetch RSS feeds, using fallback data.', error);
+          setNews(FALLBACK_NEWS);
+          setUsingFallback(true);
+      }
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) {
+          setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
     fetchNews();
+    return () => {
+        // Cleanup no unmount
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+    };
   }, []);
 
   // Filter Logic (Search Query Only)
   const filteredNews = news.filter(item => {
+    if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
-    const matchesSearch = item.title.toLowerCase().includes(query) || 
-                          item.excerpt.toLowerCase().includes(query) ||
-                          item.category.toLowerCase().includes(query);
-
-    return matchesSearch;
+    return item.title.toLowerCase().includes(query) || 
+           item.excerpt.toLowerCase().includes(query) ||
+           item.source.toLowerCase().includes(query);
   });
-
-  const getCategoryIcon = (cat: string) => {
-    switch(cat) {
-      case 'Games': return <Gamepad2 size={14} />;
-      case 'Tecnologia': return <Cpu size={14} />;
-      case 'Segurança': return <ShieldAlert size={14} />;
-      case 'Streaming': return <Tv size={14} />;
-      case 'Telecom/Infra': return <Server size={14} />;
-      default: return <Tag size={14} />;
-    }
-  };
-
-  const getCategoryColor = (cat: string) => {
-      switch(cat) {
-          case 'Telecom/Infra': return 'bg-blue-600 text-white border-blue-400';
-          case 'Segurança': return 'bg-red-600 text-white border-red-400';
-          case 'Games': return 'bg-purple-600 text-white border-purple-400';
-          default: return 'bg-black/70 text-white border-white/10';
-      }
-  }
 
   return (
     <div className="bg-fiber-dark min-h-screen pt-24">
@@ -238,7 +255,7 @@ const NewsSection: React.FC = () => {
             {/* Refresh */}
             <div className="flex items-center justify-center lg:justify-end">
                 <button 
-                    onClick={fetchNews} 
+                    onClick={() => fetchNews(true)} 
                     disabled={loading}
                     className="flex items-center gap-2 px-6 py-3 rounded-full bg-neutral-800 hover:bg-neutral-700 text-white transition-colors disabled:opacity-50 border border-white/5 focus:outline-none focus:ring-2 focus:ring-fiber-orange"
                     title="Atualizar Notícias"
@@ -253,7 +270,7 @@ const NewsSection: React.FC = () => {
         {loading ? (
              <div className="flex flex-col items-center justify-center py-32">
                  <Loader2 size={48} className="text-fiber-orange animate-spin mb-4" />
-                 <p className="text-gray-400 animate-pulse">Buscando as últimas novidades no G1, TecMundo e Olhar Digital...</p>
+                 <p className="text-gray-400 animate-pulse">Buscando as últimas novidades...</p>
              </div>
         ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-fadeIn">
@@ -264,12 +281,6 @@ const NewsSection: React.FC = () => {
                 >
                 {/* Image */}
                 <div className="relative h-48 overflow-hidden bg-neutral-900">
-                    <div className="absolute top-3 left-3 z-10">
-                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-md backdrop-blur-md text-xs font-bold uppercase tracking-wider border border-white/10 shadow-lg ${getCategoryColor(item.category)}`}>
-                        {getCategoryIcon(item.category)}
-                        {item.category}
-                    </span>
-                    </div>
                     <img 
                     src={item.imageUrl} 
                     alt={item.title} 
@@ -339,7 +350,7 @@ const NewsSection: React.FC = () => {
                Agregador de Conteúdo Inteligente
            </h3>
            <p className="text-sm text-gray-500 max-w-2xl mx-auto">
-             As notícias exibidas são coletadas automaticamente de fontes públicas (G1, TecMundo, Olhar Digital, Adrenaline) e filtradas por inteligência artificial para focar em Telecom, Segurança e Tecnologia. Conteúdos de terceiros são de responsabilidade de seus autores.
+             As notícias exibidas são coletadas automaticamente de fontes públicas (G1, TecMundo, Olhar Digital, Adrenaline) para manter você informado. Conteúdos de terceiros são de responsabilidade de seus autores.
            </p>
         </div>
 
@@ -352,7 +363,6 @@ const NewsSection: React.FC = () => {
 const FALLBACK_NEWS: NewsArticle[] = [
   {
     id: 1,
-    category: 'Telecom/Infra',
     title: 'Anatel anuncia novas medidas contra "GatoNet" e TV Box pirata',
     excerpt: 'Agência reguladora intensifica bloqueio de IPs servidores utilizados por aparelhos não homologados no Brasil.',
     date: 'Hoje, 10:00',
@@ -363,7 +373,6 @@ const FALLBACK_NEWS: NewsArticle[] = [
   },
   {
     id: 2,
-    category: 'Segurança',
     title: 'Cloudflare corrige falha que causou instabilidade global em sites',
     excerpt: 'Diversas plataformas como Discord e serviços de banco ficaram fora do ar nesta manhã devido a erro de roteamento.',
     date: 'Ontem, 14:30',
@@ -374,7 +383,6 @@ const FALLBACK_NEWS: NewsArticle[] = [
   },
   {
     id: 3,
-    category: 'Games',
     title: 'Servidores da PSN apresentam lentidão; Sony investiga',
     excerpt: 'Jogadores relatam dificuldades para baixar jogos e acessar partidas online no PlayStation 5 e 4.',
     date: '2 dias atrás',

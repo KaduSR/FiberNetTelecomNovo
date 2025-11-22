@@ -26,6 +26,13 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, onOpenSupport 
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     e.preventDefault();
     
+    // Handle external links
+    if (href.startsWith('http')) {
+        window.open(href, '_blank');
+        setIsOpen(false);
+        return;
+    }
+    
     if (href.startsWith('#')) {
       if (currentPage !== 'home') {
         onNavigate('home');
@@ -45,7 +52,7 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, onOpenSupport 
   };
 
   const isLinkActive = (href: string) => {
-    if (href.startsWith('#')) return false; 
+    if (href.startsWith('#') || href.startsWith('http')) return false; 
     return currentPage === href;
   };
 

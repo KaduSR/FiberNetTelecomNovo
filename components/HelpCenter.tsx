@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Search, FileText, Gauge, Lock, MessageCircle, ChevronDown, ChevronUp, Globe, ChevronRight, ShieldCheck, Tv, Smartphone, Gamepad2, Activity } from 'lucide-react'; 
+import { Search, Gauge, MessageCircle, ChevronDown, ChevronUp, Globe, ChevronRight, Tv, Activity } from 'lucide-react'; 
 import Button from './Button';
 import { CONTACT_INFO } from '../constants';
 import FiberNetTextLogo from './FiberNetTextLogo';
@@ -138,21 +138,22 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ onNavigate }) => {
           <button 
             className="bg-neutral-900 p-4 rounded-xl border border-white/5 hover:border-fiber-orange/50 transition-all cursor-pointer group flex flex-col items-center text-center focus:outline-none focus:ring-2 focus:ring-fiber-orange"
             aria-label="Realizar teste de velocidade"
-            onClick={() => onNavigate ? onNavigate('speedtest') : null}
+            onClick={() => window.open('https://www.speedtest.net/', '_blank')}
           >
             <Gauge size={24} className="text-fiber-orange mb-2 group-hover:scale-110 transition-transform" aria-hidden="true" />
             <h3 className="text-white font-bold text-sm">Teste de Velocidade</h3>
           </button>
 
-          {/* Status dos Serviços (NEW) */}
+          {/* Status dos Serviços */}
           <button 
-            onClick={() => onNavigate ? onNavigate('status') : null}
             className="bg-neutral-900 p-4 rounded-xl border border-white/5 hover:border-fiber-orange/50 transition-all cursor-pointer group flex flex-col items-center text-center focus:outline-none focus:ring-2 focus:ring-fiber-orange"
+            aria-label="Verificar status dos serviços"
+            onClick={() => onNavigate?.('status')}
           >
-            <Activity size={24} className="text-fiber-blue mb-2 group-hover:scale-110 transition-transform" aria-hidden="true" />
-            <h3 className="text-white font-bold text-sm">Status dos Serviços</h3>
+            <Activity size={24} className="text-fiber-orange mb-2 group-hover:scale-110 transition-transform" aria-hidden="true" />
+            <h3 className="text-white font-bold text-sm">Status Serviços</h3>
           </button>
-          
+
            {/* Streaming & Apps */}
            <button 
             onClick={() => setActiveCategory("Streaming e Apps (IPTV)")}
