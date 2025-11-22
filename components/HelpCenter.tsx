@@ -1,8 +1,7 @@
 
 import React, { useState } from 'react';
-import { Search, FileText, Gauge, Lock, MessageCircle, ChevronDown, ChevronUp, Globe, ChevronRight, ShieldCheck, Tv, Smartphone, Gamepad2 } from 'lucide-react'; 
+import { Search, FileText, Gauge, Lock, MessageCircle, ChevronDown, ChevronUp, Globe, ChevronRight, ShieldCheck, Tv, Smartphone, Gamepad2, Activity } from 'lucide-react'; 
 import Button from './Button';
-import ServiceStatus from './ServiceStatus';
 import { CONTACT_INFO } from '../constants';
 import FiberNetTextLogo from './FiberNetTextLogo';
 
@@ -132,7 +131,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ onNavigate }) => {
       </div>
 
       {/* Quick Actions (Autoatendimento) */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 border-b border-white/5 justify-center">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 justify-center">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
           
           {/* Teste de Velocidade */}
@@ -145,13 +144,13 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ onNavigate }) => {
             <h3 className="text-white font-bold text-sm">Teste de Velocidade</h3>
           </button>
 
-          {/* Dicas de Segurança */}
+          {/* Status dos Serviços (NEW) */}
           <button 
-            onClick={() => setActiveCategory("Segurança Digital")}
+            onClick={() => onNavigate ? onNavigate('status') : null}
             className="bg-neutral-900 p-4 rounded-xl border border-white/5 hover:border-fiber-orange/50 transition-all cursor-pointer group flex flex-col items-center text-center focus:outline-none focus:ring-2 focus:ring-fiber-orange"
           >
-            <ShieldCheck size={24} className="text-fiber-blue mb-2 group-hover:scale-110 transition-transform" aria-hidden="true" />
-            <h3 className="text-white font-bold text-sm">Dicas de Segurança</h3>
+            <Activity size={24} className="text-fiber-blue mb-2 group-hover:scale-110 transition-transform" aria-hidden="true" />
+            <h3 className="text-white font-bold text-sm">Status dos Serviços</h3>
           </button>
           
            {/* Streaming & Apps */}
@@ -175,11 +174,8 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* Service Status Monitor */}
-      <ServiceStatus />
-
       {/* Layout FAQ - Sidebar + Content */}
-      <div className="bg-black py-16">
+      <div className="bg-black py-16 border-t border-white/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col lg:flex-row gap-8">
             
@@ -304,4 +300,3 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ onNavigate }) => {
 };
 
 export default HelpCenter;
-    

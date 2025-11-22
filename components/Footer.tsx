@@ -78,6 +78,7 @@ const Footer: React.FC<FooterProps> = ({ onNavigate, currentPage, onOpenSupport 
               <li><a href="#planos" onClick={(e) => handleNav(e, '#planos')} className="hover:text-fiber-orange transition-colors focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded px-1">Serviços</a></li>
               <li><a href="help" onClick={(e) => handleNav(e, 'help')} className="hover:text-fiber-orange transition-colors focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded px-1">Central de Ajuda</a></li>
               <li><a href="client-guide" onClick={(e) => handleNav(e, 'client-guide')} className="hover:text-fiber-orange transition-colors focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded px-1">Guia do Cliente</a></li>
+              <li><a href="status" onClick={(e) => handleNav(e, 'status')} className="hover:text-fiber-orange transition-colors focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded px-1">Status dos Serviços</a></li>
             </ul>
           </div>
 

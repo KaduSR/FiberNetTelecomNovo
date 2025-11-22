@@ -12,6 +12,7 @@ import SupportModal from './components/SupportModal';
 import SpeedTestSection from './components/SpeedTestSection';
 import ClientArea from './components/ClientArea';
 import NewsSection from './components/NewsSection'; // Import News Component
+import ServiceStatus from './components/ServiceStatus'; // Import new full page component
 import { PLANS, HISTORY_TEXT } from './constants';
 import { MessageCircle } from 'lucide-react';
 
@@ -154,6 +155,8 @@ const App: React.FC = () => {
         {currentPage === 'news' && <NewsSection />}
         
         {currentPage === 'speedtest' && <SpeedTestSection />}
+        
+        {currentPage === 'status' && <ServiceStatus onNavigate={handleNavigate} />}
 
       </main>
 
