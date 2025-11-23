@@ -109,11 +109,16 @@ const ClientArea: React.FC = () => {
     // Load saved Login on mount
     useEffect(() => {
         const savedLogin = localStorage.getItem('fiber_client_login');
+        const savedPassword = localStorage.getItem('fiber_client_password');
         const savedToken = localStorage.getItem('fiber_auth_token');
         
         if (savedLogin) {
             setLogin(savedLogin);
+            // Se houver login salvo, marcamos o checkbox e preenchemos a senha se existir
             setRememberMe(true);
+            if (savedPassword) {
+                setPassword(savedPassword);
+            }
         }
 
         if (savedToken) {
@@ -325,8 +330,13 @@ const ClientArea: React.FC = () => {
         if (login === 'teste' && password === '123') {
             setTimeout(() => {
                 localStorage.setItem('fiber_auth_token', 'demo-token');
-                if (rememberMe) localStorage.setItem('fiber_client_login', login);
-                else localStorage.removeItem('fiber_client_login');
+                if (rememberMe) {
+                    localStorage.setItem('fiber_client_login', login);
+                    localStorage.setItem('fiber_client_password', password);
+                } else {
+                    localStorage.removeItem('fiber_client_login');
+                    localStorage.removeItem('fiber_client_password');
+                }
                 loadDemoData();
                 setLoading(false);
             }, 1000);
@@ -372,8 +382,10 @@ const ClientArea: React.FC = () => {
                 
                 if (rememberMe) {
                     localStorage.setItem('fiber_client_login', login);
+                    localStorage.setItem('fiber_client_password', password);
                 } else {
                     localStorage.removeItem('fiber_client_login');
+                    localStorage.removeItem('fiber_client_password');
                 }
                 
                 await fetchDashboardData(data.token); 
@@ -391,7 +403,10 @@ const ClientArea: React.FC = () => {
                 
                 setTimeout(() => {
                     localStorage.setItem('fiber_auth_token', 'demo-token');
-                    if (rememberMe) localStorage.setItem('fiber_client_login', login);
+                    if (rememberMe) {
+                        localStorage.setItem('fiber_client_login', login);
+                        localStorage.setItem('fiber_client_password', password);
+                    }
                     loadDemoData();
                     setError(null);
                     setLoading(false);
@@ -418,14 +433,16 @@ const ClientArea: React.FC = () => {
         setFiscalNotes([]);
         setClientName('');
         setError(null);
-        setPassword('');
         setIsDemoMode(false);
         setUnlockedSuccess(false);
         setIsChatOpen(false);
         localStorage.removeItem('fiber_auth_token');
+        
         if (!rememberMe || clearLogin) {
             setLogin('');
+            setPassword('');
             localStorage.removeItem('fiber_client_login');
+            localStorage.removeItem('fiber_client_password');
         }
     };
 
@@ -657,7 +674,7 @@ const ClientArea: React.FC = () => {
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center">
                                         <input id="remember-me" type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="h-4 w-4 accent-fiber-orange rounded bg-neutral-800" />
-                                        <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-400">Lembrar e-mail</label>
+                                        <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-400">Lembrar meus dados</label>
                                     </div>
                                     <a href="https://wa.me/552424581861" target="_blank" className="text-sm text-fiber-orange hover:underline">Esqueceu a senha?</a>
                                 </div>
