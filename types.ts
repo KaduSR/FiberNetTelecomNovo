@@ -36,7 +36,7 @@ export interface Invoice {
   id: string | number;
   vencimento: string;
   valor: string | number;
-  status: 'aberto' | 'vencido' | 'pago';
+  status: 'aberto' | 'vencido' | 'pago' | 'cancelado';
   linha_digitavel?: string; // Barcode line
   pix_code?: string; // Pix copy paste
   link_pdf?: string;
