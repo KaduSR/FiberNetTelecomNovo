@@ -4,10 +4,22 @@ import {
   QrCode, X, LogOut, Shield, Eye, EyeOff, Mail, AlertTriangle, Wifi, Activity, 
   Router, Unlock, Clock, ChevronRight, MapPin, RefreshCw, BarChart3, Calendar, 
   Printer, Phone, FileCheck, ScrollText, FileCode, MessageSquare, Send, Bot, 
-  MoreHorizontal, Settings, KeyRound, Home, ArrowUp, ArrowDown, Signal
+  MoreHorizontal, Settings, KeyRound, Home, ArrowUp, ArrowDown
 } from 'lucide-react';
 import Button from './Button';
 import { Invoice } from '../types';
+
+// === HELPER PARA EVITAR ERRO REACT #31 (OBJECTS AS CHILDREN) ===
+const safeString = (value: any, fallback = ''): string => {
+    if (value === null || value === undefined) return fallback;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number') return String(value);
+    if (typeof value === 'object') {
+        // Tenta extrair propriedades comuns se for um objeto acidental
+        return value.label || value.nome || value.name || value.text || JSON.stringify(value);
+    }
+    return fallback;
+};
 
 // === TYPES ===
 interface ConnectionData {
@@ -131,10 +143,9 @@ const ClientArea: React.FC = () => {
         }
     }, []);
 
-    // === AUTO SCROLL CHAT ===
+    // === AUTO SCROLL CHAT (CORRIGIDO: block: nearest) ===
     useEffect(() => {
         if (activeTab === 'chat') {
-            // block: 'nearest' evita que a página inteira pule, rolando apenas o container do chat
             chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
         }
     }, [messages, isBotTyping, activeTab]);
@@ -147,7 +158,7 @@ const ClientArea: React.FC = () => {
                 setMessages([{
                     id: 1,
                     sender: 'bot',
-                    text: `Olá, ${clientName.split(' ')[0]}! Sou o assistente virtual da Fiber.Net. Como posso te ajudar hoje?`,
+                    text: `Olá, ${safeString(clientName.split(' ')[0])}! Sou o assistente virtual da Fiber.Net. Como posso te ajudar hoje?`,
                     options: [
                         { label: '2ª Via de Fatura', action: 'fatura' },
                         { label: 'Estou sem internet', action: 'suporte' },
@@ -250,7 +261,7 @@ const ClientArea: React.FC = () => {
         return data;
     };
 
-    // === FETCH DATA FROM API ===
+    // === FETCH DATA FROM API (COM PROTEÇÃO CONTRA OBJETOS) ===
     const fetchDashboardData = async (token: string) => {
         setLoading(true);
         setError(null);
@@ -264,84 +275,98 @@ const ClientArea: React.FC = () => {
                 },
             });
 
-            if (!response.ok) throw new Error('Sessão expirada');
+            // Se der erro de autorização (401/403), lança erro específico
+            if (response.status === 401 || response.status === 403) {
+                throw new Error('Sessão expirada');
+            }
+
+            if (!response.ok) throw new Error('Erro ao carregar dados');
 
             const raw = await response.json();
-            console.log('%cAPI RESPONSE COMPLETA:', 'background: #000; color: #0f0; font-size: 16px;', raw);
+            console.log('API Raw Data:', raw);
 
-            // A SUA API HOJE RETORNA DESSA FORMA → raw.data.dados
+            // Normalização dos dados
             const dados = raw?.data?.dados || raw?.dados || raw?.data || raw;
 
             if (!dados) throw new Error('Dados não encontrados');
 
             // === NOME DO CLIENTE ===
-            const nomeCliente = dados.cliente?.nome || dados.nome || dados.cliente_nome || 'Carlos';
+            const nomeCliente = safeString(dados.cliente?.nome || dados.nome || dados.cliente_nome, 'Cliente');
             setClientName(nomeCliente.split(' ')[0]);
 
             // === FATURAS ===
             const faturas = dados.faturas || dados.boletos || [];
             setInvoices(faturas.map((f: any) => ({
                 id: f.id || f.codigo || Date.now(),
-                vencimento: f.vencimento || f.data_vencimento || '--',
-                valor: f.valor ? `R$ ${String(f.valor).replace('.', ',')}` : 'R$ 0,00',
-                status: f.status?.toLowerCase().includes('vencid') ? 'vencido' : 'aberto',
-                descricao: f.descricao || f.referencia || 'Mensalidade Fibra',
-                linha_digitavel: f.linha_digitavel || '',
-                pix_code: f.pix_codigo || f.codigo_pix || f.linha_digitavel || '',
-                link_pdf: f.link_boleto || f.boleto_pdf || '',
+                vencimento: safeString(f.vencimento || f.data_vencimento, '--'),
+                valor: f.valor ? `R$ ${safeString(String(f.valor)).replace('.', ',')}` : 'R$ 0,00',
+                status: safeString(f.status).toLowerCase().includes('vencid') ? 'vencido' : 'aberto',
+                descricao: safeString(f.descricao || f.referencia, 'Mensalidade Fibra'),
+                linha_digitavel: safeString(f.linha_digitavel),
+                pix_code: safeString(f.pix_codigo || f.codigo_pix || f.linha_digitavel),
+                link_pdf: safeString(f.link_boleto || f.boleto_pdf),
             })));
 
             // === CONEXÃO ===
             const conexao = dados.conexao || dados.conexão || dados.status_conexao || {};
             setConnection({
-                status: conexao.online === true || conexao.status === 'online' || conexao.situacao === 'Ativo' ? 'online' : 'offline',
-                ip: conexao.ip || conexao.ip_publico || 'Não disponível',
-                uptime: conexao.uptime || '0h 0min',
-                download_usage: conexao.download_mes || conexao.download || '0 GB',
-                upload_usage: conexao.upload_mes || conexao.upload || '0 GB',
-                mac: conexao.mac || 'Não informado',
-                last_auth: conexao.ultima_autenticacao || 'Nunca',
+                status: (conexao.online === true || safeString(conexao.status) === 'online' || safeString(conexao.situacao) === 'Ativo') ? 'online' : 'offline',
+                ip: safeString(conexao.ip || conexao.ip_publico, 'Não disponível'),
+                uptime: safeString(conexao.uptime, '0h 0min'),
+                download_usage: safeString(conexao.download_mes || conexao.download, '0 GB'),
+                upload_usage: safeString(conexao.upload_mes || conexao.upload, '0 GB'),
+                mac: safeString(conexao.mac, 'Não informado'),
+                last_auth: safeString(conexao.ultima_autenticacao, 'Nunca'),
             });
 
             // === CONTRATO ===
             const contrato = dados.contrato || dados.contrato_dados || {};
             setContract({
                 id: contrato.id || contrato.contrato_id || 0,
-                plan_name: contrato.plano || contrato.plano_nome || 'FIBER 500MB',
-                speed_label: contrato.velocidade || '500 Mbps',
-                address: contrato.endereco || contrato.endereco_instalacao || 'Endereço não informado',
-                installation_date: contrato.data_instalacao || contrato.data_ativacao || '01/01/2023',
-                status: contrato.status || 'Ativo',
+                plan_name: safeString(contrato.plano || contrato.plano_nome, 'FIBER 500MB'),
+                speed_label: safeString(contrato.velocidade, '500 Mbps'),
+                address: safeString(contrato.endereco || contrato.endereco_instalacao, 'Endereço não informado'),
+                installation_date: safeString(contrato.data_instalacao || contrato.data_ativacao, '01/01/2023'),
+                status: safeString(contrato.status, 'Ativo'),
             });
 
             // === PROTOCOLOS ===
             setProtocols((dados.protocolos || dados.chamados || []).map((p: any) => ({
-                id: p.protocolo || p.id || '0000',
-                type: p.tipo || 'Suporte',
-                subject: p.assunto || p.titulo || 'Sem título',
-                date: p.data || p.criado_em || new Date().toLocaleDateString('pt-BR'),
-                status: p.status === 'Aberto' ? 'Aberto' : p.status === 'Fechado' ? 'Fechado' : 'Em Análise',
+                id: safeString(p.protocolo || p.id, '0000'),
+                type: safeString(p.tipo, 'Suporte'),
+                subject: safeString(p.assunto || p.titulo, 'Sem título'),
+                date: safeString(p.data || p.criado_em, new Date().toLocaleDateString('pt-BR')),
+                status: safeString(p.status) === 'Aberto' ? 'Aberto' : safeString(p.status) === 'Fechado' ? 'Fechado' : 'Em Análise',
             })));
 
             // === NOTAS FISCAIS ===
             setFiscalNotes((dados.notas_fiscais || dados.nfs || []).map((n: any) => ({
                 id: n.id || Date.now(),
-                numero: n.numero || '000000',
-                serie: n.serie || '1',
-                emissao: n.emissao || n.data_emissao || '--/--/----',
-                referencia: n.referencia || n.competencia || 'Atual',
-                valor: `R$ ${String(n.valor || '0,00').replace('.', ',')}`,
-                link_pdf: n.link_pdf || '',
-                link_xml: n.link_xml || '',
+                numero: safeString(n.numero, '000000'),
+                serie: safeString(n.serie, '1'),
+                emissao: safeString(n.emissao || n.data_emissao, '--/--/----'),
+                referencia: safeString(n.referencia || n.competencia, 'Atual'),
+                valor: `R$ ${safeString(String(n.valor || '0,00')).replace('.', ',')}`,
+                link_pdf: safeString(n.link_pdf),
+                link_xml: safeString(n.link_xml),
             })));
 
             setIsAuthenticated(true);
             setIsDemoMode(false);
 
-        } catch (err) {
+        } catch (err: any) {
             console.error('Erro ao carregar dados:', err);
-            setError('Falha ao carregar dados reais. Modo demo ativado.');
-            setTimeout(loadDemoData, 2000);
+            
+            // Se o token expirou, faz logout imediato
+            if (err.message === 'Sessão expirada' || err.message.includes('401')) {
+                handleLogout();
+                setError('Sessão expirada. Por favor, faça login novamente.');
+                return;
+            }
+
+            // Para outros erros, mostra mensagem e volta para login
+            setError('Falha na conexão com a central. Tente novamente mais tarde.');
+            setIsAuthenticated(false);
         } finally {
             setLoading(false);
         }
@@ -643,7 +668,7 @@ const ClientArea: React.FC = () => {
                                 <User size={24} />
                             </div>
                             <div>
-                                <h1 className="text-xl font-bold text-white">Olá, {clientName}</h1>
+                                <h1 className="text-xl font-bold text-white">Olá, {safeString(clientName)}</h1>
                                 <p className="text-sm text-fiber-orange flex items-center gap-1">
                                     <span className={`w-2 h-2 rounded-full animate-pulse ${connection?.status === 'online' ? 'bg-green-500' : 'bg-red-500'}`}></span>
                                     {connection?.status === 'online' ? 'Conectado' : 'Desconectado'}
@@ -707,15 +732,15 @@ const ClientArea: React.FC = () => {
                                 <div className="space-y-4">
                                     <div className="bg-neutral-900/50 rounded-lg p-3 flex justify-between items-center">
                                         <span className="text-gray-400 text-sm flex items-center gap-2"><Clock size={14} /> Tempo Conectado</span>
-                                        <span className="text-white font-mono font-bold">{connection?.uptime || '--'}</span>
+                                        <span className="text-white font-mono font-bold">{safeString(connection?.uptime, '--')}</span>
                                     </div>
                                     <div className="bg-neutral-900/50 rounded-lg p-3 flex justify-between items-center">
                                         <span className="text-gray-400 text-sm flex items-center gap-2"><ArrowDown size={14} className="text-fiber-blue" /> Download Mês</span>
-                                        <span className="text-white font-mono font-bold">{connection?.download_usage || '0 GB'}</span>
+                                        <span className="text-white font-mono font-bold">{safeString(connection?.download_usage, '0 GB')}</span>
                                     </div>
                                     <div className="bg-neutral-900/50 rounded-lg p-3 flex justify-between items-center">
                                         <span className="text-gray-400 text-sm flex items-center gap-2"><ArrowUp size={14} className="text-fiber-orange" /> Upload Mês</span>
-                                        <span className="text-white font-mono font-bold">{connection?.upload_usage || '0 GB'}</span>
+                                        <span className="text-white font-mono font-bold">{safeString(connection?.upload_usage, '0 GB')}</span>
                                     </div>
                                 </div>
                             </div>
@@ -778,36 +803,36 @@ const ClientArea: React.FC = () => {
                                                 <div className="flex-1 w-full md:w-auto text-center md:text-left">
                                                     <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 mb-2">
                                                         <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider w-fit mx-auto md:mx-0 ${
-                                                            invoice.status === 'vencido' 
+                                                            safeString(invoice.status).includes('vencido') 
                                                                 ? 'bg-red-500/10 text-red-500' 
-                                                                : invoice.status === 'pago' ? 'bg-green-500/10 text-green-500'
+                                                                : safeString(invoice.status).includes('pago') ? 'bg-green-500/10 text-green-500'
                                                                 : 'bg-fiber-blue/10 text-fiber-blue'
                                                         }`}>
-                                                            {invoice.status}
+                                                            {safeString(invoice.status)}
                                                         </span>
-                                                        <span className="text-gray-500 text-sm">{invoice.descricao}</span>
+                                                        <span className="text-gray-500 text-sm">{safeString(invoice.descricao)}</span>
                                                     </div>
                                                     <div className="flex flex-col md:flex-row gap-4 md:gap-8 mt-3">
                                                         <div>
                                                             <span className="text-gray-500 text-[10px] block uppercase tracking-widest font-bold">Vencimento</span>
-                                                            <span className={`text-lg font-bold ${invoice.status === 'vencido' ? 'text-red-400' : 'text-white'}`}>
-                                                                {invoice.vencimento}
+                                                            <span className={`text-lg font-bold ${safeString(invoice.status).includes('vencido') ? 'text-red-400' : 'text-white'}`}>
+                                                                {safeString(invoice.vencimento)}
                                                             </span>
                                                         </div>
                                                         <div>
                                                             <span className="text-gray-500 text-[10px] block uppercase tracking-widest font-bold">Valor</span>
-                                                            <span className="text-lg font-bold text-white">R$ {invoice.valor}</span>
+                                                            <span className="text-lg font-bold text-white">{invoice.valor}</span>
                                                         </div>
                                                     </div>
                                                 </div>
 
                                                 <div className="flex flex-wrap justify-center md:justify-end gap-2 w-full md:w-auto">
-                                                    {invoice.status !== 'pago' && invoice.pix_code && (
+                                                    {!safeString(invoice.status).includes('pago') && invoice.pix_code && (
                                                         <button onClick={() => openPixModal(invoice.pix_code!)} className="flex items-center px-4 py-2 bg-fiber-green/10 hover:bg-fiber-green/20 text-fiber-green rounded-lg text-sm font-bold transition-colors border border-fiber-green/30">
                                                             <QrCode size={16} className="mr-2" /> PIX
                                                         </button>
                                                     )}
-                                                    {invoice.status !== 'pago' && invoice.linha_digitavel && (
+                                                    {!safeString(invoice.status).includes('pago') && invoice.linha_digitavel && (
                                                         <button onClick={() => copyToClipboard(invoice.linha_digitavel!, `bar-${idx}`)} className="flex items-center px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-sm font-medium border border-white/10">
                                                             {copiedId === `bar-${idx}` ? <CheckCircle size={16} className="mr-2 text-green-500" /> : <Copy size={16} className="mr-2" />} Código
                                                         </button>
@@ -832,30 +857,30 @@ const ClientArea: React.FC = () => {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
                                         <label className="text-gray-500 text-xs uppercase font-bold block mb-1">Nome do Titular</label>
-                                        <p className="text-white font-medium bg-neutral-900 p-3 rounded-lg border border-white/5">{clientName}</p>
+                                        <p className="text-white font-medium bg-neutral-900 p-3 rounded-lg border border-white/5">{safeString(clientName)}</p>
                                     </div>
                                     <div>
                                         <label className="text-gray-500 text-xs uppercase font-bold block mb-1">Plano Contratado</label>
                                         <p className="text-fiber-orange font-bold bg-neutral-900 p-3 rounded-lg border border-white/5 flex justify-between items-center">
-                                            {contract?.plan_name}
-                                            <span className="text-xs bg-fiber-orange/20 px-2 py-1 rounded text-fiber-orange">{contract?.speed_label}</span>
+                                            {safeString(contract?.plan_name)}
+                                            <span className="text-xs bg-fiber-orange/20 px-2 py-1 rounded text-fiber-orange">{safeString(contract?.speed_label)}</span>
                                         </p>
                                     </div>
                                     <div className="md:col-span-2">
                                         <label className="text-gray-500 text-xs uppercase font-bold block mb-1">Endereço de Instalação</label>
                                         <p className="text-gray-300 text-sm bg-neutral-900 p-3 rounded-lg border border-white/5 flex items-start gap-2">
                                             <MapPin size={16} className="mt-0.5 flex-shrink-0 text-gray-500" />
-                                            {contract?.address}
+                                            {safeString(contract?.address)}
                                         </p>
                                     </div>
                                     <div>
                                         <label className="text-gray-500 text-xs uppercase font-bold block mb-1">Data de Ativação</label>
-                                        <p className="text-white text-sm bg-neutral-900 p-3 rounded-lg border border-white/5">{contract?.installation_date}</p>
+                                        <p className="text-white text-sm bg-neutral-900 p-3 rounded-lg border border-white/5">{safeString(contract?.installation_date)}</p>
                                     </div>
                                     <div>
                                         <label className="text-gray-500 text-xs uppercase font-bold block mb-1">Status do Contrato</label>
                                         <p className="text-green-400 font-bold text-sm bg-neutral-900 p-3 rounded-lg border border-white/5 flex items-center gap-2">
-                                            <span className="w-2 h-2 bg-green-500 rounded-full"></span> {contract?.status}
+                                            <span className="w-2 h-2 bg-green-500 rounded-full"></span> {safeString(contract?.status)}
                                         </p>
                                     </div>
                                 </div>
@@ -943,10 +968,10 @@ const ClientArea: React.FC = () => {
                             {fiscalNotes.length > 0 ? fiscalNotes.map((nf, i) => (
                                 <div key={i} className="bg-fiber-dark border border-white/10 rounded-lg p-4 flex justify-between items-center hover:bg-neutral-900 transition-colors">
                                     <div className="flex items-center gap-4">
-                                        <div className="text-gray-500 text-sm font-mono">{nf.referencia}</div>
+                                        <div className="text-gray-500 text-sm font-mono">{safeString(nf.referencia)}</div>
                                         <div>
-                                            <div className="text-white font-bold text-sm">Nota Nº {nf.numero} - Série {nf.serie}</div>
-                                            <div className="text-gray-500 text-xs">Emissão: {nf.emissao} • Valor: R$ {nf.valor}</div>
+                                            <div className="text-white font-bold text-sm">Nota Nº {safeString(nf.numero)} - Série {safeString(nf.serie)}</div>
+                                            <div className="text-gray-500 text-xs">Emissão: {safeString(nf.emissao)} • Valor: {nf.valor}</div>
                                         </div>
                                     </div>
                                     <div className="flex gap-2">
