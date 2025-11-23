@@ -3,9 +3,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   User, Lock, FileText, Download, Copy, CheckCircle, AlertCircle, Loader2, 
   QrCode, X, LogOut, Shield, Eye, EyeOff, Mail, AlertTriangle, Wifi, Activity, 
-  Router, Unlock, Clock, ChevronRight, MapPin, RefreshCw, BarChart3, Calendar, 
-  Printer, Phone, FileCheck, ScrollText, FileCode, MessageSquare, Send, Bot, 
-  MoreHorizontal 
+  Unlock, Clock, ChevronRight, MapPin, BarChart3, Calendar, 
+  Printer, Phone, FileCheck, ScrollText, FileCode, Send, Bot, 
+  MoreHorizontal, Settings 
 } from 'lucide-react';
 import Button from './Button';
 import { Invoice } from '../types';
@@ -84,13 +84,20 @@ const ClientArea: React.FC = () => {
     const [fiscalNotes, setFiscalNotes] = useState<FiscalNote[]>([]);
 
     // UI State
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'consumption' | 'reports' | 'fiscal'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'consumption' | 'reports' | 'fiscal' | 'options' | 'chat'>('dashboard');
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [activePixCode, setActivePixCode] = useState<string | null>(null);
     const [isPixCopied, setIsPixCopied] = useState(false);
     const [isDemoMode, setIsDemoMode] = useState(false);
     const [unlocking, setUnlocking] = useState(false);
     const [unlockedSuccess, setUnlockedSuccess] = useState(false);
+
+    // Change Password State
+    const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [changePassLoading, setChangePassLoading] = useState(false);
+    const [changePassMessage, setChangePassMessage] = useState<{type: 'success'|'error', text: string} | null>(null);
 
     // Consumption State
     const [consumptionPeriod, setConsumptionPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
@@ -101,9 +108,9 @@ const ClientArea: React.FC = () => {
     const [reportYear, setReportYear] = useState('2025');
 
     // Chatbot State
-    const [isChatOpen, setIsChatOpen] = useState(false);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isBotTyping, setIsBotTyping] = useState(false);
+    const [chatInput, setChatInput] = useState(''); // New state for text input
     const chatEndRef = useRef<HTMLDivElement>(null);
 
     // Load saved Login on mount
@@ -114,7 +121,6 @@ const ClientArea: React.FC = () => {
         
         if (savedLogin) {
             setLogin(savedLogin);
-            // Se houver login salvo, marcamos o checkbox e preenchemos a senha se existir
             setRememberMe(true);
             if (savedPassword) {
                 setPassword(savedPassword);
@@ -133,11 +139,11 @@ const ClientArea: React.FC = () => {
     // Auto-scroll chat
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages, isBotTyping, isChatOpen]);
+    }, [messages, isBotTyping, activeTab]);
 
-    // Init Chat when opened
+    // Init Chat when opened (Tab)
     useEffect(() => {
-        if (isChatOpen && messages.length === 0) {
+        if (activeTab === 'chat' && messages.length === 0) {
             setIsBotTyping(true);
             setTimeout(() => {
                 setMessages([
@@ -156,14 +162,13 @@ const ClientArea: React.FC = () => {
                 setIsBotTyping(false);
             }, 1000);
         }
-    }, [isChatOpen]);
+    }, [activeTab]);
 
-    // Atualiza o gráfico quando muda o período (apenas no modo demo por enquanto)
+    // Atualiza o gráfico quando muda o período
     useEffect(() => {
         if (isDemoMode) {
             setChartData(generateMockConsumption(consumptionPeriod));
         } else if (isAuthenticated && activeTab === 'consumption') {
-            // Lógica para buscar consumo real (se disponível na API)
             // fetchRealConsumption(consumptionPeriod);
         }
     }, [consumptionPeriod, isDemoMode, isAuthenticated, activeTab]);
@@ -300,7 +305,6 @@ const ClientArea: React.FC = () => {
             setConnection(data.conexao || null);
             setContract(data.contrato || null);
             setProtocols(data.protocolos || []);
-            // Notas Fiscais viriam da API aqui também
             setFiscalNotes(data.notas_fiscais || []); 
 
             setIsAuthenticated(true);
@@ -343,15 +347,12 @@ const ClientArea: React.FC = () => {
             return;
         }
 
-        // Timeout Controller
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 15000); 
 
         try {
-            // Limpeza do login
             const cleanLogin = login.includes('@') ? login.trim() : login.replace(/\D/g, '');
 
-            // Envia login e senha para o endpoint de autenticação
             const response = await fetch('https://api.centralfiber.online/api/v1/auth/login', {
                 method: 'POST',
                 headers: { 
@@ -389,15 +390,13 @@ const ClientArea: React.FC = () => {
                 }
                 
                 await fetchDashboardData(data.token); 
-                setLoading(false); // Ensure loading stops on success
+                setLoading(false); 
             } else {
                  throw new Error('Erro no servidor: Token não recebido.');
             }
         } catch (err: any) {
             console.error('Login Failed:', err);
             
-            // --- FALLBACK AUTOMÁTICO ---
-            // Se o servidor estiver fora (Failed to fetch), ativa o modo Demo para que o usuário possa ver a UI.
             if (err.message === 'Failed to fetch' || err.message.includes('NetworkError')) {
                 setError('Servidor indisponível. Entrando em Modo Demonstração...');
                 
@@ -411,7 +410,7 @@ const ClientArea: React.FC = () => {
                     setError(null);
                     setLoading(false);
                 }, 1500);
-                return; // Retorna para não executar o setLoading(false) abaixo imediatamente
+                return; 
             }
 
             let errorMessage = err.message || 'Falha desconhecida.';
@@ -435,7 +434,6 @@ const ClientArea: React.FC = () => {
         setError(null);
         setIsDemoMode(false);
         setUnlockedSuccess(false);
-        setIsChatOpen(false);
         localStorage.removeItem('fiber_auth_token');
         
         if (!rememberMe || clearLogin) {
@@ -454,97 +452,188 @@ const ClientArea: React.FC = () => {
         }, 2000);
     };
 
-    // CHATBOT LOGIC
-    const handleChatOption = (action: string, label: string) => {
-        // Add user message
-        setMessages(prev => [...prev, { id: Date.now(), text: label, sender: 'user' }]);
-        setIsBotTyping(true);
+    const handleChangePassword = async () => {
+        if (!currentPassword || !newPassword) {
+            setChangePassMessage({type: 'error', text: 'Preencha todos os campos.'});
+            return;
+        }
 
-        setTimeout(() => {
-            let botResponse: ChatMessage = { id: Date.now() + 1, text: '', sender: 'bot' };
-
-            switch(action) {
-                case 'fatura':
-                    const openInvoices = invoices?.filter(i => i.status !== 'pago') || [];
-                    if (openInvoices.length > 0) {
-                        const inv = openInvoices[0];
-                        botResponse.text = `Encontrei uma fatura com vencimento em ${inv.vencimento} no valor de R$ ${inv.valor}.`;
-                        if (inv.pix_code) {
-                            botResponse.type = 'pix';
-                            botResponse.pixCode = inv.pix_code;
-                        } else if (inv.linha_digitavel) {
-                            botResponse.text += "\nCódigo de barras: " + inv.linha_digitavel;
-                        }
-                        botResponse.options = [{ label: 'Voltar ao menu', action: 'menu' }];
-                    } else {
-                        botResponse.text = "Parabéns! Não encontrei nenhuma fatura em aberto no seu cadastro. Você está em dia com a Fiber.Net!";
-                        botResponse.options = [{ label: 'Voltar ao menu', action: 'menu' }];
-                    }
-                    break;
-
-                case 'suporte':
-                    if (connection?.status === 'offline') {
-                        botResponse.text = "Identifiquei que seu equipamento consta como OFFLINE. Por favor, verifique se ele está ligado na tomada e se os cabos estão conectados. Já tentou reiniciar?";
-                        botResponse.options = [
-                            { label: 'Sim, já reiniciei', action: 'reiniciei' },
-                            { label: 'Vou tentar agora', action: 'menu' }
-                        ];
-                    } else {
-                        botResponse.text = "Seu equipamento consta como ONLINE e com sinal estável. Se está com lentidão, pode ser interferência no Wi-Fi. Deseja falar com um atendente?";
-                        botResponse.options = [
-                            { label: 'Falar com Atendente', action: 'humano' },
-                            { label: 'Voltar ao menu', action: 'menu' }
-                        ];
-                    }
-                    break;
-
-                case 'reiniciei':
-                    // Check for overdue invoices logic for unlocking
-                    const hasOverdue = invoices?.some(i => i.status === 'vencido');
-                    if (hasOverdue && !unlockedSuccess) {
-                        botResponse.text = "Entendi. Verifiquei que existe uma fatura vencida que pode ter causado o bloqueio automático. Você pode liberar o sinal por 48h agora mesmo.";
-                        botResponse.options = [
-                            { label: 'Liberar Internet (48h)', action: 'do_unlock' },
-                            { label: 'Não, obrigado', action: 'menu' }
-                        ];
-                    } else {
-                        botResponse.text = "Como o problema persiste, vou te encaminhar para nosso suporte técnico especializado no WhatsApp.";
-                        botResponse.options = [{ label: 'Ir para WhatsApp', action: 'humano' }];
-                    }
-                    break;
-
-                case 'desbloqueio':
-                case 'do_unlock':
-                    if (unlockedSuccess) {
-                        botResponse.text = "Seu desbloqueio de confiança já foi utilizado recentemente e está ativo!";
-                    } else {
-                        handleUnlockTrust(); // Trigger dashboard action
-                        botResponse.text = "Pronto! Realizei o desbloqueio de confiança. Seu sinal deve voltar em até 5 minutos. Lembre-se de regularizar a fatura em até 48 horas.";
-                    }
-                    botResponse.options = [{ label: 'Obrigado', action: 'menu' }];
-                    break;
-
-                case 'humano':
-                    botResponse.text = "Para atendimento humano, por favor, clique no botão abaixo para abrir o WhatsApp da nossa equipe.";
-                    window.open('https://wa.me/552424581861', '_blank');
-                    botResponse.options = [{ label: 'Voltar ao menu', action: 'menu' }];
-                    break;
-
-                case 'menu':
-                default:
-                    botResponse.text = "Posso ajudar com algo mais?";
-                    botResponse.options = [
-                        { label: '2ª Via de Fatura', action: 'fatura' },
-                        { label: 'Estou sem internet', action: 'suporte' },
-                        { label: 'Desbloqueio de Confiança', action: 'desbloqueio' },
-                        { label: 'Falar com Atendente', action: 'humano' }
-                    ];
-                    break;
+        setChangePassLoading(true);
+        setChangePassMessage(null);
+        
+        const token = localStorage.getItem('fiber_auth_token');
+        
+        try {
+            if (isDemoMode) {
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                setChangePassMessage({type: 'success', text: 'Senha alterada com sucesso (Simulação)!'});
+            } else {
+                const res = await fetch("https://api.centralfiber.online/api/v1/dashboard/trocar-senha", {
+                    method: "POST",
+                    headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+                    body: JSON.stringify({ senhaAtual: currentPassword, novaSenha: newPassword })
+                });
+                const data = await res.json();
+                
+                if(!res.ok) throw new Error(data.message || data.error || "Erro ao trocar senha");
+                setChangePassMessage({type: 'success', text: 'Senha alterada com sucesso!'});
             }
+            
+            setTimeout(() => {
+                setIsChangePasswordOpen(false);
+                setCurrentPassword('');
+                setNewPassword('');
+                setChangePassMessage(null);
+            }, 2000);
+        } catch (err: any) {
+            setChangePassMessage({type: 'error', text: err.message});
+        } finally {
+            setChangePassLoading(false);
+        }
+    };
 
-            setMessages(prev => [...prev, botResponse]);
-            setIsBotTyping(false);
-        }, 1000);
+    // === CHATBOT INTEGRADO (API + FALLBACK) ===
+    const sendMessageToBackend = async (messageText: string, actionContext?: string) => {
+        const token = localStorage.getItem('fiber_auth_token');
+        
+        // Adiciona mensagem do usuário na UI
+        const userMsgId = Date.now();
+        setMessages(prev => [...prev, { id: userMsgId, text: messageText, sender: 'user' }]);
+        setIsBotTyping(true);
+        setChatInput('');
+
+        try {
+            // Tenta conectar com o Backend Real
+            if (!isDemoMode) {
+                const res = await fetch("https://api.centralfiber.online/api/v1/chatbot/message", {
+                    method: "POST",
+                    headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+                    body: JSON.stringify({ message: messageText, context: actionContext })
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    // Backend deve retornar: { text: string, options?: [], type?: 'pix', pixCode?: string }
+                    setMessages(prev => [...prev, { 
+                        id: Date.now() + 1, 
+                        sender: 'bot', 
+                        text: data.text, 
+                        options: data.options,
+                        type: data.type,
+                        pixCode: data.pixCode 
+                    }]);
+                    setIsBotTyping(false);
+                    return; // Sucesso, encerra aqui.
+                }
+            }
+            throw new Error("Fallback to local"); // Força o catch se demo ou erro
+        } catch (err) {
+            // === LÓGICA LOCAL (FALLBACK) ===
+            // Se o backend falhar, usa a lógica do frontend baseada no estado atual
+            setTimeout(() => {
+                let botResponse: ChatMessage = { id: Date.now() + 1, text: '', sender: 'bot' };
+                const action = actionContext || 'default';
+
+                switch(action) {
+                    case 'fatura':
+                        const openInvoices = invoices?.filter(i => i.status !== 'pago') || [];
+                        if (openInvoices.length > 0) {
+                            const inv = openInvoices[0];
+                            botResponse.text = `Encontrei uma fatura com vencimento em ${inv.vencimento} no valor de R$ ${inv.valor}.`;
+                            if (inv.pix_code) {
+                                botResponse.type = 'pix';
+                                botResponse.pixCode = inv.pix_code;
+                            } else if (inv.linha_digitavel) {
+                                botResponse.text += "\nCódigo de barras: " + inv.linha_digitavel;
+                            }
+                            botResponse.options = [{ label: 'Voltar ao menu', action: 'menu' }];
+                        } else {
+                            botResponse.text = "Parabéns! Não encontrei nenhuma fatura em aberto no seu cadastro. Você está em dia com a Fiber.Net!";
+                            botResponse.options = [{ label: 'Voltar ao menu', action: 'menu' }];
+                        }
+                        break;
+
+                    case 'suporte':
+                        if (connection?.status === 'offline') {
+                            botResponse.text = "Identifiquei que seu equipamento consta como OFFLINE. Por favor, verifique se ele está ligado na tomada e se os cabos estão conectados. Já tentou reiniciar?";
+                            botResponse.options = [
+                                { label: 'Sim, já reiniciei', action: 'reiniciei' },
+                                { label: 'Vou tentar agora', action: 'menu' }
+                            ];
+                        } else {
+                            botResponse.text = "Seu equipamento consta como ONLINE e com sinal estável. Se está com lentidão, pode ser interferência no Wi-Fi. Deseja falar com um atendente?";
+                            botResponse.options = [
+                                { label: 'Falar com Atendente', action: 'humano' },
+                                { label: 'Voltar ao menu', action: 'menu' }
+                            ];
+                        }
+                        break;
+
+                    case 'reiniciei':
+                        const hasOverdue = invoices?.some(i => i.status === 'vencido');
+                        if (hasOverdue && !unlockedSuccess) {
+                            botResponse.text = "Entendi. Verifiquei que existe uma fatura vencida que pode ter causado o bloqueio automático. Você pode liberar o sinal por 48h agora mesmo.";
+                            botResponse.options = [
+                                { label: 'Liberar Internet (48h)', action: 'do_unlock' },
+                                { label: 'Não, obrigado', action: 'menu' }
+                            ];
+                        } else {
+                            botResponse.text = "Como o problema persiste, vou te encaminhar para nosso suporte técnico especializado no WhatsApp.";
+                            botResponse.options = [{ label: 'Ir para WhatsApp', action: 'humano' }];
+                        }
+                        break;
+
+                    case 'desbloqueio':
+                    case 'do_unlock':
+                        if (unlockedSuccess) {
+                            botResponse.text = "Seu desbloqueio de confiança já foi utilizado recentemente e está ativo!";
+                        } else {
+                            handleUnlockTrust();
+                            botResponse.text = "Pronto! Realizei o desbloqueio de confiança. Seu sinal deve voltar em até 5 minutos. Lembre-se de regularizar a fatura em até 48 horas.";
+                        }
+                        botResponse.options = [{ label: 'Obrigado', action: 'menu' }];
+                        break;
+
+                    case 'humano':
+                        botResponse.text = "Para atendimento humano, por favor, clique no botão abaixo para abrir o WhatsApp da nossa equipe.";
+                        window.open('https://wa.me/552424581861', '_blank');
+                        botResponse.options = [{ label: 'Voltar ao menu', action: 'menu' }];
+                        break;
+
+                    case 'menu':
+                        botResponse.text = "Posso ajudar com algo mais?";
+                        botResponse.options = [
+                            { label: '2ª Via de Fatura', action: 'fatura' },
+                            { label: 'Estou sem internet', action: 'suporte' },
+                            { label: 'Desbloqueio de Confiança', action: 'desbloqueio' },
+                            { label: 'Falar com Atendente', action: 'humano' }
+                        ];
+                        break;
+                    
+                    default:
+                        // Se for texto livre
+                        botResponse.text = "Desculpe, ainda estou aprendendo. Por favor, selecione uma das opções abaixo ou fale com um atendente.";
+                        botResponse.options = [
+                            { label: '2ª Via de Fatura', action: 'fatura' },
+                            { label: 'Falar com Atendente', action: 'humano' }
+                        ];
+                }
+
+                setMessages(prev => [...prev, botResponse]);
+                setIsBotTyping(false);
+            }, 1000);
+        }
+    };
+
+    const handleChatOption = (action: string, label: string) => {
+        sendMessageToBackend(label, action);
+    };
+
+    const handleChatSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (chatInput.trim()) {
+            sendMessageToBackend(chatInput);
+        }
     };
 
     const copyToClipboard = (text: string, id: string) => {
@@ -560,23 +649,12 @@ const ClientArea: React.FC = () => {
     // --- CHART COMPONENT (SVG Native) ---
     const SimpleLineChart = ({ data }: { data: ConsumptionData[] }) => {
         if (!data || data.length === 0) return null;
-        
-        const height = 300;
-        const width = 1000;
-        const padding = 40;
-        
-        // Encontrar valor máximo para escala
+        const height = 300; const width = 1000; const padding = 40;
         const maxVal = Math.max(...data.map(d => Math.max(d.download, d.upload))) * 1.1;
-        
-        // Helpers para coordenadas
         const getX = (index: number) => padding + (index / (data.length - 1)) * (width - 2 * padding);
         const getY = (val: number) => height - padding - (val / maxVal) * (height - 2 * padding);
-        
-        // Construir paths (linhas)
         const dlPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(d.download)}`).join(' ');
         const ulPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(d.upload)}`).join(' ');
-        
-        // Construir áreas (para preenchimento gradiente)
         const dlArea = `${dlPath} L ${getX(data.length - 1)} ${height - padding} L ${padding} ${height - padding} Z`;
         const ulArea = `${ulPath} L ${getX(data.length - 1)} ${height - padding} L ${padding} ${height - padding} Z`;
 
@@ -584,57 +662,17 @@ const ClientArea: React.FC = () => {
             <div className="w-full overflow-x-auto">
                 <div className="min-w-[600px] relative">
                      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto drop-shadow-xl">
-                        {/* Grid Lines */}
-                        {[0, 0.25, 0.5, 0.75, 1].map(tick => (
-                            <line 
-                                key={tick} 
-                                x1={padding} 
-                                y1={getY(maxVal * tick)} 
-                                x2={width - padding} 
-                                y2={getY(maxVal * tick)} 
-                                stroke="#ffffff20" 
-                                strokeDasharray="4" 
-                            />
-                        ))}
-                        
-                        {/* Areas */}
-                        <path d={dlArea} fill="rgba(6, 182, 212, 0.15)" />
-                        <path d={ulArea} fill="rgba(249, 115, 22, 0.15)" />
-
-                        {/* Lines */}
+                        {[0, 0.25, 0.5, 0.75, 1].map(tick => ( <line key={tick} x1={padding} y1={getY(maxVal * tick)} x2={width - padding} y2={getY(maxVal * tick)} stroke="#ffffff20" strokeDasharray="4" /> ))}
+                        <path d={dlArea} fill="rgba(6, 182, 212, 0.15)" /> <path d={ulArea} fill="rgba(249, 115, 22, 0.15)" />
                         <path d={dlPath} fill="none" stroke="#06b6d4" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                         <path d={ulPath} fill="none" stroke="#f97316" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-
-                        {/* Points */}
-                        {data.map((d, i) => (
-                            <g key={i}>
-                                <circle cx={getX(i)} cy={getY(d.download)} r="4" fill="#06b6d4" className="hover:r-6 transition-all" />
-                                <circle cx={getX(i)} cy={getY(d.upload)} r="4" fill="#f97316" className="hover:r-6 transition-all" />
-                                
-                                {/* X Axis Labels (Mostrar menos se tiver muitos dados) */}
-                                {(data.length < 15 || i % 3 === 0) && (
-                                    <text x={getX(i)} y={height - 10} textAnchor="middle" fill="#9ca3af" fontSize="12">{d.label}</text>
-                                )}
-                            </g>
-                        ))}
-
-                         {/* Y Axis Labels */}
-                         {[0, 0.5, 1].map(tick => (
-                            <text key={tick} x={padding - 10} y={getY(maxVal * tick) + 4} textAnchor="end" fill="#9ca3af" fontSize="12">
-                                {Math.round(maxVal * tick)}GB
-                            </text>
-                        ))}
+                        {data.map((d, i) => ( <g key={i}> <circle cx={getX(i)} cy={getY(d.download)} r="4" fill="#06b6d4" className="hover:r-6 transition-all" /> <circle cx={getX(i)} cy={getY(d.upload)} r="4" fill="#f97316" className="hover:r-6 transition-all" /> {(data.length < 15 || i % 3 === 0) && ( <text x={getX(i)} y={height - 10} textAnchor="middle" fill="#9ca3af" fontSize="12">{d.label}</text> )} </g> ))}
+                         {[0, 0.5, 1].map(tick => ( <text key={tick} x={padding - 10} y={getY(maxVal * tick) + 4} textAnchor="end" fill="#9ca3af" fontSize="12"> {Math.round(maxVal * tick)}GB </text> ))}
                      </svg>
                 </div>
                 <div className="flex justify-center gap-6 mt-4">
-                    <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-cyan-500 rounded-full"></div>
-                        <span className="text-gray-300 text-sm">Download</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-fiber-orange rounded-full"></div>
-                        <span className="text-gray-300 text-sm">Upload</span>
-                    </div>
+                    <div className="flex items-center gap-2"><div className="w-3 h-3 bg-cyan-500 rounded-full"></div><span className="text-gray-300 text-sm">Download</span></div>
+                    <div className="flex items-center gap-2"><div className="w-3 h-3 bg-fiber-orange rounded-full"></div><span className="text-gray-300 text-sm">Upload</span></div>
                 </div>
             </div>
         );
@@ -691,6 +729,60 @@ const ClientArea: React.FC = () => {
 
     const hasOverdue = invoices?.some(i => i.status === 'vencido');
 
+    // Render Chat Messages (Used in Tab view)
+    const renderChatContent = () => (
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-neutral-950/50 scrollbar-thin scrollbar-thumb-neutral-700 h-full">
+            {messages.map((msg) => (
+                <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[85%] rounded-2xl p-3 text-sm ${
+                        msg.sender === 'user' 
+                            ? 'bg-fiber-orange text-white rounded-tr-none' 
+                            : 'bg-neutral-800 text-gray-200 rounded-tl-none border border-white/5'
+                    }`}>
+                        <p className="whitespace-pre-wrap">{msg.text}</p>
+                        
+                        {/* Render Pix Code Special Block */}
+                        {msg.type === 'pix' && msg.pixCode && (
+                            <div className="mt-2 bg-white p-2 rounded-lg">
+                                <p className="text-neutral-900 text-xs font-mono break-all mb-2 select-all">{msg.pixCode}</p>
+                                <button 
+                                    onClick={() => { copyToClipboard(msg.pixCode!, `chat-pix-${msg.id}`); }}
+                                    className="w-full py-1.5 bg-neutral-900 text-white text-xs font-bold rounded flex items-center justify-center gap-1 hover:bg-neutral-700"
+                                >
+                                    {copiedId === `chat-pix-${msg.id}` ? <CheckCircle size={12} /> : <Copy size={12} />}
+                                    {copiedId === `chat-pix-${msg.id}` ? 'Copiado!' : 'Copiar PIX'}
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Render Options */}
+                        {msg.options && (
+                            <div className="mt-3 space-y-2">
+                                {msg.options.map((opt, idx) => (
+                                    <button
+                                        key={idx}
+                                        onClick={() => handleChatOption(opt.action, opt.label)}
+                                        className="w-full text-left px-3 py-2 bg-neutral-900 hover:bg-neutral-700 text-fiber-orange text-xs font-bold rounded border border-white/5 transition-colors"
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            ))}
+            {isBotTyping && (
+                <div className="flex justify-start">
+                    <div className="bg-neutral-800 rounded-2xl rounded-tl-none p-3 border border-white/5">
+                        <MoreHorizontal size={20} className="text-gray-500 animate-pulse" />
+                    </div>
+                </div>
+            )}
+            <div ref={chatEndRef} />
+        </div>
+    );
+
     return (
         <div className="min-h-screen bg-fiber-dark pt-24 pb-12">
             
@@ -710,30 +802,12 @@ const ClientArea: React.FC = () => {
                     
                     {/* Navigation Tabs */}
                     <div className="flex space-x-6 border-b border-white/10 overflow-x-auto scrollbar-hide">
-                        <button 
-                            onClick={() => setActiveTab('dashboard')}
-                            className={`pb-3 text-sm font-bold transition-colors border-b-2 whitespace-nowrap ${activeTab === 'dashboard' ? 'text-fiber-orange border-fiber-orange' : 'text-gray-400 border-transparent hover:text-white'}`}
-                        >
-                            Visão Geral
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab('consumption')}
-                            className={`pb-3 text-sm font-bold transition-colors border-b-2 whitespace-nowrap ${activeTab === 'consumption' ? 'text-fiber-orange border-fiber-orange' : 'text-gray-400 border-transparent hover:text-white'}`}
-                        >
-                            Meus Consumos
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab('reports')}
-                            className={`pb-3 text-sm font-bold transition-colors border-b-2 whitespace-nowrap ${activeTab === 'reports' ? 'text-fiber-orange border-fiber-orange' : 'text-gray-400 border-transparent hover:text-white'}`}
-                        >
-                            Relatórios
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab('fiscal')}
-                            className={`pb-3 text-sm font-bold transition-colors border-b-2 whitespace-nowrap ${activeTab === 'fiscal' ? 'text-fiber-orange border-fiber-orange' : 'text-gray-400 border-transparent hover:text-white'}`}
-                        >
-                            Notas Fiscais
-                        </button>
+                        <button onClick={() => setActiveTab('dashboard')} className={`pb-3 text-sm font-bold transition-colors border-b-2 whitespace-nowrap ${activeTab === 'dashboard' ? 'text-fiber-orange border-fiber-orange' : 'text-gray-400 border-transparent hover:text-white'}`}>Visão Geral</button>
+                        <button onClick={() => setActiveTab('consumption')} className={`pb-3 text-sm font-bold transition-colors border-b-2 whitespace-nowrap ${activeTab === 'consumption' ? 'text-fiber-orange border-fiber-orange' : 'text-gray-400 border-transparent hover:text-white'}`}>Meus Consumos</button>
+                        <button onClick={() => setActiveTab('reports')} className={`pb-3 text-sm font-bold transition-colors border-b-2 whitespace-nowrap ${activeTab === 'reports' ? 'text-fiber-orange border-fiber-orange' : 'text-gray-400 border-transparent hover:text-white'}`}>Relatórios</button>
+                        <button onClick={() => setActiveTab('fiscal')} className={`pb-3 text-sm font-bold transition-colors border-b-2 whitespace-nowrap ${activeTab === 'fiscal' ? 'text-fiber-orange border-fiber-orange' : 'text-gray-400 border-transparent hover:text-white'}`}>Notas Fiscais</button>
+                        <button onClick={() => setActiveTab('chat')} className={`pb-3 text-sm font-bold transition-colors border-b-2 whitespace-nowrap ${activeTab === 'chat' ? 'text-fiber-orange border-fiber-orange' : 'text-gray-400 border-transparent hover:text-white'}`}>Atendimento</button>
+                        <button onClick={() => setActiveTab('options')} className={`pb-3 text-sm font-bold transition-colors border-b-2 whitespace-nowrap ${activeTab === 'options' ? 'text-fiber-orange border-fiber-orange' : 'text-gray-400 border-transparent hover:text-white'}`}>Opções</button>
                     </div>
                 </div>
             </div>
@@ -916,24 +990,9 @@ const ClientArea: React.FC = () => {
 
                                 {/* Period Filters */}
                                 <div className="flex bg-neutral-900 p-1 rounded-lg border border-white/5">
-                                    <button 
-                                        onClick={() => setConsumptionPeriod('daily')}
-                                        className={`px-4 py-2 text-xs font-bold rounded-md transition-colors ${consumptionPeriod === 'daily' ? 'bg-fiber-orange text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
-                                    >
-                                        Diário
-                                    </button>
-                                    <button 
-                                        onClick={() => setConsumptionPeriod('weekly')}
-                                        className={`px-4 py-2 text-xs font-bold rounded-md transition-colors ${consumptionPeriod === 'weekly' ? 'bg-fiber-orange text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
-                                    >
-                                        Semanal
-                                    </button>
-                                    <button 
-                                        onClick={() => setConsumptionPeriod('monthly')}
-                                        className={`px-4 py-2 text-xs font-bold rounded-md transition-colors ${consumptionPeriod === 'monthly' ? 'bg-fiber-orange text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
-                                    >
-                                        Mensal
-                                    </button>
+                                    <button onClick={() => setConsumptionPeriod('daily')} className={`px-4 py-2 text-xs font-bold rounded-md transition-colors ${consumptionPeriod === 'daily' ? 'bg-fiber-orange text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Diário</button>
+                                    <button onClick={() => setConsumptionPeriod('weekly')} className={`px-4 py-2 text-xs font-bold rounded-md transition-colors ${consumptionPeriod === 'weekly' ? 'bg-fiber-orange text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Semanal</button>
+                                    <button onClick={() => setConsumptionPeriod('monthly')} className={`px-4 py-2 text-xs font-bold rounded-md transition-colors ${consumptionPeriod === 'monthly' ? 'bg-fiber-orange text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Mensal</button>
                                 </div>
                             </div>
 
@@ -957,7 +1016,6 @@ const ClientArea: React.FC = () => {
                 {/* VIEW: REPORTS */}
                 {activeTab === 'reports' && (
                     <div className="animate-fadeIn space-y-6">
-                        {/* Card 1: Quitação de Débitos */}
                         <div className="bg-fiber-card border border-white/10 rounded-xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6">
                             <div className="flex items-center gap-6">
                                 <div className="w-12 h-12 rounded-lg bg-neutral-800 flex items-center justify-center text-gray-400 border border-white/5">
@@ -967,24 +1025,14 @@ const ClientArea: React.FC = () => {
                                     <span className="text-xs text-gray-500 uppercase tracking-wider font-bold">Relatórios</span>
                                     <h3 className="text-xl font-bold text-white mt-1">Quitação de Débitos</h3>
                                     <div className="mt-3">
-                                        <select 
-                                            value={reportYear}
-                                            onChange={(e) => setReportYear(e.target.value)}
-                                            className="bg-neutral-900 text-white text-sm border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-fiber-orange focus:ring-1 focus:ring-fiber-orange"
-                                        >
-                                            <option value="2025">2025</option>
-                                            <option value="2024">2024</option>
-                                            <option value="2023">2023</option>
+                                        <select value={reportYear} onChange={(e) => setReportYear(e.target.value)} className="bg-neutral-900 text-white text-sm border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-fiber-orange focus:ring-1 focus:ring-fiber-orange">
+                                            <option value="2025">2025</option><option value="2024">2024</option><option value="2023">2023</option>
                                         </select>
                                     </div>
                                 </div>
                             </div>
-                            <button className="p-3 rounded-lg bg-neutral-800 hover:bg-fiber-orange hover:text-white text-gray-400 transition-colors border border-white/5" title="Imprimir Relatório">
-                                <Printer size={24} />
-                            </button>
+                            <button className="p-3 rounded-lg bg-neutral-800 hover:bg-fiber-orange hover:text-white text-gray-400 transition-colors border border-white/5" title="Imprimir Relatório"><Printer size={24} /></button>
                         </div>
-
-                        {/* Card 2: Extrato de Ligações */}
                         <div className="bg-fiber-card border border-white/10 rounded-xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6">
                             <div className="flex items-center gap-6">
                                 <div className="w-12 h-12 rounded-lg bg-neutral-800 flex items-center justify-center text-gray-400 border border-white/5">
@@ -994,21 +1042,14 @@ const ClientArea: React.FC = () => {
                                     <span className="text-xs text-gray-500 uppercase tracking-wider font-bold">Relatórios</span>
                                     <h3 className="text-xl font-bold text-white mt-1">Extrato de Ligações</h3>
                                     <div className="mt-3">
-                                        <select 
-                                            className="bg-neutral-900 text-white text-sm border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-fiber-orange focus:ring-1 focus:ring-fiber-orange w-full md:w-auto"
-                                        >
-                                            <option>Extrato de Ligações Tarifadas</option>
-                                            <option>Extrato Detalhado</option>
+                                        <select className="bg-neutral-900 text-white text-sm border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-fiber-orange focus:ring-1 focus:ring-fiber-orange w-full md:w-auto">
+                                            <option>Extrato de Ligações Tarifadas</option><option>Extrato Detalhado</option>
                                         </select>
                                     </div>
                                 </div>
                             </div>
                         </div>
-
-                        {/* Empty State Footer */}
-                        <div className="py-8 text-center border-t border-white/5 mt-8">
-                            <p className="text-gray-500 text-sm">Nenhum ramal encontrado!</p>
-                        </div>
+                        <div className="py-8 text-center border-t border-white/5 mt-8"><p className="text-gray-500 text-sm">Nenhum ramal encontrado!</p></div>
                     </div>
                 )}
 
@@ -1018,32 +1059,17 @@ const ClientArea: React.FC = () => {
                         <div className="bg-fiber-card border border-white/10 rounded-xl p-6 md:p-8">
                             <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
                                 <div>
-                                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                                        <ScrollText className="text-fiber-orange" /> Notas Fiscais
-                                    </h2>
-                                    <p className="text-sm text-gray-400 mt-1">
-                                        Documentos fiscais (NF-21/22 e NFSe) dos pagamentos realizados.
-                                    </p>
+                                    <h2 className="text-xl font-bold text-white flex items-center gap-2"><ScrollText className="text-fiber-orange" /> Notas Fiscais</h2>
+                                    <p className="text-sm text-gray-400 mt-1">Documentos fiscais (NF-21/22 e NFSe) dos pagamentos realizados.</p>
                                 </div>
                                 <div>
-                                    <select 
-                                        value={reportYear}
-                                        onChange={(e) => setReportYear(e.target.value)}
-                                        className="bg-neutral-900 text-white text-sm border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-fiber-orange focus:ring-1 focus:ring-fiber-orange"
-                                    >
-                                        <option value="2025">2025</option>
-                                        <option value="2024">2024</option>
-                                        <option value="2023">2023</option>
+                                    <select value={reportYear} onChange={(e) => setReportYear(e.target.value)} className="bg-neutral-900 text-white text-sm border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-fiber-orange focus:ring-1 focus:ring-fiber-orange">
+                                        <option value="2025">2025</option><option value="2024">2024</option><option value="2023">2023</option>
                                     </select>
                                 </div>
                             </div>
-
                             {fiscalNotes.length === 0 ? (
-                                <div className="text-center py-12 bg-neutral-900/50 rounded-xl border border-dashed border-white/10">
-                                    <ScrollText className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                                    <h3 className="text-white font-bold text-lg">Nenhuma Nota Fiscal</h3>
-                                    <p className="text-gray-400">Não há documentos fiscais disponíveis para o ano selecionado.</p>
-                                </div>
+                                <div className="text-center py-12 bg-neutral-900/50 rounded-xl border border-dashed border-white/10"><ScrollText className="w-12 h-12 text-gray-600 mx-auto mb-3" /><h3 className="text-white font-bold text-lg">Nenhuma Nota Fiscal</h3><p className="text-gray-400">Não há documentos fiscais disponíveis para o ano selecionado.</p></div>
                             ) : (
                                 <div className="space-y-4">
                                     {fiscalNotes.map((note) => (
@@ -1054,33 +1080,14 @@ const ClientArea: React.FC = () => {
                                                     <span className="text-gray-400 text-xs font-bold">Nota Nº {note.numero} - Série {note.serie}</span>
                                                 </div>
                                                 <div className="flex flex-col sm:flex-row gap-4 sm:gap-8">
-                                                    <div>
-                                                        <span className="text-[10px] text-gray-500 uppercase">Referência</span>
-                                                        <p className="text-white font-bold">{note.referencia}</p>
-                                                    </div>
-                                                    <div>
-                                                        <span className="text-[10px] text-gray-500 uppercase">Emissão</span>
-                                                        <p className="text-gray-300 font-mono text-sm">{note.emissao}</p>
-                                                    </div>
-                                                    <div>
-                                                        <span className="text-[10px] text-gray-500 uppercase">Valor</span>
-                                                        <p className="text-white font-bold">R$ {note.valor}</p>
-                                                    </div>
+                                                    <div><span className="text-[10px] text-gray-500 uppercase">Referência</span><p className="text-white font-bold">{note.referencia}</p></div>
+                                                    <div><span className="text-[10px] text-gray-500 uppercase">Emissão</span><p className="text-gray-300 font-mono text-sm">{note.emissao}</p></div>
+                                                    <div><span className="text-[10px] text-gray-500 uppercase">Valor</span><p className="text-white font-bold">R$ {note.valor}</p></div>
                                                 </div>
                                             </div>
                                             <div className="flex gap-2 w-full md:w-auto">
-                                                <button 
-                                                    onClick={() => window.open(note.link_xml || '#', '_blank')}
-                                                    className="flex-1 md:flex-none py-2 px-4 bg-neutral-800 text-gray-300 hover:text-white rounded-lg text-sm font-bold border border-white/10 hover:bg-neutral-700 transition-colors flex items-center justify-center gap-2"
-                                                >
-                                                    <FileCode size={16} /> XML
-                                                </button>
-                                                <button 
-                                                    onClick={() => window.open(note.link_pdf || '#', '_blank')}
-                                                    className="flex-1 md:flex-none py-2 px-4 bg-fiber-orange text-white hover:bg-orange-600 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2 shadow-lg"
-                                                >
-                                                    <FileText size={16} /> PDF
-                                                </button>
+                                                <button onClick={() => window.open(note.link_xml || '#', '_blank')} className="flex-1 md:flex-none py-2 px-4 bg-neutral-800 text-gray-300 hover:text-white rounded-lg text-sm font-bold border border-white/10 hover:bg-neutral-700 transition-colors flex items-center justify-center gap-2"><FileCode size={16} /> XML</button>
+                                                <button onClick={() => window.open(note.link_pdf || '#', '_blank')} className="flex-1 md:flex-none py-2 px-4 bg-fiber-orange text-white hover:bg-orange-600 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2 shadow-lg"><FileText size={16} /> PDF</button>
                                             </div>
                                         </div>
                                     ))}
@@ -1089,102 +1096,67 @@ const ClientArea: React.FC = () => {
                         </div>
                     </div>
                 )}
+
+                {/* VIEW: CHAT TAB (Expanded) */}
+                {activeTab === 'chat' && (
+                    <div className="animate-fadeIn h-[600px] bg-fiber-card border border-white/10 rounded-xl overflow-hidden flex flex-col shadow-2xl">
+                        <div className="bg-neutral-900 p-4 border-b border-white/5 flex items-center gap-3">
+                            <div className="bg-fiber-orange/10 p-2 rounded-full text-fiber-orange"><Bot size={24} /></div>
+                            <div>
+                                <h3 className="text-white font-bold">Assistente Virtual Fiber.Net</h3>
+                                <div className="flex items-center gap-1"><span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span><span className="text-xs text-gray-400">Online - API Conectada</span></div>
+                            </div>
+                        </div>
+                        
+                        {renderChatContent()}
+
+                        <div className="p-4 bg-neutral-900 border-t border-white/5">
+                            <form onSubmit={handleChatSubmit} className="relative">
+                                <input 
+                                    type="text" 
+                                    value={chatInput}
+                                    onChange={(e) => setChatInput(e.target.value)}
+                                    placeholder="Digite sua mensagem ou selecione uma opção..." 
+                                    className="w-full bg-neutral-800 border border-white/10 rounded-full py-3 pl-5 pr-12 text-sm text-white focus:outline-none focus:border-fiber-orange focus:ring-1 focus:ring-fiber-orange placeholder-gray-500"
+                                    disabled={isBotTyping}
+                                />
+                                <button 
+                                    type="submit"
+                                    disabled={!chatInput.trim() || isBotTyping}
+                                    className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 bg-fiber-orange text-white rounded-full hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <Send size={16} />
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                )}
+
+                {/* VIEW: OPTIONS (Security/Settings) */}
+                {activeTab === 'options' && (
+                    <div className="animate-fadeIn space-y-6">
+                        <div className="bg-fiber-card border border-white/10 rounded-xl p-6 md:p-8">
+                            <h2 className="text-xl font-bold text-white flex items-center gap-2 mb-6"><Settings className="text-fiber-orange" /> Opções & Configurações</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="bg-neutral-900 p-6 rounded-xl border border-white/5 flex flex-col justify-between">
+                                    <div>
+                                        <div className="flex items-center gap-3 mb-3"><div className="p-2 bg-fiber-blue/10 rounded-lg text-fiber-blue"><Lock size={20} /></div><h3 className="text-white font-bold">Segurança</h3></div>
+                                        <p className="text-gray-400 text-sm mb-6">Mantenha sua conta segura alterando sua senha periodicamente.</p>
+                                    </div>
+                                    <Button variant="outline" fullWidth onClick={() => setIsChangePasswordOpen(true)}>Trocar Senha</Button>
+                                </div>
+                                <div className="bg-neutral-900 p-6 rounded-xl border border-white/5 opacity-50 flex flex-col justify-between">
+                                     <div>
+                                        <div className="flex items-center gap-3 mb-3"><div className="p-2 bg-gray-800 rounded-lg text-gray-500"><MoreHorizontal size={20} /></div><h3 className="text-gray-400 font-bold">Outras Opções</h3></div>
+                                        <p className="text-gray-500 text-sm mb-6">Novas funcionalidades em breve.</p>
+                                    </div>
+                                    <Button variant="outline" fullWidth disabled className="cursor-not-allowed">Em Breve</Button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
-
-            {/* CHATBOT FLOATING BUTTON */}
-            <button
-                onClick={() => setIsChatOpen(!isChatOpen)}
-                className="fixed bottom-24 right-6 z-50 bg-fiber-orange text-white p-4 rounded-full shadow-2xl hover:scale-110 transition-transform flex items-center justify-center"
-                aria-label="Abrir Assistente Virtual"
-            >
-                {isChatOpen ? <X size={28} /> : <Bot size={28} />}
-            </button>
-
-            {/* CHATBOT WINDOW */}
-            {isChatOpen && (
-                <div className="fixed bottom-40 right-6 z-50 w-80 sm:w-96 h-[500px] bg-fiber-card border border-white/10 rounded-2xl shadow-2xl flex flex-col animate-float overflow-hidden">
-                    {/* Chat Header */}
-                    <div className="bg-neutral-900 p-4 border-b border-white/5 flex items-center gap-3">
-                        <div className="bg-fiber-orange/10 p-2 rounded-full text-fiber-orange">
-                            <Bot size={20} />
-                        </div>
-                        <div>
-                            <h3 className="text-white font-bold text-sm">Assistente Virtual Fiber.Net</h3>
-                            <div className="flex items-center gap-1">
-                                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                                <span className="text-xs text-gray-400">Online</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Chat Messages */}
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-neutral-950/50 scrollbar-thin scrollbar-thumb-neutral-700">
-                        {messages.map((msg) => (
-                            <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[85%] rounded-2xl p-3 text-sm ${
-                                    msg.sender === 'user' 
-                                        ? 'bg-fiber-orange text-white rounded-tr-none' 
-                                        : 'bg-neutral-800 text-gray-200 rounded-tl-none border border-white/5'
-                                }`}>
-                                    <p className="whitespace-pre-wrap">{msg.text}</p>
-                                    
-                                    {/* Render Pix Code Special Block */}
-                                    {msg.type === 'pix' && msg.pixCode && (
-                                        <div className="mt-2 bg-white p-2 rounded-lg">
-                                            <p className="text-neutral-900 text-xs font-mono break-all mb-2 select-all">{msg.pixCode}</p>
-                                            <button 
-                                                onClick={() => { copyToClipboard(msg.pixCode!, `chat-pix-${msg.id}`); }}
-                                                className="w-full py-1.5 bg-neutral-900 text-white text-xs font-bold rounded flex items-center justify-center gap-1 hover:bg-neutral-700"
-                                            >
-                                                {copiedId === `chat-pix-${msg.id}` ? <CheckCircle size={12} /> : <Copy size={12} />}
-                                                {copiedId === `chat-pix-${msg.id}` ? 'Copiado!' : 'Copiar PIX'}
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    {/* Render Options */}
-                                    {msg.options && (
-                                        <div className="mt-3 space-y-2">
-                                            {msg.options.map((opt, idx) => (
-                                                <button
-                                                    key={idx}
-                                                    onClick={() => handleChatOption(opt.action, opt.label)}
-                                                    className="w-full text-left px-3 py-2 bg-neutral-900 hover:bg-neutral-700 text-fiber-orange text-xs font-bold rounded border border-white/5 transition-colors"
-                                                >
-                                                    {opt.label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                        {isBotTyping && (
-                            <div className="flex justify-start">
-                                <div className="bg-neutral-800 rounded-2xl rounded-tl-none p-3 border border-white/5">
-                                    <MoreHorizontal size={20} className="text-gray-500 animate-pulse" />
-                                </div>
-                            </div>
-                        )}
-                        <div ref={chatEndRef} />
-                    </div>
-
-                    {/* Chat Footer (Input Placeholder - Disabled for Bot Flow) */}
-                    <div className="p-3 bg-neutral-900 border-t border-white/5">
-                        <div className="relative">
-                            <input 
-                                type="text" 
-                                placeholder="Selecione uma opção acima..." 
-                                disabled
-                                className="w-full bg-neutral-800 border border-white/10 rounded-full py-2 px-4 text-sm text-gray-500 cursor-not-allowed focus:outline-none"
-                            />
-                            <button disabled className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-600">
-                                <Send size={16} />
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* PIX Modal */}
             {activePixCode && (
@@ -1195,6 +1167,24 @@ const ClientArea: React.FC = () => {
                         <div className="text-center mb-4"><QrCode size={40} className="text-fiber-green mx-auto mb-2" /><h3 className="text-xl font-bold text-white">Pagamento via PIX</h3></div>
                         <div className="bg-neutral-900 p-3 rounded border border-white/5 mb-4"><p className="text-gray-500 text-xs break-all font-mono line-clamp-6">{activePixCode}</p></div>
                         <button onClick={copyPixCode} className="w-full py-3 bg-fiber-green text-white font-bold rounded hover:bg-green-600 flex justify-center items-center gap-2">{isPixCopied ? <CheckCircle size={18} /> : <Copy size={18} />} {isPixCopied ? 'Copiado!' : 'Copiar Código'}</button>
+                    </div>
+                </div>
+            )}
+
+            {/* Password Change Modal */}
+            {isChangePasswordOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsChangePasswordOpen(false)}></div>
+                    <div className="relative bg-fiber-card border border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-float">
+                        <button onClick={() => setIsChangePasswordOpen(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white"><X size={20} /></button>
+                        <h3 className="text-xl font-bold text-white mb-1">Trocar Senha</h3>
+                        <p className="text-gray-400 text-sm mb-6">Digite sua senha atual e a nova senha desejada.</p>
+                        <div className="space-y-4">
+                            <div><label className="text-xs text-gray-500 uppercase font-bold">Senha Atual</label><input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-fiber-orange outline-none mt-1 transition-all" placeholder="••••••" /></div>
+                            <div><label className="text-xs text-gray-500 uppercase font-bold">Nova Senha</label><input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-fiber-orange outline-none mt-1 transition-all" placeholder="••••••" /></div>
+                            {changePassMessage && (<div className={`text-sm p-3 rounded border ${changePassMessage.type === 'success' ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>{changePassMessage.text}</div>)}
+                            <Button fullWidth onClick={handleChangePassword} disabled={changePassLoading}>{changePassLoading ? <Loader2 className="animate-spin" /> : 'Confirmar Alteração'}</Button>
+                        </div>
                     </div>
                 </div>
             )}
