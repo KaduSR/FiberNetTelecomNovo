@@ -1,16 +1,15 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   User, Lock, FileText, Download, Copy, CheckCircle, AlertCircle, Loader2, 
   QrCode, X, LogOut, Shield, Eye, EyeOff, Mail, AlertTriangle, Wifi, Activity, 
-  Unlock, Clock, ChevronRight, MapPin, BarChart3, Calendar, 
-  Printer, Phone, FileCheck, ScrollText, FileCode, Send, Bot, 
-  MoreHorizontal, Settings 
+  Router, Unlock, Clock, ChevronRight, MapPin, RefreshCw, BarChart3, Calendar, 
+  Printer, Phone, FileCheck, ScrollText, FileCode, MessageSquare, Send, Bot, 
+  MoreHorizontal, Settings, KeyRound, Home, ArrowUp, ArrowDown, Signal
 } from 'lucide-react';
 import Button from './Button';
 import { Invoice } from '../types';
 
-// Tipos extendidos para o Dashboard Completo
+// === TYPES ===
 interface ConnectionData {
     status: 'online' | 'offline';
     ip: string;
@@ -40,8 +39,8 @@ interface Protocol {
 
 interface ConsumptionData {
     label: string;
-    download: number; // GB
-    upload: number;   // GB
+    download: number;
+    upload: number;
 }
 
 interface FiscalNote {
@@ -49,13 +48,12 @@ interface FiscalNote {
     numero: string;
     serie: string;
     emissao: string;
-    referencia: string; // mm/aaaa
+    referencia: string;
     valor: string;
     link_pdf?: string;
     link_xml?: string;
 }
 
-// Chat Types
 interface ChatMessage {
     id: number;
     text: string;
@@ -65,8 +63,9 @@ interface ChatMessage {
     pixCode?: string;
 }
 
+// === MAIN COMPONENT ===
 const ClientArea: React.FC = () => {
-    // Auth State
+    // === AUTH STATE ===
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [login, setLogin] = useState('');
     const [password, setPassword] = useState('');
@@ -75,58 +74,54 @@ const ClientArea: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Dashboard Data State
+    // === DATA STATE ===
     const [clientName, setClientName] = useState('Cliente Fiber.Net');
-    const [invoices, setInvoices] = useState<Invoice[] | null>(null);
+    const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [connection, setConnection] = useState<ConnectionData | null>(null);
     const [contract, setContract] = useState<ContractData | null>(null);
-    const [protocols, setProtocols] = useState<Protocol[] | null>(null);
+    const [protocols, setProtocols] = useState<Protocol[]>([]);
     const [fiscalNotes, setFiscalNotes] = useState<FiscalNote[]>([]);
 
-    // UI State
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'consumption' | 'reports' | 'fiscal' | 'options' | 'chat'>('dashboard');
+    // === UI STATE ===
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'consumption' | 'reports' | 'fiscal' | 'chat' | 'options'>('dashboard');
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [activePixCode, setActivePixCode] = useState<string | null>(null);
     const [isPixCopied, setIsPixCopied] = useState(false);
-    const [isDemoMode, setIsDemoMode] = useState(false);
     const [unlocking, setUnlocking] = useState(false);
     const [unlockedSuccess, setUnlockedSuccess] = useState(false);
+    const [isDemoMode, setIsDemoMode] = useState(false);
 
-    // Change Password State
-    const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
-    const [currentPassword, setCurrentPassword] = useState('');
-    const [newPassword, setNewPassword] = useState('');
-    const [changePassLoading, setChangePassLoading] = useState(false);
-    const [changePassMessage, setChangePassMessage] = useState<{type: 'success'|'error', text: string} | null>(null);
-
-    // Consumption State
-    const [consumptionPeriod, setConsumptionPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+    // === CHART STATE ===
+    const [consumptionPeriod, setConsumptionPeriod] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
     const [chartData, setChartData] = useState<ConsumptionData[]>([]);
     const [isLoadingChart, setIsLoadingChart] = useState(false);
 
-    // Reports/Fiscal State
-    const [reportYear, setReportYear] = useState('2025');
-
-    // Chatbot State
+    // === CHAT STATE ===
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isBotTyping, setIsBotTyping] = useState(false);
-    const [chatInput, setChatInput] = useState(''); // New state for text input
+    const [chatInput, setChatInput] = useState('');
     const chatEndRef = useRef<HTMLDivElement>(null);
 
-    // Load saved Login on mount
+    // === CHANGE PASSWORD STATE ===
+    const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [passwordLoading, setPasswordLoading] = useState(false);
+
+    // === REPORTS STATE ===
+    const [reportYear, setReportYear] = useState('2025');
+
+    const API_BASE_URL = 'https://api.centralfiber.online/api/v1';
+
+    // === INITIAL LOAD ===
     useEffect(() => {
         const savedLogin = localStorage.getItem('fiber_client_login');
-        const savedPassword = localStorage.getItem('fiber_client_password');
         const savedToken = localStorage.getItem('fiber_auth_token');
-        
+       
         if (savedLogin) {
             setLogin(savedLogin);
             setRememberMe(true);
-            if (savedPassword) {
-                setPassword(savedPassword);
-            }
         }
-
         if (savedToken) {
             if (savedToken === 'demo-token') {
                 loadDemoData();
@@ -136,312 +131,294 @@ const ClientArea: React.FC = () => {
         }
     }, []);
 
-    // Auto-scroll chat
+    // === AUTO SCROLL CHAT ===
     useEffect(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        if (activeTab === 'chat') {
+            chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }
     }, [messages, isBotTyping, activeTab]);
 
-    // Init Chat when opened (Tab)
+    // === INIT CHAT ON TAB SWITCH ===
     useEffect(() => {
         if (activeTab === 'chat' && messages.length === 0) {
             setIsBotTyping(true);
             setTimeout(() => {
-                setMessages([
-                    {
-                        id: 1,
-                        sender: 'bot',
-                        text: `Olá, ${clientName.split(' ')[0]}! Sou o assistente virtual da Fiber.Net. Como posso te ajudar hoje?`,
-                        options: [
-                            { label: '2ª Via de Fatura', action: 'fatura' },
-                            { label: 'Estou sem internet', action: 'suporte' },
-                            { label: 'Desbloqueio de Confiança', action: 'desbloqueio' },
-                            { label: 'Falar com Atendente', action: 'humano' }
-                        ]
-                    }
-                ]);
+                setMessages([{
+                    id: 1,
+                    sender: 'bot',
+                    text: `Olá, ${clientName.split(' ')[0]}! Sou o assistente virtual da Fiber.Net. Como posso te ajudar hoje?`,
+                    options: [
+                        { label: '2ª Via de Fatura', action: 'fatura' },
+                        { label: 'Estou sem internet', action: 'suporte' },
+                        { label: 'Desbloqueio de Confiança', action: 'desbloqueio' },
+                        { label: 'Falar com Atendente', action: 'humano' }
+                    ]
+                }]);
                 setIsBotTyping(false);
             }, 1000);
         }
     }, [activeTab]);
 
-    // Atualiza o gráfico quando muda o período
-    useEffect(() => {
-        if (isDemoMode) {
-            setChartData(generateMockConsumption(consumptionPeriod));
-        } else if (isAuthenticated && activeTab === 'consumption') {
-            // fetchRealConsumption(consumptionPeriod);
+    // === CHART DATA FETCH ===
+    const fetchRealConsumption = async (period: 'daily' | 'weekly' | 'monthly') => {
+        if (!contract?.id || isDemoMode) {
+            if (isDemoMode) setChartData(generateMockConsumption(period));
+            return;
         }
-    }, [consumptionPeriod, isDemoMode, isAuthenticated, activeTab]);
+        
+        const token = localStorage.getItem('fiber_auth_token');
+        if (!token) return;
 
-    // --- DADOS MOCKADOS (Simulação Completa de ISP) ---
+        setIsLoadingChart(true);
+        try {
+            const response = await fetch(`${API_BASE_URL}/ixc/consumo`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    contrato_id: contract.id,
+                    periodo: period === 'daily' ? 'diario' : period === 'weekly' ? 'semanal' : 'mensal'
+                })
+            });
+
+            if (!response.ok) throw new Error('Erro ao buscar consumo');
+
+            const result = await response.json();
+            const formatted = result.dados.map((item: any) => ({
+                label: period === 'monthly'
+                    ? new Date(item.data).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
+                    : period === 'weekly'
+                    ? ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][new Date(item.data).getDay()]
+                    : new Date(item.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+                download: Number(item.download.toFixed(1)),
+                upload: Number(item.upload.toFixed(1))
+            }));
+
+            setChartData(formatted.reverse());
+        } catch (err) {
+            console.warn('Usando mock de consumo');
+            setChartData(generateMockConsumption(period));
+        } finally {
+            setIsLoadingChart(false);
+        }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'consumption' && isAuthenticated) {
+            fetchRealConsumption(consumptionPeriod);
+        }
+    }, [activeTab, consumptionPeriod, contract?.id, isAuthenticated]);
+
+    // === DEMO DATA ===
     const loadDemoData = () => {
         setIsAuthenticated(true);
         setIsDemoMode(true);
-        setClientName('João da Silva');
-
-        // 1. Faturas
+        setClientName('Usuário Demo');
         setInvoices([
-            {
-                id: 101,
-                vencimento: '10/12/2025',
-                valor: '99,90',
-                status: 'aberto',
-                descricao: 'Mensalidade Fibra 500MB',
-                linha_digitavel: '34191.79001 01043.510047 91020.150008 5 84600000026000',
-                pix_code: '00020126360014BR.GOV.BCB.PIX0114+552499999999520400005303986540599.905802BR5925FIBER NET TELECOM6009RIO DAS FLORES62070503***6304ABCD'
-            },
-            {
-                id: 102,
-                vencimento: '10/11/2025',
-                valor: '99,90',
-                status: 'vencido',
-                descricao: 'Mensalidade Fibra 500MB',
-                linha_digitavel: '34191.79001 01043.510047 91020.150008 5 84600000026000'
-            },
-            {
-                id: 103,
-                vencimento: '10/10/2025',
-                valor: '99,90',
-                status: 'pago',
-                descricao: 'Mensalidade Fibra 500MB'
-            }
+            { id: 101, vencimento: '10/12/2025', valor: '99,90', descricao: 'Mensalidade Fibra 500MB', status: 'aberto', linha_digitavel: '34191.79001 01043.510047 91020.150008 1 89370026000', pix_code: '00020126360014BR.GOV.BCB.PIX0114+552499999999520400005303986540599.905802BR5925FIBER NET TELECOM' },
+            { id: 102, vencimento: '10/11/2025', valor: '99,90', descricao: 'Mensalidade Fibra 500MB', status: 'vencido' }
         ]);
-
-        // 2. Dados de Conexão
-        setConnection({
-            status: 'online',
-            ip: '177.45.12.104',
-            uptime: '14 dias, 3 horas',
-            download_usage: '450 GB',
-            upload_usage: '120 GB',
-            mac: 'A1:B2:C3:D4:E5:F6',
-            last_auth: '22/10/2025 08:30'
-        });
-
-        // 3. Contrato
-        setContract({
-            id: 5502,
-            plan_name: 'FIBER MAX 500 MEGA',
-            speed_label: '500 Mbps',
-            address: 'Rua das Flores, 123, Centro - Rio das Flores/RJ',
-            installation_date: '15/01/2023',
-            status: 'Ativo'
-        });
-
-        // 4. Protocolos
+        setConnection({ status: 'online', ip: '177.45.12.104', uptime: '14 dias, 3 horas', download_usage: '450 GB', upload_usage: '120 GB', mac: 'A1:B2:C3:D4:E5:F6', last_auth: '22/10/2025 08:30' });
+        setContract({ id: 5502, plan_name: 'FIBER MAX 500 MEGA', speed_label: '500 Mbps', address: 'Rua das Flores, 123, Centro', installation_date: '15/01/2023', status: 'Ativo' });
         setProtocols([
-            { id: '2025102201', type: 'Financeiro', subject: 'Solicitação de 2ª via', date: '22/10/2025', status: 'Fechado' },
-            { id: '2025091503', type: 'Suporte', subject: 'Lentidão momentânea', date: '15/09/2025', status: 'Fechado' }
+            { id: '2025102201', type: 'Financeiro', subject: 'Solicitação de 2ª via', date: '22/10/2025', status: 'Fechado' }
         ]);
-
-        // 5. Consumo Inicial (Diário)
         setChartData(generateMockConsumption('daily'));
-
-        // 6. Notas Fiscais
-        setFiscalNotes([
-            { id: 501, numero: '000152', serie: '1', emissao: '10/10/2025', referencia: 'Outubro/2025', valor: '99,90', link_pdf: '#', link_xml: '#' },
-            { id: 500, numero: '000148', serie: '1', emissao: '10/09/2025', referencia: 'Setembro/2025', valor: '99,90', link_pdf: '#', link_xml: '#' },
-            { id: 499, numero: '000135', serie: '1', emissao: '10/08/2025', referencia: 'Agosto/2025', valor: '99,90', link_pdf: '#', link_xml: '#' },
-        ]);
     };
 
     const generateMockConsumption = (period: 'daily' | 'weekly' | 'monthly'): ConsumptionData[] => {
         const data: ConsumptionData[] = [];
         const now = new Date();
+        const count = period === 'daily' ? 30 : period === 'weekly' ? 7 : 12;
         
-        if (period === 'daily') {
-            // Últimos 30 dias
-            for (let i = 30; i >= 0; i--) {
-                const d = new Date();
-                d.setDate(now.getDate() - i);
-                data.push({
-                    label: d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-                    download: Math.floor(Math.random() * 40) + 5,
-                    upload: Math.floor(Math.random() * 10) + 1
-                });
-            }
-        } else if (period === 'weekly') {
-            // Últimos 7 dias (mais detalhado)
-            for (let i = 6; i >= 0; i--) {
-                const d = new Date();
-                d.setDate(now.getDate() - i);
-                data.push({
-                    label: d.toLocaleDateString('pt-BR', { weekday: 'short' }),
-                    download: Math.floor(Math.random() * 60) + 20,
-                    upload: Math.floor(Math.random() * 20) + 5
-                });
-            }
-        } else {
-            // Últimos 12 meses
-            for (let i = 11; i >= 0; i--) {
-                const d = new Date();
-                d.setMonth(now.getMonth() - i);
-                data.push({
-                    label: d.toLocaleDateString('pt-BR', { month: 'short' }),
-                    download: Math.floor(Math.random() * 800) + 200,
-                    upload: Math.floor(Math.random() * 200) + 50
-                });
-            }
+        for (let i = count; i >= 0; i--) {
+            const d = new Date();
+            if (period === 'monthly') d.setMonth(now.getMonth() - i);
+            else d.setDate(now.getDate() - i);
+            
+            data.push({
+                label: period === 'monthly' 
+                    ? d.toLocaleDateString('pt-BR', { month: 'short' }) 
+                    : d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+                download: Math.floor(Math.random() * (period === 'monthly' ? 800 : 50)) + 10,
+                upload: Math.floor(Math.random() * (period === 'monthly' ? 200 : 15)) + 5
+            });
         }
         return data;
     };
 
+    // === FETCH DATA FROM API ===
     const fetchDashboardData = async (token: string) => {
-        setLoading(true);
-        try {
-            const response = await fetch('https://api.centralfiber.online/api/v1/dashboard/dados', {
-                headers: { 'Authorization': `Bearer ${token}` },
-            });
-
-            if (!response.ok) {
-                handleLogout(false);
-                throw new Error('Sessão expirada.');
-            }
-
-            const data = await response.json();
-            
-            setClientName(data.cliente?.nome?.split(' ')[0] || 'Cliente');
-            setInvoices(data.faturas || []);
-            setConnection(data.conexao || null);
-            setContract(data.contrato || null);
-            setProtocols(data.protocolos || []);
-            setFiscalNotes(data.notas_fiscais || []); 
-
-            setIsAuthenticated(true);
-            setError(null);
-
-        } catch (err: any) {
-            console.error('Fetch Error:', err);
-            if (token === 'demo-token') {
-                loadDemoData();
-            } else {
-                handleLogout(false);
-                setError('Falha ao carregar dados. Faça login novamente.');
-            }
-        } finally {
-            setLoading(false);
-        }
-    }
-
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!login || !password) { setError('Preencha o e-mail e a senha.'); return; }
-        
         setLoading(true);
         setError(null);
 
-        // DEV MODE Mock (Prioridade para teste explícito)
-        if (login === 'teste' && password === '123') {
-            setTimeout(() => {
-                localStorage.setItem('fiber_auth_token', 'demo-token');
-                if (rememberMe) {
-                    localStorage.setItem('fiber_client_login', login);
-                    localStorage.setItem('fiber_client_password', password);
-                } else {
-                    localStorage.removeItem('fiber_client_login');
-                    localStorage.removeItem('fiber_client_password');
+        try {
+            const response = await fetch(`${API_BASE_URL}/dashboard/dados`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error(`Erro ${response.status}`);
+            }
+
+            const raw = await response.json();
+            const apiData = raw.data || raw;
+
+            if (!apiData || Object.keys(apiData).length === 0) {
+                throw new Error("Dados vazios");
+            }
+
+            // Helper to safely get string from potential objects
+            const getString = (val: any, fallback: string) => {
+                if (val === null || val === undefined) return fallback;
+                if (typeof val === 'string') return val;
+                if (typeof val === 'number') return String(val);
+                if (typeof val === 'object') {
+                    return val.nome || val.descricao || val.valor || val.label || val.text || fallback;
                 }
+                return fallback;
+            };
+
+            // NOME
+            const nomeObj = apiData.cliente?.nome || apiData.nome || 'Cliente';
+            const nomeCompleto = getString(nomeObj, 'Cliente');
+            setClientName(nomeCompleto.split(' ')[0]);
+
+            // FATURAS
+            const faturasRaw = apiData.faturas || apiData.boletos || [];
+            setInvoices(faturasRaw.map((f: any) => ({
+                id: f.id || f.codigo || Date.now(),
+                vencimento: getString(f.vencimento || f.data_vencimento, ''),
+                valor: String(f.valor || f.valor_total || '0,00').replace('.', ','),
+                status: getString(f.status, '').toLowerCase() || (new Date(f.vencimento) < new Date() ? 'vencido' : 'aberto'),
+                descricao: getString(f.descricao || f.referencia, 'Mensalidade Fibra'),
+                linha_digitavel: getString(f.linha_digitavel || f.codigo_barras, ''),
+                pix_code: getString(f.pix_codigo || f.pix_code || f.codigo_pix || f.linha_digitavel, ''),
+                link_pdf: getString(f.link_boleto || f.boleto_pdf || f.pdf, ''),
+            })));
+
+            // CONEXÃO
+            setConnection({
+                status: (getString(apiData.conexao?.status || apiData.status_conexao, 'offline').toLowerCase() === 'online') ? 'online' : 'offline',
+                ip: getString(apiData.conexao?.ip_publico || apiData.ip_publico, 'Indisponível'),
+                uptime: getString(apiData.conexao?.uptime, '0h 0min'),
+                download_usage: getString(apiData.conexao?.download_mes || apiData.download_mes, '0 GB'),
+                upload_usage: getString(apiData.conexao?.upload_mes || apiData.upload_mes, '0 GB'),
+                mac: getString(apiData.conexao?.mac || apiData.mac_address, 'Não informado'),
+                last_auth: getString(apiData.conexao?.ultima_autenticacao, 'Nunca'),
+            });
+
+            // CONTRATO
+            setContract({
+                id: apiData.contrato?.id || apiData.id_contrato || 0,
+                plan_name: getString(apiData.contrato?.plano || apiData.plano, 'FIBER 500MB'),
+                speed_label: getString(apiData.contrato?.velocidade || apiData.velocidade, '500 Mbps'),
+                address: getString(apiData.contrato?.endereco_instalacao || apiData.endereco, 'Endereço não informado'),
+                installation_date: getString(apiData.contrato?.data_instalacao, '01/01/2023'),
+                status: getString(apiData.contrato?.status, 'Ativo'),
+            });
+
+            // PROTOCOLOS
+            const protocolosRaw = apiData.protocolos || apiData.atendimentos || apiData.chamados || [];
+            setProtocols(protocolosRaw.map((p: any) => ({
+                id: getString(p.protocolo || p.id, '0000'),
+                type: getString(p.tipo || p.categoria, 'Suporte'),
+                subject: getString(p.assunto || p.titulo, 'Sem título'),
+                date: getString(p.data || p.criado_em, new Date().toLocaleDateString('pt-BR')),
+                status: (getString(p.status, 'Fechado')) as 'Aberto' | 'Fechado' | 'Em Análise',
+            })));
+
+            // NOTAS FISCAIS
+            const notasRaw = apiData.notas_fiscais || apiData.nfs || [];
+            setFiscalNotes(notasRaw.map((n: any) => ({
+                id: n.id || Date.now(),
+                numero: getString(n.numero, '000000'),
+                serie: getString(n.serie, '1'),
+                emissao: getString(n.emissao || n.data_emissao, new Date().toLocaleDateString('pt-BR')),
+                referencia: getString(n.referencia || n.competencia, 'Atual'),
+                valor: String(n.valor || '0,00').replace('.', ','),
+                link_pdf: getString(n.link_pdf || n.pdf, ''),
+                link_xml: getString(n.link_xml || n.xml, ''),
+            })));
+
+            setIsAuthenticated(true);
+            setIsDemoMode(false);
+            setError(null);
+
+        } catch (err: any) {
+            console.error('Erro API:', err);
+            setError('Falha ao carregar dados reais. Entrando em modo demonstração...');
+            setTimeout(() => {
                 loadDemoData();
-                setLoading(false);
-            }, 1000);
+                setError(null);
+            }, 2500);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // === AUTH ACTIONS ===
+    const handleLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!login || !password) return setError('Preencha e-mail e senha');
+        
+        if (login === 'teste' && password === '123') {
+            loadDemoData();
             return;
         }
 
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); 
+        setLoading(true);
+        setError(null);
 
         try {
-            const cleanLogin = login.includes('@') ? login.trim() : login.replace(/\D/g, '');
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-            const response = await fetch('https://api.centralfiber.online/api/v1/auth/login', {
+            const response = await fetch(`${API_BASE_URL}/auth/login`, {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify({ 
-                    login: cleanLogin, 
-                    senha: password 
-                }),
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ login: login.trim(), senha: password }),
                 signal: controller.signal
             });
             
             clearTimeout(timeoutId);
 
-            const contentType = response.headers.get("content-type");
-            let data;
-            if (contentType && contentType.indexOf("application/json") !== -1) {
-                data = await response.json();
-            }
+            if (!response.ok) throw new Error('Credenciais inválidas');
+            const data = await response.json();
 
-            if (!response.ok) {
-                throw new Error(data?.message || `Erro do servidor: ${response.status}`);
-            }
-            
-            if (data && data.token) {
+            if (data.token) {
                 localStorage.setItem('fiber_auth_token', data.token);
-                
-                if (rememberMe) {
-                    localStorage.setItem('fiber_client_login', login);
-                    localStorage.setItem('fiber_client_password', password);
-                } else {
-                    localStorage.removeItem('fiber_client_login');
-                    localStorage.removeItem('fiber_client_password');
-                }
-                
-                await fetchDashboardData(data.token); 
-                setLoading(false); 
-            } else {
-                 throw new Error('Erro no servidor: Token não recebido.');
+                if (rememberMe) localStorage.setItem('fiber_client_login', login);
+                await fetchDashboardData(data.token);
             }
         } catch (err: any) {
-            console.error('Login Failed:', err);
-            
-            if (err.message === 'Failed to fetch' || err.message.includes('NetworkError')) {
-                setError('Servidor indisponível. Entrando em Modo Demonstração...');
-                
-                setTimeout(() => {
-                    localStorage.setItem('fiber_auth_token', 'demo-token');
-                    if (rememberMe) {
-                        localStorage.setItem('fiber_client_login', login);
-                        localStorage.setItem('fiber_client_password', password);
-                    }
-                    loadDemoData();
-                    setError(null);
-                    setLoading(false);
-                }, 1500);
-                return; 
+            if (err.name === 'AbortError' || err.message === 'Failed to fetch') {
+                console.warn("Backend indisponível, entrando em modo DEMO");
+                loadDemoData();
+            } else {
+                setError('E-mail ou senha incorretos.');
             }
-
-            let errorMessage = err.message || 'Falha desconhecida.';
-            if (err.name === 'AbortError') {
-                errorMessage = 'O servidor demorou muito para responder. Tente novamente.';
-            }
-            
-            setError(errorMessage);
+        } finally {
             setLoading(false);
         }
     };
 
-    const handleLogout = (clearLogin = true) => {
+    const handleLogout = () => {
         setIsAuthenticated(false);
-        setInvoices(null);
-        setConnection(null);
-        setContract(null);
-        setProtocols(null);
-        setFiscalNotes([]);
-        setClientName('');
-        setError(null);
-        setIsDemoMode(false);
-        setUnlockedSuccess(false);
         localStorage.removeItem('fiber_auth_token');
-        
-        if (!rememberMe || clearLogin) {
+        if (!rememberMe) {
             setLogin('');
-            setPassword('');
             localStorage.removeItem('fiber_client_login');
-            localStorage.removeItem('fiber_client_password');
         }
+        setInvoices([]); setConnection(null); setContract(null); setProtocols([]); setFiscalNotes([]);
+        setIsDemoMode(false); setUnlockedSuccess(false);
     };
 
     const handleUnlockTrust = () => {
@@ -452,234 +429,169 @@ const ClientArea: React.FC = () => {
         }, 2000);
     };
 
-    const handleChangePassword = async () => {
-        if (!currentPassword || !newPassword) {
-            setChangePassMessage({type: 'error', text: 'Preencha todos os campos.'});
-            return;
-        }
-
-        setChangePassLoading(true);
-        setChangePassMessage(null);
-        
-        const token = localStorage.getItem('fiber_auth_token');
-        
-        try {
-            if (isDemoMode) {
-                await new Promise(resolve => setTimeout(resolve, 1500));
-                setChangePassMessage({type: 'success', text: 'Senha alterada com sucesso (Simulação)!'});
-            } else {
-                const res = await fetch("https://api.centralfiber.online/api/v1/dashboard/trocar-senha", {
-                    method: "POST",
-                    headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-                    body: JSON.stringify({ senhaAtual: currentPassword, novaSenha: newPassword })
-                });
-                const data = await res.json();
-                
-                if(!res.ok) throw new Error(data.message || data.error || "Erro ao trocar senha");
-                setChangePassMessage({type: 'success', text: 'Senha alterada com sucesso!'});
-            }
-            
-            setTimeout(() => {
-                setIsChangePasswordOpen(false);
-                setCurrentPassword('');
-                setNewPassword('');
-                setChangePassMessage(null);
-            }, 2000);
-        } catch (err: any) {
-            setChangePassMessage({type: 'error', text: err.message});
-        } finally {
-            setChangePassLoading(false);
-        }
-    };
-
-    // === CHATBOT INTEGRADO (API + FALLBACK) ===
-    const sendMessageToBackend = async (messageText: string, actionContext?: string) => {
-        const token = localStorage.getItem('fiber_auth_token');
-        
-        // Adiciona mensagem do usuário na UI
-        const userMsgId = Date.now();
-        setMessages(prev => [...prev, { id: userMsgId, text: messageText, sender: 'user' }]);
-        setIsBotTyping(true);
-        setChatInput('');
-
-        try {
-            // Tenta conectar com o Backend Real
-            if (!isDemoMode) {
-                const res = await fetch("https://api.centralfiber.online/api/v1/chatbot/message", {
-                    method: "POST",
-                    headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-                    body: JSON.stringify({ message: messageText, context: actionContext })
-                });
-                
-                if (res.ok) {
-                    const data = await res.json();
-                    // Backend deve retornar: { text: string, options?: [], type?: 'pix', pixCode?: string }
-                    setMessages(prev => [...prev, { 
-                        id: Date.now() + 1, 
-                        sender: 'bot', 
-                        text: data.text, 
-                        options: data.options,
-                        type: data.type,
-                        pixCode: data.pixCode 
-                    }]);
-                    setIsBotTyping(false);
-                    return; // Sucesso, encerra aqui.
-                }
-            }
-            throw new Error("Fallback to local"); // Força o catch se demo ou erro
-        } catch (err) {
-            // === LÓGICA LOCAL (FALLBACK) ===
-            // Se o backend falhar, usa a lógica do frontend baseada no estado atual
-            setTimeout(() => {
-                let botResponse: ChatMessage = { id: Date.now() + 1, text: '', sender: 'bot' };
-                const action = actionContext || 'default';
-
-                switch(action) {
-                    case 'fatura':
-                        const openInvoices = invoices?.filter(i => i.status !== 'pago') || [];
-                        if (openInvoices.length > 0) {
-                            const inv = openInvoices[0];
-                            botResponse.text = `Encontrei uma fatura com vencimento em ${inv.vencimento} no valor de R$ ${inv.valor}.`;
-                            if (inv.pix_code) {
-                                botResponse.type = 'pix';
-                                botResponse.pixCode = inv.pix_code;
-                            } else if (inv.linha_digitavel) {
-                                botResponse.text += "\nCódigo de barras: " + inv.linha_digitavel;
-                            }
-                            botResponse.options = [{ label: 'Voltar ao menu', action: 'menu' }];
-                        } else {
-                            botResponse.text = "Parabéns! Não encontrei nenhuma fatura em aberto no seu cadastro. Você está em dia com a Fiber.Net!";
-                            botResponse.options = [{ label: 'Voltar ao menu', action: 'menu' }];
-                        }
-                        break;
-
-                    case 'suporte':
-                        if (connection?.status === 'offline') {
-                            botResponse.text = "Identifiquei que seu equipamento consta como OFFLINE. Por favor, verifique se ele está ligado na tomada e se os cabos estão conectados. Já tentou reiniciar?";
-                            botResponse.options = [
-                                { label: 'Sim, já reiniciei', action: 'reiniciei' },
-                                { label: 'Vou tentar agora', action: 'menu' }
-                            ];
-                        } else {
-                            botResponse.text = "Seu equipamento consta como ONLINE e com sinal estável. Se está com lentidão, pode ser interferência no Wi-Fi. Deseja falar com um atendente?";
-                            botResponse.options = [
-                                { label: 'Falar com Atendente', action: 'humano' },
-                                { label: 'Voltar ao menu', action: 'menu' }
-                            ];
-                        }
-                        break;
-
-                    case 'reiniciei':
-                        const hasOverdue = invoices?.some(i => i.status === 'vencido');
-                        if (hasOverdue && !unlockedSuccess) {
-                            botResponse.text = "Entendi. Verifiquei que existe uma fatura vencida que pode ter causado o bloqueio automático. Você pode liberar o sinal por 48h agora mesmo.";
-                            botResponse.options = [
-                                { label: 'Liberar Internet (48h)', action: 'do_unlock' },
-                                { label: 'Não, obrigado', action: 'menu' }
-                            ];
-                        } else {
-                            botResponse.text = "Como o problema persiste, vou te encaminhar para nosso suporte técnico especializado no WhatsApp.";
-                            botResponse.options = [{ label: 'Ir para WhatsApp', action: 'humano' }];
-                        }
-                        break;
-
-                    case 'desbloqueio':
-                    case 'do_unlock':
-                        if (unlockedSuccess) {
-                            botResponse.text = "Seu desbloqueio de confiança já foi utilizado recentemente e está ativo!";
-                        } else {
-                            handleUnlockTrust();
-                            botResponse.text = "Pronto! Realizei o desbloqueio de confiança. Seu sinal deve voltar em até 5 minutos. Lembre-se de regularizar a fatura em até 48 horas.";
-                        }
-                        botResponse.options = [{ label: 'Obrigado', action: 'menu' }];
-                        break;
-
-                    case 'humano':
-                        botResponse.text = "Para atendimento humano, por favor, clique no botão abaixo para abrir o WhatsApp da nossa equipe.";
-                        window.open('https://wa.me/552424581861', '_blank');
-                        botResponse.options = [{ label: 'Voltar ao menu', action: 'menu' }];
-                        break;
-
-                    case 'menu':
-                        botResponse.text = "Posso ajudar com algo mais?";
-                        botResponse.options = [
-                            { label: '2ª Via de Fatura', action: 'fatura' },
-                            { label: 'Estou sem internet', action: 'suporte' },
-                            { label: 'Desbloqueio de Confiança', action: 'desbloqueio' },
-                            { label: 'Falar com Atendente', action: 'humano' }
-                        ];
-                        break;
-                    
-                    default:
-                        // Se for texto livre
-                        botResponse.text = "Desculpe, ainda estou aprendendo. Por favor, selecione uma das opções abaixo ou fale com um atendente.";
-                        botResponse.options = [
-                            { label: '2ª Via de Fatura', action: 'fatura' },
-                            { label: 'Falar com Atendente', action: 'humano' }
-                        ];
-                }
-
-                setMessages(prev => [...prev, botResponse]);
-                setIsBotTyping(false);
-            }, 1000);
-        }
-    };
-
-    const handleChatOption = (action: string, label: string) => {
-        sendMessageToBackend(label, action);
-    };
-
-    const handleChatSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (chatInput.trim()) {
-            sendMessageToBackend(chatInput);
-        }
-    };
-
     const copyToClipboard = (text: string, id: string) => {
-        try { navigator.clipboard.writeText(text); } 
-        catch (e) { /* Fallback logic */ }
+        navigator.clipboard.writeText(text);
         setCopiedId(id);
         setTimeout(() => setCopiedId(null), 3000);
     };
-    const openPixModal = (code: string) => { setActivePixCode(code); setIsPixCopied(false); };
-    const closePixModal = () => { setActivePixCode(null); setIsPixCopied(false); };
-    const copyPixCode = () => { if (activePixCode) { copyToClipboard(activePixCode, 'pix-modal'); setIsPixCopied(true); } };
 
-    // --- CHART COMPONENT (SVG Native) ---
+    const openPixModal = (code: string) => {
+        setActivePixCode(code);
+        setIsPixCopied(false);
+    };
+
+    const closePixModal = () => {
+        setActivePixCode(null);
+        setIsPixCopied(false);
+    };
+
+    const copyPixCode = () => {
+        if (activePixCode) {
+            navigator.clipboard.writeText(activePixCode);
+            setIsPixCopied(true);
+            setTimeout(() => setIsPixCopied(false), 3000);
+        }
+    };
+
+    const handleChangePassword = async () => {
+        if (!currentPassword || !newPassword) return alert("Preencha todos os campos");
+        setPasswordLoading(true);
+        try {
+            const token = localStorage.getItem('fiber_auth_token');
+            const res = await fetch(`${API_BASE_URL}/dashboard/trocar-senha`, {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+                body: JSON.stringify({ senhaAtual: currentPassword, novaSenha: newPassword })
+            });
+            if (res.ok) {
+                alert("Senha alterada com sucesso!");
+                setIsChangePasswordOpen(false);
+                setCurrentPassword('');
+                setNewPassword('');
+            } else {
+                alert("Erro ao alterar senha");
+            }
+        } catch (e) {
+            alert("Erro de conexão");
+        } finally {
+            setPasswordLoading(false);
+        }
+    };
+
+    const sendMessage = async (text: string) => {
+        if (!text.trim()) return;
+        
+        const userMsg: ChatMessage = { id: Date.now(), text, sender: 'user' };
+        setMessages(prev => [...prev, userMsg]);
+        setChatInput('');
+        setIsBotTyping(true);
+
+        try {
+            const token = localStorage.getItem('fiber_auth_token');
+            const response = await fetch(`${API_BASE_URL}/chatbot/message`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ message: text })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                setMessages(prev => [...prev, { id: Date.now() + 1, text: data.message, sender: 'bot' }]);
+            } else {
+                throw new Error('Chat error');
+            }
+        } catch (e) {
+            setTimeout(() => {
+                let botResponse: ChatMessage = { id: Date.now() + 1, text: '', sender: 'bot' };
+                const lowerText = text.toLowerCase();
+
+                if (lowerText.includes('fatura') || lowerText.includes('pagar') || lowerText.includes('2 via')) {
+                    const openInvoices = invoices?.filter(i => i.status === 'aberto' || i.status === 'vencido') || [];
+                    if (openInvoices.length > 0) {
+                        botResponse.text = `Encontrei ${openInvoices.length} fatura(s) em aberto. Aqui está o PIX da mais antiga:`;
+                        botResponse.type = 'pix';
+                        botResponse.pixCode = openInvoices[0].pix_code || openInvoices[0].linha_digitavel;
+                    } else {
+                        botResponse.text = "Parabéns! Não constam faturas em aberto no seu cadastro.";
+                    }
+                } else if (lowerText.includes('internet') || lowerText.includes('caiu') || lowerText.includes('lenta')) {
+                    const hasOverdue = invoices?.some(i => i.status === 'vencido');
+                    if (hasOverdue) {
+                        botResponse.text = "Verifiquei que existe uma fatura vencida. Seu sinal pode ter sido reduzido. Deseja realizar o desbloqueio de confiança?";
+                        botResponse.options = [{ label: 'Sim, desbloquear', action: 'desbloqueio' }];
+                    } else {
+                        botResponse.text = "Sua conexão parece normal no sistema. Por favor, desligue seu roteador da tomada por 30 segundos e ligue novamente. Se não voltar, chame nosso suporte.";
+                    }
+                } else if (lowerText.includes('desbloqueio')) {
+                    handleUnlockTrust();
+                    botResponse.text = "Solicitação de desbloqueio enviada! Aguarde cerca de 10 minutos e reinicie seu equipamento.";
+                } else {
+                    botResponse.text = "Desculpe, não entendi. Posso ajudar com Faturas, Suporte Técnico ou Desbloqueio.";
+                    botResponse.options = [
+                        { label: '2ª Via de Fatura', action: 'fatura' },
+                        { label: 'Falar com Humano', action: 'humano' }
+                    ];
+                }
+                
+                setMessages(prev => [...prev, botResponse]);
+                setIsBotTyping(false);
+            }, 1000);
+        } finally {
+            setIsBotTyping(false);
+        }
+    };
+
     const SimpleLineChart = ({ data }: { data: ConsumptionData[] }) => {
-        if (!data || data.length === 0) return null;
-        const height = 300; const width = 1000; const padding = 40;
-        const maxVal = Math.max(...data.map(d => Math.max(d.download, d.upload))) * 1.1;
-        const getX = (index: number) => padding + (index / (data.length - 1)) * (width - 2 * padding);
+        if (!data || data.length === 0) return <div className="text-center py-20 text-gray-500">Sem dados para exibir</div>;
+
+        const height = 300;
+        const width = 1000;
+        const padding = 40;
+        const maxVal = Math.max(...data.map(d => Math.max(d.download, d.upload)), 10) * 1.1;
+
+        const getX = (i: number) => padding + (i / (data.length - 1 || 1)) * (width - 2 * padding);
         const getY = (val: number) => height - padding - (val / maxVal) * (height - 2 * padding);
-        const dlPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(d.download)}`).join(' ');
-        const ulPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(d.upload)}`).join(' ');
+
+        const dlPoints = data.map((d, i) => `${getX(i)},${getY(d.download)}`).join(' ');
+        const ulPoints = data.map((d, i) => `${getX(i)},${getY(d.upload)}`).join(' ');
+
+        const dlPath = data.length > 1 ? `M ${dlPoints}` : `M ${padding} ${height-padding} L ${width-padding} ${height-padding}`;
+        const ulPath = data.length > 1 ? `M ${ulPoints}` : `M ${padding} ${height-padding} L ${width-padding} ${height-padding}`;
+
         const dlArea = `${dlPath} L ${getX(data.length - 1)} ${height - padding} L ${padding} ${height - padding} Z`;
         const ulArea = `${ulPath} L ${getX(data.length - 1)} ${height - padding} L ${padding} ${height - padding} Z`;
 
         return (
             <div className="w-full overflow-x-auto">
-                <div className="min-w-[600px] relative">
-                     <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto drop-shadow-xl">
-                        {[0, 0.25, 0.5, 0.75, 1].map(tick => ( <line key={tick} x1={padding} y1={getY(maxVal * tick)} x2={width - padding} y2={getY(maxVal * tick)} stroke="#ffffff20" strokeDasharray="4" /> ))}
-                        <path d={dlArea} fill="rgba(6, 182, 212, 0.15)" /> <path d={ulArea} fill="rgba(249, 115, 22, 0.15)" />
+                <div className="min-w-[600px]">
+                    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto font-sans">
+                        {[0, 0.25, 0.5, 0.75, 1].map((t) => (
+                            <line key={t} x1={padding} y1={getY(maxVal * t)} x2={width - padding} y2={getY(maxVal * t)} stroke="#333" strokeWidth="1" strokeDasharray="4" />
+                        ))}
+                        <path d={dlArea} fill="rgba(6, 182, 212, 0.1)" />
+                        <path d={ulArea} fill="rgba(249, 115, 22, 0.1)" />
                         <path d={dlPath} fill="none" stroke="#06b6d4" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                         <path d={ulPath} fill="none" stroke="#f97316" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                        {data.map((d, i) => ( <g key={i}> <circle cx={getX(i)} cy={getY(d.download)} r="4" fill="#06b6d4" className="hover:r-6 transition-all" /> <circle cx={getX(i)} cy={getY(d.upload)} r="4" fill="#f97316" className="hover:r-6 transition-all" /> {(data.length < 15 || i % 3 === 0) && ( <text x={getX(i)} y={height - 10} textAnchor="middle" fill="#9ca3af" fontSize="12">{d.label}</text> )} </g> ))}
-                         {[0, 0.5, 1].map(tick => ( <text key={tick} x={padding - 10} y={getY(maxVal * tick) + 4} textAnchor="end" fill="#9ca3af" fontSize="12"> {Math.round(maxVal * tick)}GB </text> ))}
-                     </svg>
+                        {data.map((d, i) => (
+                            <g key={i}>
+                                <circle cx={getX(i)} cy={getY(d.download)} r="4" fill="#06b6d4" className="hover:r-6 transition-all" />
+                                <circle cx={getX(i)} cy={getY(d.upload)} r="4" fill="#f97316" className="hover:r-6 transition-all" />
+                                {data.length <= 12 && (
+                                    <text x={getX(i)} y={height - 15} textAnchor="middle" fill="#666" fontSize="12">{d.label}</text>
+                                )}
+                            </g>
+                        ))}
+                    </svg>
                 </div>
                 <div className="flex justify-center gap-6 mt-4">
-                    <div className="flex items-center gap-2"><div className="w-3 h-3 bg-cyan-500 rounded-full"></div><span className="text-gray-300 text-sm">Download</span></div>
-                    <div className="flex items-center gap-2"><div className="w-3 h-3 bg-fiber-orange rounded-full"></div><span className="text-gray-300 text-sm">Upload</span></div>
+                    <div className="flex items-center gap-2"><div className="w-3 h-3 bg-cyan-500 rounded-full"></div><span className="text-gray-300 text-sm">Download (GB)</span></div>
+                    <div className="flex items-center gap-2"><div className="w-3 h-3 bg-orange-500 rounded-full"></div><span className="text-gray-300 text-sm">Upload (GB)</span></div>
                 </div>
             </div>
         );
     };
 
-
-    // --- LOGIN SCREEN ---
+    // === LOGIN RENDER ===
     if (!isAuthenticated) {
         return (
             <div className="min-h-screen bg-fiber-dark flex flex-col pt-24 pb-12">
@@ -690,35 +602,41 @@ const ClientArea: React.FC = () => {
                                 <User size={32} />
                             </div>
                             <h1 className="text-2xl font-bold text-white">Central do Assinante</h1>
-                            <p className="text-gray-400 mt-2 text-sm">Acesse faturas, consumo e desbloqueio.</p>
+                            <p className="text-gray-400 mt-2 text-sm">Acesse sua conta com segurança</p>
                         </div>
                         <div className="p-8">
                             <form onSubmit={handleLogin} className="space-y-5">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-400 mb-2">E-mail</label>
                                     <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-500"><Mail size={20} /></div>
-                                        <input type="email" value={login} onChange={(e) => setLogin(e.target.value)} placeholder="Digite seu e-mail cadastrado" className="w-full h-12 pl-11 pr-4 bg-fiber-dark border border-white/10 rounded-lg text-white focus:border-fiber-orange focus:ring-1 focus:ring-fiber-orange" required />
+                                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
+                                        <input type="email" value={login} onChange={(e) => setLogin(e.target.value)} placeholder="seu@email.com" className="w-full h-12 pl-11 pr-4 bg-fiber-dark border border-white/10 rounded-lg text-white focus:border-fiber-orange focus:ring-1 focus:ring-fiber-orange" required />
                                     </div>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-400 mb-2">Senha</label>
                                     <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-500"><Lock size={20} /></div>
-                                        <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Senha da Central" className="w-full h-12 pl-11 pr-12 bg-fiber-dark border border-white/10 rounded-lg text-white focus:border-fiber-orange focus:ring-1 focus:ring-fiber-orange" required />
-                                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-4 text-gray-500 hover:text-fiber-orange"><Eye size={20} /></button>
+                                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
+                                        <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full h-12 pl-11 pr-12 bg-fiber-dark border border-white/10 rounded-lg text-white focus:border-fiber-orange focus:ring-1 focus:ring-fiber-orange" required />
+                                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-fiber-orange">
+                                            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                        </button>
                                     </div>
                                 </div>
                                 <div className="flex items-center justify-between">
-                                    <div className="flex items-center">
-                                        <input id="remember-me" type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="h-4 w-4 accent-fiber-orange rounded bg-neutral-800" />
-                                        <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-400">Lembrar meus dados</label>
-                                    </div>
+                                    <label className="flex items-center cursor-pointer">
+                                        <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="h-4 w-4 accent-fiber-orange rounded" />
+                                        <span className="ml-2 text-sm text-gray-400">Lembrar e-mail</span>
+                                    </label>
                                     <a href="https://wa.me/552424581861" target="_blank" className="text-sm text-fiber-orange hover:underline">Esqueceu a senha?</a>
                                 </div>
                                 {error && <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 p-3 rounded-lg border border-red-500/20"><AlertCircle size={16} />{error}</div>}
-                                <Button type="submit" variant="primary" fullWidth disabled={loading} className="h-12 text-base mt-2">{loading ? <Loader2 className="animate-spin mx-auto" /> : 'Entrar'}</Button>
-                                <div className="mt-2 p-2 bg-yellow-500/5 border border-yellow-500/10 rounded text-center"><p className="text-[10px] text-yellow-600 font-bold">MOCK DEV</p><p className="text-xs text-gray-400">Login: teste | Senha: 123</p></div>
+                                <Button type="submit" variant="primary" fullWidth disabled={loading} className="h-12 text-base mt-2">
+                                    {loading ? <Loader2 className="animate-spin mx-auto" /> : 'Entrar na Central'}
+                                </Button>
+                                <div className="mt-4 p-4 bg-neutral-800/50 rounded-lg text-center border border-white/5">
+                                    <p className="text-xs text-gray-400">Modo de Teste: <span className="text-white font-mono">teste</span> / <span className="text-white font-mono">123</span></p>
+                                </div>
                             </form>
                         </div>
                     </div>
@@ -729,462 +647,457 @@ const ClientArea: React.FC = () => {
 
     const hasOverdue = invoices?.some(i => i.status === 'vencido');
 
-    // Render Chat Messages (Used in Tab view)
-    const renderChatContent = () => (
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-neutral-950/50 scrollbar-thin scrollbar-thumb-neutral-700 h-full">
-            {messages.map((msg) => (
-                <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[85%] rounded-2xl p-3 text-sm ${
-                        msg.sender === 'user' 
-                            ? 'bg-fiber-orange text-white rounded-tr-none' 
-                            : 'bg-neutral-800 text-gray-200 rounded-tl-none border border-white/5'
-                    }`}>
-                        <p className="whitespace-pre-wrap">{msg.text}</p>
-                        
-                        {/* Render Pix Code Special Block */}
-                        {msg.type === 'pix' && msg.pixCode && (
-                            <div className="mt-2 bg-white p-2 rounded-lg">
-                                <p className="text-neutral-900 text-xs font-mono break-all mb-2 select-all">{msg.pixCode}</p>
-                                <button 
-                                    onClick={() => { copyToClipboard(msg.pixCode!, `chat-pix-${msg.id}`); }}
-                                    className="w-full py-1.5 bg-neutral-900 text-white text-xs font-bold rounded flex items-center justify-center gap-1 hover:bg-neutral-700"
-                                >
-                                    {copiedId === `chat-pix-${msg.id}` ? <CheckCircle size={12} /> : <Copy size={12} />}
-                                    {copiedId === `chat-pix-${msg.id}` ? 'Copiado!' : 'Copiar PIX'}
-                                </button>
-                            </div>
-                        )}
-
-                        {/* Render Options */}
-                        {msg.options && (
-                            <div className="mt-3 space-y-2">
-                                {msg.options.map((opt, idx) => (
-                                    <button
-                                        key={idx}
-                                        onClick={() => handleChatOption(opt.action, opt.label)}
-                                        className="w-full text-left px-3 py-2 bg-neutral-900 hover:bg-neutral-700 text-fiber-orange text-xs font-bold rounded border border-white/5 transition-colors"
-                                    >
-                                        {opt.label}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            ))}
-            {isBotTyping && (
-                <div className="flex justify-start">
-                    <div className="bg-neutral-800 rounded-2xl rounded-tl-none p-3 border border-white/5">
-                        <MoreHorizontal size={20} className="text-gray-500 animate-pulse" />
-                    </div>
-                </div>
-            )}
-            <div ref={chatEndRef} />
-        </div>
-    );
-
+    // === DASHBOARD RENDER ===
     return (
         <div className="min-h-screen bg-fiber-dark pt-24 pb-12">
             
-            {/* Header & Tabs */}
-            <div className="bg-fiber-card border-y border-white/5 mb-8">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-                    <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
+            {/* Header */}
+            <div className="bg-fiber-card border-y border-white/5 mb-8 sticky top-16 z-40 shadow-lg">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex flex-col md:flex-row justify-between items-center py-4 gap-4">
                         <div className="flex items-center gap-4">
-                            <div className="bg-neutral-800 p-3 rounded-full text-gray-300"><User size={24} /></div>
+                            <div className="bg-neutral-800 p-3 rounded-full text-gray-300 border border-white/5">
+                                <User size={24} />
+                            </div>
                             <div>
                                 <h1 className="text-xl font-bold text-white">Olá, {clientName}</h1>
-                                <p className="text-sm text-gray-400">{contract?.plan_name || 'Plano Fibra'}</p>
+                                <p className="text-sm text-fiber-orange flex items-center gap-1">
+                                    <span className={`w-2 h-2 rounded-full animate-pulse ${connection?.status === 'online' ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                                    {connection?.status === 'online' ? 'Conectado' : 'Desconectado'}
+                                </p>
                             </div>
                         </div>
-                        <Button variant="outline" onClick={() => handleLogout(true)} className="text-sm py-2 px-4"><LogOut size={16} className="mr-2" /> Sair</Button>
+                        <Button variant="outline" onClick={handleLogout} className="text-sm py-2 px-4 border-white/20 text-gray-300 hover:bg-white/5">
+                            <LogOut size={16} className="mr-2" /> Sair
+                        </Button>
                     </div>
                     
                     {/* Navigation Tabs */}
-                    <div className="flex space-x-6 border-b border-white/10 overflow-x-auto scrollbar-hide">
-                        <button onClick={() => setActiveTab('dashboard')} className={`pb-3 text-sm font-bold transition-colors border-b-2 whitespace-nowrap ${activeTab === 'dashboard' ? 'text-fiber-orange border-fiber-orange' : 'text-gray-400 border-transparent hover:text-white'}`}>Visão Geral</button>
-                        <button onClick={() => setActiveTab('consumption')} className={`pb-3 text-sm font-bold transition-colors border-b-2 whitespace-nowrap ${activeTab === 'consumption' ? 'text-fiber-orange border-fiber-orange' : 'text-gray-400 border-transparent hover:text-white'}`}>Meus Consumos</button>
-                        <button onClick={() => setActiveTab('reports')} className={`pb-3 text-sm font-bold transition-colors border-b-2 whitespace-nowrap ${activeTab === 'reports' ? 'text-fiber-orange border-fiber-orange' : 'text-gray-400 border-transparent hover:text-white'}`}>Relatórios</button>
-                        <button onClick={() => setActiveTab('fiscal')} className={`pb-3 text-sm font-bold transition-colors border-b-2 whitespace-nowrap ${activeTab === 'fiscal' ? 'text-fiber-orange border-fiber-orange' : 'text-gray-400 border-transparent hover:text-white'}`}>Notas Fiscais</button>
-                        <button onClick={() => setActiveTab('chat')} className={`pb-3 text-sm font-bold transition-colors border-b-2 whitespace-nowrap ${activeTab === 'chat' ? 'text-fiber-orange border-fiber-orange' : 'text-gray-400 border-transparent hover:text-white'}`}>Atendimento</button>
-                        <button onClick={() => setActiveTab('options')} className={`pb-3 text-sm font-bold transition-colors border-b-2 whitespace-nowrap ${activeTab === 'options' ? 'text-fiber-orange border-fiber-orange' : 'text-gray-400 border-transparent hover:text-white'}`}>Opções</button>
+                    <div className="flex gap-6 overflow-x-auto no-scrollbar border-t border-white/5 pt-2">
+                        {[
+                            { id: 'dashboard', label: 'Visão Geral', icon: Home },
+                            { id: 'consumption', label: 'Meus Consumos', icon: BarChart3 },
+                            { id: 'reports', label: 'Relatórios', icon: FileCheck },
+                            { id: 'fiscal', label: 'Notas Fiscais', icon: FileText },
+                            { id: 'chat', label: 'Atendimento', icon: MessageSquare },
+                            { id: 'options', label: 'Opções', icon: Settings },
+                        ].map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id as any)}
+                                className={`flex items-center gap-2 pb-3 text-sm font-bold transition-all border-b-2 whitespace-nowrap ${
+                                    activeTab === tab.id 
+                                        ? 'text-fiber-orange border-fiber-orange' 
+                                        : 'text-gray-400 border-transparent hover:text-white hover:border-gray-700'
+                                }`}
+                            >
+                                <tab.icon size={16} />
+                                {tab.label}
+                            </button>
+                        ))}
                     </div>
                 </div>
             </div>
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 
-                {/* Alerts */}
-                {isDemoMode && (
-                    <div className="mb-6 bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 flex items-center gap-3">
-                        <AlertTriangle className="text-yellow-500" size={20} />
-                        <span className="text-yellow-500 text-sm font-bold">Ambiente de Demonstração (Dados Fictícios)</span>
-                    </div>
-                )}
-
-                {/* VIEW: DASHBOARD */}
+                {/* TAB: DASHBOARD */}
                 {activeTab === 'dashboard' && (
-                    <div className="animate-fadeIn">
-                        {/* Desbloqueio de Confiança */}
-                        {hasOverdue && !unlockedSuccess && (
-                            <div className="mb-8 bg-red-500/10 border border-red-500/20 rounded-xl p-6 flex flex-col md:flex-row justify-between items-center gap-4 animate-pulse">
-                                <div className="flex items-center gap-4">
-                                    <div className="p-3 bg-red-500/20 rounded-full text-red-500"><Unlock size={24} /></div>
-                                    <div>
-                                        <h3 className="text-white font-bold text-lg">Sinal Bloqueado?</h3>
-                                        <p className="text-red-400 text-sm">Você possui faturas pendentes. Utilize o desbloqueio de confiança para liberar seu sinal por 48h.</p>
-                                    </div>
-                                </div>
-                                <Button onClick={handleUnlockTrust} disabled={unlocking} className="bg-red-600 hover:bg-red-700 text-white min-w-[200px]">
-                                    {unlocking ? <Loader2 className="animate-spin" /> : 'Liberar Internet Agora'}
-                                </Button>
-                            </div>
-                        )}
-
-                        {unlockedSuccess && (
-                            <div className="mb-8 bg-green-500/10 border border-green-500/20 rounded-xl p-4 flex items-center gap-3 animate-fadeIn">
-                                <CheckCircle className="text-green-500" size={24} />
-                                <div>
-                                    <h4 className="text-white font-bold">Internet Liberada com Sucesso!</h4>
-                                    <p className="text-green-400 text-sm">Seu sinal ficará ativo por 48 horas. Regularize sua fatura para evitar novo bloqueio.</p>
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                            {/* Left Column: Connection & Contract */}
-                            <div className="lg:col-span-1 space-y-6">
-                                <div className="bg-fiber-card border border-white/10 rounded-xl p-6 relative overflow-hidden">
-                                    {connection?.status === 'online' ? (
-                                        <div className="absolute top-0 right-0 p-4"><div className="w-3 h-3 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_#22c55e]"></div></div>
-                                    ) : (
-                                        <div className="absolute top-0 right-0 p-4"><div className="w-3 h-3 bg-red-500 rounded-full"></div></div>
-                                    )}
-                                    
-                                    <h3 className="text-white font-bold mb-4 flex items-center gap-2"><Activity size={18} className="text-fiber-orange" /> Status da Conexão</h3>
-                                    
-                                    <div className="space-y-4">
-                                        <div className="flex justify-between items-center p-3 bg-neutral-900 rounded-lg border border-white/5">
-                                            <span className="text-gray-400 text-sm">Status</span>
-                                            <span className={`font-bold ${connection?.status === 'online' ? 'text-green-500' : 'text-red-500'}`}>{connection?.status === 'online' ? 'CONECTADO' : 'DESCONECTADO'}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center p-3 bg-neutral-900 rounded-lg border border-white/5">
-                                            <span className="text-gray-400 text-sm">Uptime</span>
-                                            <span className="text-white font-mono text-sm">{connection?.uptime || '-'}</span>
-                                        </div>
-                                        
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <div className="p-2 bg-neutral-900 rounded border border-white/5 text-center">
-                                                <p className="text-[10px] text-gray-500 uppercase">Download (Mês)</p>
-                                                <p className="text-fiber-blue font-bold text-lg">{connection?.download_usage || '0 GB'}</p>
-                                            </div>
-                                            <div className="p-2 bg-neutral-900 rounded border border-white/5 text-center">
-                                                <p className="text-[10px] text-gray-500 uppercase">Upload (Mês)</p>
-                                                <p className="text-fiber-orange font-bold text-lg">{connection?.upload_usage || '0 GB'}</p>
-                                            </div>
-                                        </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fadeIn">
+                        
+                        {/* Sidebar - Status */}
+                        <div className="lg:col-span-1 space-y-6">
+                            {/* Status de Conexão */}
+                            <div className="bg-fiber-card border border-white/10 rounded-xl p-6 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-fiber-orange/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+                                <h3 className="text-white font-bold mb-6 flex items-center gap-2">
+                                    <Activity size={18} className="text-fiber-orange" /> Status da Conexão
+                                </h3>
+                                
+                                <div className="flex items-center justify-center mb-6">
+                                    <div className={`relative w-24 h-24 rounded-full flex items-center justify-center border-4 ${connection?.status === 'online' ? 'border-green-500/20' : 'border-red-500/20'}`}>
+                                        <div className={`absolute inset-0 rounded-full opacity-20 animate-ping ${connection?.status === 'online' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                        <Wifi size={40} className={connection?.status === 'online' ? 'text-green-500' : 'text-red-500'} />
                                     </div>
                                 </div>
 
-                                <div className="bg-fiber-card border border-white/10 rounded-xl p-6">
-                                    <h3 className="text-white font-bold mb-4 flex items-center gap-2"><FileText size={18} className="text-fiber-orange" /> Meu Contrato</h3>
-                                    <div className="space-y-3 text-sm">
-                                        <div>
-                                            <p className="text-gray-500 text-xs uppercase">Plano Contratado</p>
-                                            <p className="text-white font-bold text-lg">{contract?.plan_name}</p>
-                                        </div>
-                                        <div className="flex items-start gap-2">
-                                            <MapPin size={16} className="text-fiber-orange mt-0.5 flex-shrink-0" />
-                                            <p className="text-gray-300 text-xs">{contract?.address}</p>
-                                        </div>
-                                        <div className="flex items-center justify-between pt-2 border-t border-white/5 mt-2">
-                                            <span className="text-gray-500 text-xs">Contrato #{contract?.id}</span>
-                                            <span className="text-green-500 text-xs font-bold bg-green-500/10 px-2 py-1 rounded">ATIVO</span>
-                                        </div>
-                                        <button className="w-full mt-2 py-2 text-fiber-orange text-xs font-bold hover:underline flex items-center justify-center">
-                                            <Download size={14} className="mr-1" /> Baixar Contrato PDF
-                                        </button>
+                                <div className="space-y-4">
+                                    <div className="bg-neutral-900/50 rounded-lg p-3 flex justify-between items-center">
+                                        <span className="text-gray-400 text-sm flex items-center gap-2"><Clock size={14} /> Tempo Conectado</span>
+                                        <span className="text-white font-mono font-bold">{connection?.uptime || '--'}</span>
+                                    </div>
+                                    <div className="bg-neutral-900/50 rounded-lg p-3 flex justify-between items-center">
+                                        <span className="text-gray-400 text-sm flex items-center gap-2"><ArrowDown size={14} className="text-fiber-blue" /> Download Mês</span>
+                                        <span className="text-white font-mono font-bold">{connection?.download_usage || '0 GB'}</span>
+                                    </div>
+                                    <div className="bg-neutral-900/50 rounded-lg p-3 flex justify-between items-center">
+                                        <span className="text-gray-400 text-sm flex items-center gap-2"><ArrowUp size={14} className="text-fiber-orange" /> Upload Mês</span>
+                                        <span className="text-white font-mono font-bold">{connection?.upload_usage || '0 GB'}</span>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Main Content: Invoices & Protocols */}
-                            <div className="lg:col-span-2 space-y-8">
-                                <div className="bg-fiber-card border border-white/10 rounded-xl p-6 md:p-8">
-                                    <div className="flex items-center justify-between mb-6">
-                                        <h2 className="text-xl font-bold text-white flex items-center gap-2"><FileText className="text-fiber-orange" /> Minhas Faturas</h2>
-                                        <span className="bg-neutral-800 text-gray-400 text-xs font-bold px-3 py-1 rounded-full">{invoices?.filter(i => i.status !== 'pago').length || 0} pendentes</span>
+                            {/* Desbloqueio */}
+                            {hasOverdue && !unlockedSuccess && (
+                                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 animate-pulse">
+                                    <div className="flex items-center gap-3 mb-3 text-red-400">
+                                        <Unlock size={24} />
+                                        <h3 className="font-bold">Sinal Bloqueado?</h3>
                                     </div>
-
-                                    {!invoices?.length ? (
-                                        <div className="text-center py-12"><CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" /><h3 className="text-white">Tudo em dia!</h3></div>
-                                    ) : (
-                                        <div className="space-y-4">
-                                            {invoices.map((invoice, idx) => (
-                                                <div key={idx} className="bg-fiber-dark border border-white/10 rounded-xl p-4 md:p-6 flex flex-col md:flex-row justify-between items-center gap-4">
-                                                    <div className="flex-1 w-full">
-                                                        <div className="flex items-center gap-3 mb-2">
-                                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                                                invoice.status === 'vencido' ? 'bg-red-500/10 text-red-500' : 
-                                                                invoice.status === 'pago' ? 'bg-green-500/10 text-green-500' : 'bg-blue-500/10 text-blue-500'
-                                                            }`}>{invoice.status}</span>
-                                                            <span className="text-gray-500 text-xs">{invoice.descricao}</span>
-                                                        </div>
-                                                        <div className="flex justify-between md:justify-start md:gap-8">
-                                                            <div><p className="text-[10px] text-gray-500 uppercase">Vencimento</p><p className="text-white font-bold">{invoice.vencimento}</p></div>
-                                                            <div><p className="text-[10px] text-gray-500 uppercase">Valor</p><p className="text-white font-bold">R$ {invoice.valor}</p></div>
-                                                        </div>
-                                                    </div>
-                                                    
-                                                    {invoice.status !== 'pago' && (
-                                                        <div className="flex gap-2 w-full md:w-auto justify-end">
-                                                            {invoice.pix_code && <button onClick={() => openPixModal(invoice.pix_code!)} className="p-2 bg-fiber-green/10 text-fiber-green rounded border border-fiber-green/20 hover:bg-fiber-green/20" title="PIX"><QrCode size={18} /></button>}
-                                                            {invoice.linha_digitavel && <button onClick={() => copyToClipboard(invoice.linha_digitavel!, `bar-${idx}`)} className="p-2 bg-neutral-800 text-white rounded border border-white/10 hover:bg-neutral-700" title="Copiar Código"><Copy size={18} /></button>}
-                                                            {invoice.link_pdf && <button onClick={() => window.open(invoice.link_pdf, '_blank')} className="p-2 bg-fiber-orange text-white rounded hover:bg-orange-600" title="PDF"><Download size={18} /></button>}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="bg-fiber-card border border-white/10 rounded-xl p-6">
-                                    <h3 className="text-white font-bold mb-4 flex items-center gap-2"><Clock size={18} className="text-fiber-orange" /> Histórico de Atendimento</h3>
-                                    <div className="space-y-3">
-                                        {protocols?.length ? protocols.map((p) => (
-                                            <div key={p.id} className="flex items-center justify-between p-3 bg-neutral-900 rounded border border-white/5 hover:border-white/10 transition-colors">
-                                                <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-white text-sm font-medium">{p.subject}</span>
-                                                        <span className="text-[10px] bg-neutral-800 text-gray-400 px-1.5 rounded border border-white/5">{p.type}</span>
-                                                    </div>
-                                                    <p className="text-gray-500 text-xs mt-0.5">Protocolo: {p.id} • {p.date}</p>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className={`text-xs font-bold px-2 py-1 rounded ${p.status === 'Fechado' ? 'bg-green-500/10 text-green-500' : 'bg-yellow-500/10 text-yellow-500'}`}>{p.status}</span>
-                                                    <ChevronRight size={14} className="text-gray-600" />
-                                                </div>
-                                            </div>
-                                        )) : <p className="text-gray-500 text-sm py-4">Nenhum protocolo recente.</p>}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* VIEW: CONSUMPTION CHARTS */}
-                {activeTab === 'consumption' && (
-                    <div className="animate-fadeIn">
-                        <div className="bg-fiber-card border border-white/10 rounded-xl p-6 md:p-8">
-                            <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-6">
-                                <div>
-                                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                                        <BarChart3 className="text-fiber-orange" /> Histórico de Consumo
-                                    </h2>
-                                    <p className="text-sm text-gray-400 mt-1">
-                                        Acompanhe o tráfego de Download e Upload da sua conexão
+                                    <p className="text-sm text-gray-300 mb-4">
+                                        Você possui faturas vencidas. Utilize o desbloqueio de confiança para liberar sua internet por 48h.
                                     </p>
+                                    <button 
+                                        onClick={handleUnlockTrust}
+                                        disabled={unlocking}
+                                        className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        {unlocking ? <Loader2 className="animate-spin" /> : <Unlock size={16} />}
+                                        {unlocking ? 'Liberando...' : 'Liberar Internet Agora'}
+                                    </button>
                                 </div>
-
-                                {/* Period Filters */}
-                                <div className="flex bg-neutral-900 p-1 rounded-lg border border-white/5">
-                                    <button onClick={() => setConsumptionPeriod('daily')} className={`px-4 py-2 text-xs font-bold rounded-md transition-colors ${consumptionPeriod === 'daily' ? 'bg-fiber-orange text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Diário</button>
-                                    <button onClick={() => setConsumptionPeriod('weekly')} className={`px-4 py-2 text-xs font-bold rounded-md transition-colors ${consumptionPeriod === 'weekly' ? 'bg-fiber-orange text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Semanal</button>
-                                    <button onClick={() => setConsumptionPeriod('monthly')} className={`px-4 py-2 text-xs font-bold rounded-md transition-colors ${consumptionPeriod === 'monthly' ? 'bg-fiber-orange text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Mensal</button>
+                            )}
+                            
+                            {unlockedSuccess && (
+                                <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-6">
+                                    <div className="flex items-center gap-2 text-green-400 font-bold mb-2">
+                                        <CheckCircle size={20} /> Desbloqueio Realizado!
+                                    </div>
+                                    <p className="text-sm text-gray-300">Reinicie seu roteador em 5 minutos.</p>
                                 </div>
-                            </div>
+                            )}
+                        </div>
 
-                            {/* Chart Container */}
-                            <div className="bg-neutral-900/50 rounded-xl p-4 border border-white/5">
-                                <div className="flex items-center gap-2 mb-4 text-xs text-gray-500">
-                                    <Calendar size={14} />
-                                    <span>
-                                        {consumptionPeriod === 'daily' && 'Últimos 30 dias'}
-                                        {consumptionPeriod === 'weekly' && 'Últimos 7 dias'}
-                                        {consumptionPeriod === 'monthly' && 'Últimos 12 meses'}
+                        {/* Main Column */}
+                        <div className="lg:col-span-2 space-y-8">
+                            
+                            {/* Faturas */}
+                            <div className="bg-fiber-card border border-white/10 rounded-xl p-6 md:p-8">
+                                <div className="flex items-center justify-between mb-6">
+                                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                                        <FileText className="text-fiber-orange" /> Minhas Faturas
+                                    </h2>
+                                    <span className="bg-neutral-800 text-gray-400 text-xs font-bold px-3 py-1 rounded-full">
+                                        {invoices?.length || 0} total
                                     </span>
                                 </div>
-                                
+
+                                {(!invoices || invoices.length === 0) ? (
+                                    <div className="text-center py-12 bg-neutral-900/50 rounded-xl border border-dashed border-white/10">
+                                        <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
+                                        <h3 className="text-white font-bold text-lg">Tudo em dia!</h3>
+                                        <p className="text-gray-400">Você não possui faturas em aberto.</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {invoices.map((invoice, idx) => (
+                                            <div key={idx} className="bg-fiber-dark border border-white/10 rounded-xl p-6 flex flex-col md:flex-row justify-between items-center gap-6 transition-all hover:border-fiber-orange/30 group">
+                                                <div className="flex-1 w-full md:w-auto text-center md:text-left">
+                                                    <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 mb-2">
+                                                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider w-fit mx-auto md:mx-0 ${
+                                                            invoice.status === 'vencido' 
+                                                                ? 'bg-red-500/10 text-red-500' 
+                                                                : invoice.status === 'pago' ? 'bg-green-500/10 text-green-500'
+                                                                : 'bg-fiber-blue/10 text-fiber-blue'
+                                                        }`}>
+                                                            {invoice.status}
+                                                        </span>
+                                                        <span className="text-gray-500 text-sm">{invoice.descricao}</span>
+                                                    </div>
+                                                    <div className="flex flex-col md:flex-row gap-4 md:gap-8 mt-3">
+                                                        <div>
+                                                            <span className="text-gray-500 text-[10px] block uppercase tracking-widest font-bold">Vencimento</span>
+                                                            <span className={`text-lg font-bold ${invoice.status === 'vencido' ? 'text-red-400' : 'text-white'}`}>
+                                                                {invoice.vencimento}
+                                                            </span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-gray-500 text-[10px] block uppercase tracking-widest font-bold">Valor</span>
+                                                            <span className="text-lg font-bold text-white">R$ {invoice.valor}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex flex-wrap justify-center md:justify-end gap-2 w-full md:w-auto">
+                                                    {invoice.status !== 'pago' && invoice.pix_code && (
+                                                        <button onClick={() => openPixModal(invoice.pix_code!)} className="flex items-center px-4 py-2 bg-fiber-green/10 hover:bg-fiber-green/20 text-fiber-green rounded-lg text-sm font-bold transition-colors border border-fiber-green/30">
+                                                            <QrCode size={16} className="mr-2" /> PIX
+                                                        </button>
+                                                    )}
+                                                    {invoice.status !== 'pago' && invoice.linha_digitavel && (
+                                                        <button onClick={() => copyToClipboard(invoice.linha_digitavel!, `bar-${idx}`)} className="flex items-center px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-sm font-medium border border-white/10">
+                                                            {copiedId === `bar-${idx}` ? <CheckCircle size={16} className="mr-2 text-green-500" /> : <Copy size={16} className="mr-2" />} Código
+                                                        </button>
+                                                    )}
+                                                    {invoice.link_pdf && (
+                                                        <button onClick={() => window.open(invoice.link_pdf, '_blank')} className="flex items-center px-4 py-2 bg-fiber-orange hover:bg-orange-600 text-white rounded-lg text-sm font-bold transition-colors shadow-lg shadow-orange-900/20">
+                                                            <Download size={16} className="mr-2" /> PDF
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Dados do Cliente e Contrato */}
+                            <div className="bg-fiber-card border border-white/10 rounded-xl p-6 md:p-8">
+                                <h3 className="text-white font-bold mb-6 flex items-center gap-2 border-b border-white/5 pb-4">
+                                    <Shield size={18} className="text-fiber-orange" /> Dados do Assinante
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="text-gray-500 text-xs uppercase font-bold block mb-1">Nome do Titular</label>
+                                        <p className="text-white font-medium bg-neutral-900 p-3 rounded-lg border border-white/5">{clientName}</p>
+                                    </div>
+                                    <div>
+                                        <label className="text-gray-500 text-xs uppercase font-bold block mb-1">Plano Contratado</label>
+                                        <p className="text-fiber-orange font-bold bg-neutral-900 p-3 rounded-lg border border-white/5 flex justify-between items-center">
+                                            {contract?.plan_name}
+                                            <span className="text-xs bg-fiber-orange/20 px-2 py-1 rounded text-fiber-orange">{contract?.speed_label}</span>
+                                        </p>
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="text-gray-500 text-xs uppercase font-bold block mb-1">Endereço de Instalação</label>
+                                        <p className="text-gray-300 text-sm bg-neutral-900 p-3 rounded-lg border border-white/5 flex items-start gap-2">
+                                            <MapPin size={16} className="mt-0.5 flex-shrink-0 text-gray-500" />
+                                            {contract?.address}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <label className="text-gray-500 text-xs uppercase font-bold block mb-1">Data de Ativação</label>
+                                        <p className="text-white text-sm bg-neutral-900 p-3 rounded-lg border border-white/5">{contract?.installation_date}</p>
+                                    </div>
+                                    <div>
+                                        <label className="text-gray-500 text-xs uppercase font-bold block mb-1">Status do Contrato</label>
+                                        <p className="text-green-400 font-bold text-sm bg-neutral-900 p-3 rounded-lg border border-white/5 flex items-center gap-2">
+                                            <span className="w-2 h-2 bg-green-500 rounded-full"></span> {contract?.status}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                )}
+
+                {/* TAB: CONSUMPTION */}
+                {activeTab === 'consumption' && (
+                    <div className="bg-fiber-card border border-white/10 rounded-xl p-6 md:p-8 animate-fadeIn">
+                        <div className="flex flex-col md:flex-row justify-between items-start mb-8 gap-6">
+                            <div>
+                                <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                                    <BarChart3 className="text-fiber-orange" /> Histórico de Consumo
+                                </h2>
+                                <div className="flex items-center gap-2 mt-2 text-sm">
+                                    <Activity size={16} className="text-green-400 animate-pulse" />
+                                    <span className="text-green-400 font-bold">Dados reais sincronizados com IXC</span>
+                                </div>
+                            </div>
+                            <div className="flex bg-neutral-900 p-1 rounded-lg border border-white/5">
+                                {(['daily', 'weekly', 'monthly'] as const).map(p => (
+                                    <button key={p} onClick={() => setConsumptionPeriod(p)} className={`px-4 py-2 text-xs font-bold rounded-md transition-colors ${consumptionPeriod === p ? 'bg-fiber-orange text-white' : 'text-gray-400 hover:text-white'}`}>
+                                        {p === 'daily' ? 'Diário' : p === 'weekly' ? 'Semanal' : 'Mensal'}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        {isLoadingChart ? (
+                            <div className="flex items-center justify-center py-20">
+                                <Loader2 className="animate-spin text-fiber-orange" size={40} />
+                                <span className="ml-3 text-gray-400">Carregando dados...</span>
+                            </div>
+                        ) : (
+                            <div className="bg-neutral-900/50 rounded-xl p-6 border border-white/5">
                                 <SimpleLineChart data={chartData} />
                             </div>
-                        </div>
+                        )}
                     </div>
                 )}
 
-                {/* VIEW: REPORTS */}
+                {/* TAB: REPORTS */}
                 {activeTab === 'reports' && (
-                    <div className="animate-fadeIn space-y-6">
-                        <div className="bg-fiber-card border border-white/10 rounded-xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6">
-                            <div className="flex items-center gap-6">
-                                <div className="w-12 h-12 rounded-lg bg-neutral-800 flex items-center justify-center text-gray-400 border border-white/5">
-                                    <FileCheck size={32} strokeWidth={1.5} />
-                                </div>
+                    <div className="space-y-6 animate-fadeIn">
+                        <div className="bg-fiber-card border border-white/10 rounded-xl p-6 flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-neutral-800 rounded-lg text-gray-400"><FileCheck size={24} /></div>
                                 <div>
-                                    <span className="text-xs text-gray-500 uppercase tracking-wider font-bold">Relatórios</span>
-                                    <h3 className="text-xl font-bold text-white mt-1">Quitação de Débitos</h3>
-                                    <div className="mt-3">
-                                        <select value={reportYear} onChange={(e) => setReportYear(e.target.value)} className="bg-neutral-900 text-white text-sm border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-fiber-orange focus:ring-1 focus:ring-fiber-orange">
-                                            <option value="2025">2025</option><option value="2024">2024</option><option value="2023">2023</option>
-                                        </select>
-                                    </div>
+                                    <h3 className="text-white font-bold">Declaração de Quitação</h3>
+                                    <p className="text-gray-400 text-sm">Emita o comprovante de quitação anual de débitos.</p>
                                 </div>
                             </div>
-                            <button className="p-3 rounded-lg bg-neutral-800 hover:bg-fiber-orange hover:text-white text-gray-400 transition-colors border border-white/5" title="Imprimir Relatório"><Printer size={24} /></button>
-                        </div>
-                        <div className="bg-fiber-card border border-white/10 rounded-xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6">
-                            <div className="flex items-center gap-6">
-                                <div className="w-12 h-12 rounded-lg bg-neutral-800 flex items-center justify-center text-gray-400 border border-white/5">
-                                    <Phone size={32} strokeWidth={1.5} />
-                                </div>
-                                <div>
-                                    <span className="text-xs text-gray-500 uppercase tracking-wider font-bold">Relatórios</span>
-                                    <h3 className="text-xl font-bold text-white mt-1">Extrato de Ligações</h3>
-                                    <div className="mt-3">
-                                        <select className="bg-neutral-900 text-white text-sm border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-fiber-orange focus:ring-1 focus:ring-fiber-orange w-full md:w-auto">
-                                            <option>Extrato de Ligações Tarifadas</option><option>Extrato Detalhado</option>
-                                        </select>
-                                    </div>
-                                </div>
+                            <div className="flex items-center gap-4">
+                                <select value={reportYear} onChange={(e) => setReportYear(e.target.value)} className="bg-neutral-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm">
+                                    <option value="2025">2025</option>
+                                    <option value="2024">2024</option>
+                                </select>
+                                <button className="p-2 bg-neutral-800 hover:bg-neutral-700 rounded-lg text-gray-300 transition-colors"><Printer size={20} /></button>
                             </div>
                         </div>
-                        <div className="py-8 text-center border-t border-white/5 mt-8"><p className="text-gray-500 text-sm">Nenhum ramal encontrado!</p></div>
+                        <div className="bg-fiber-card border border-white/10 rounded-xl p-6">
+                            <div className="flex items-center gap-4 mb-6">
+                                <div className="p-3 bg-neutral-800 rounded-lg text-gray-400"><Phone size={24} /></div>
+                                <div>
+                                    <h3 className="text-white font-bold">Extrato de Ligações</h3>
+                                    <p className="text-gray-400 text-sm">Consulte o histórico de chamadas do seu telefone fixo.</p>
+                                </div>
+                            </div>
+                            <div className="p-8 bg-neutral-900/50 rounded-lg text-center border border-white/5 text-gray-500 text-sm">
+                                Nenhum ramal telefônico vinculado a este contrato.
+                            </div>
+                        </div>
                     </div>
                 )}
 
-                {/* VIEW: FISCAL (Notas Fiscais) */}
+                {/* TAB: FISCAL NOTES */}
                 {activeTab === 'fiscal' && (
-                    <div className="animate-fadeIn space-y-6">
-                        <div className="bg-fiber-card border border-white/10 rounded-xl p-6 md:p-8">
-                            <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-                                <div>
-                                    <h2 className="text-xl font-bold text-white flex items-center gap-2"><ScrollText className="text-fiber-orange" /> Notas Fiscais</h2>
-                                    <p className="text-sm text-gray-400 mt-1">Documentos fiscais (NF-21/22 e NFSe) dos pagamentos realizados.</p>
-                                </div>
-                                <div>
-                                    <select value={reportYear} onChange={(e) => setReportYear(e.target.value)} className="bg-neutral-900 text-white text-sm border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-fiber-orange focus:ring-1 focus:ring-fiber-orange">
-                                        <option value="2025">2025</option><option value="2024">2024</option><option value="2023">2023</option>
-                                    </select>
-                                </div>
-                            </div>
-                            {fiscalNotes.length === 0 ? (
-                                <div className="text-center py-12 bg-neutral-900/50 rounded-xl border border-dashed border-white/10"><ScrollText className="w-12 h-12 text-gray-600 mx-auto mb-3" /><h3 className="text-white font-bold text-lg">Nenhuma Nota Fiscal</h3><p className="text-gray-400">Não há documentos fiscais disponíveis para o ano selecionado.</p></div>
-                            ) : (
-                                <div className="space-y-4">
-                                    {fiscalNotes.map((note) => (
-                                        <div key={note.id} className="bg-fiber-dark border border-white/10 rounded-xl p-6 flex flex-col md:flex-row justify-between items-center gap-6 hover:border-fiber-orange/30 transition-colors">
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-3 mb-2">
-                                                    <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-500 text-[10px] font-bold uppercase">NF 21/22</span>
-                                                    <span className="text-gray-400 text-xs font-bold">Nota Nº {note.numero} - Série {note.serie}</span>
-                                                </div>
-                                                <div className="flex flex-col sm:flex-row gap-4 sm:gap-8">
-                                                    <div><span className="text-[10px] text-gray-500 uppercase">Referência</span><p className="text-white font-bold">{note.referencia}</p></div>
-                                                    <div><span className="text-[10px] text-gray-500 uppercase">Emissão</span><p className="text-gray-300 font-mono text-sm">{note.emissao}</p></div>
-                                                    <div><span className="text-[10px] text-gray-500 uppercase">Valor</span><p className="text-white font-bold">R$ {note.valor}</p></div>
-                                                </div>
-                                            </div>
-                                            <div className="flex gap-2 w-full md:w-auto">
-                                                <button onClick={() => window.open(note.link_xml || '#', '_blank')} className="flex-1 md:flex-none py-2 px-4 bg-neutral-800 text-gray-300 hover:text-white rounded-lg text-sm font-bold border border-white/10 hover:bg-neutral-700 transition-colors flex items-center justify-center gap-2"><FileCode size={16} /> XML</button>
-                                                <button onClick={() => window.open(note.link_pdf || '#', '_blank')} className="flex-1 md:flex-none py-2 px-4 bg-fiber-orange text-white hover:bg-orange-600 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2 shadow-lg"><FileText size={16} /> PDF</button>
-                                            </div>
+                    <div className="bg-fiber-card border border-white/10 rounded-xl p-6 animate-fadeIn">
+                        <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                            <ScrollText className="text-fiber-orange" /> Notas Fiscais (NF 21/22)
+                        </h2>
+                        <div className="space-y-3">
+                            {fiscalNotes.length > 0 ? fiscalNotes.map((nf, i) => (
+                                <div key={i} className="bg-fiber-dark border border-white/10 rounded-lg p-4 flex justify-between items-center hover:bg-neutral-900 transition-colors">
+                                    <div className="flex items-center gap-4">
+                                        <div className="text-gray-500 text-sm font-mono">{nf.referencia}</div>
+                                        <div>
+                                            <div className="text-white font-bold text-sm">Nota Nº {nf.numero} - Série {nf.serie}</div>
+                                            <div className="text-gray-500 text-xs">Emissão: {nf.emissao} • Valor: R$ {nf.valor}</div>
                                         </div>
-                                    ))}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => window.open(nf.link_xml, '_blank')} className="p-2 hover:bg-white/10 rounded text-gray-400 hover:text-white text-xs font-bold flex items-center gap-1"><FileCode size={14} /> XML</button>
+                                        <button onClick={() => window.open(nf.link_pdf, '_blank')} className="p-2 hover:bg-fiber-orange/20 rounded text-fiber-orange font-bold text-xs flex items-center gap-1"><Download size={14} /> PDF</button>
+                                    </div>
                                 </div>
+                            )) : (
+                                <div className="text-center py-8 text-gray-500">Nenhuma nota fiscal encontrada para o período.</div>
                             )}
                         </div>
                     </div>
                 )}
 
-                {/* VIEW: CHAT TAB (Expanded) */}
+                {/* TAB: CHAT */}
                 {activeTab === 'chat' && (
-                    <div className="animate-fadeIn h-[600px] bg-fiber-card border border-white/10 rounded-xl overflow-hidden flex flex-col shadow-2xl">
-                        <div className="bg-neutral-900 p-4 border-b border-white/5 flex items-center gap-3">
-                            <div className="bg-fiber-orange/10 p-2 rounded-full text-fiber-orange"><Bot size={24} /></div>
+                    <div className="bg-fiber-card border border-white/10 rounded-xl h-[600px] flex flex-col animate-fadeIn">
+                        <div className="p-4 border-b border-white/5 flex items-center gap-3 bg-neutral-900/50">
+                            <Bot className="text-fiber-orange" />
                             <div>
-                                <h3 className="text-white font-bold">Assistente Virtual Fiber.Net</h3>
-                                <div className="flex items-center gap-1"><span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span><span className="text-xs text-gray-400">Online - API Conectada</span></div>
+                                <h3 className="text-white font-bold">Assistente Virtual</h3>
+                                <p className="text-xs text-green-400 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Online</p>
                             </div>
                         </div>
-                        
-                        {renderChatContent()}
-
-                        <div className="p-4 bg-neutral-900 border-t border-white/5">
-                            <form onSubmit={handleChatSubmit} className="relative">
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+                            {messages.map((msg) => (
+                                <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`max-w-[80%] p-4 rounded-2xl text-sm leading-relaxed ${
+                                        msg.sender === 'user' 
+                                            ? 'bg-fiber-orange text-white rounded-tr-none' 
+                                            : 'bg-neutral-800 text-gray-200 rounded-tl-none border border-white/5'
+                                    }`}>
+                                        {msg.text}
+                                        {msg.type === 'pix' && msg.pixCode && (
+                                            <div className="mt-3 bg-black/20 p-3 rounded border border-white/10">
+                                                <p className="font-mono text-xs break-all text-gray-300 mb-2">{msg.pixCode}</p>
+                                                <button onClick={() => copyToClipboard(msg.pixCode!, 'chat-pix')} className="w-full py-2 bg-white/10 hover:bg-white/20 rounded text-xs font-bold transition-colors">
+                                                    Copiar Código PIX
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                            {isBotTyping && (
+                                <div className="flex justify-start">
+                                    <div className="bg-neutral-800 px-4 py-3 rounded-2xl rounded-tl-none border border-white/5 flex gap-1">
+                                        <span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></span>
+                                        <span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-75"></span>
+                                        <span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-150"></span>
+                                    </div>
+                                </div>
+                            )}
+                            <div ref={chatEndRef} />
+                        </div>
+                        <div className="p-4 border-t border-white/5 bg-neutral-900/30">
+                            {messages.length > 0 && messages[messages.length - 1].options && (
+                                <div className="flex gap-2 overflow-x-auto mb-4 pb-2">
+                                    {messages[messages.length - 1].options?.map((opt, idx) => (
+                                        <button key={idx} onClick={() => sendMessage(opt.label)} className="whitespace-nowrap px-4 py-2 bg-neutral-800 hover:bg-neutral-700 border border-fiber-orange/30 text-fiber-orange text-xs font-bold rounded-full transition-colors">
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                            <div className="relative">
                                 <input 
                                     type="text" 
-                                    value={chatInput}
+                                    value={chatInput} 
                                     onChange={(e) => setChatInput(e.target.value)}
-                                    placeholder="Digite sua mensagem ou selecione uma opção..." 
-                                    className="w-full bg-neutral-800 border border-white/10 rounded-full py-3 pl-5 pr-12 text-sm text-white focus:outline-none focus:border-fiber-orange focus:ring-1 focus:ring-fiber-orange placeholder-gray-500"
-                                    disabled={isBotTyping}
+                                    onKeyPress={(e) => e.key === 'Enter' && sendMessage(chatInput)}
+                                    placeholder="Digite sua mensagem..." 
+                                    className="w-full bg-neutral-900 border border-white/10 rounded-full pl-5 pr-12 py-3 text-white text-sm focus:border-fiber-orange focus:outline-none"
                                 />
-                                <button 
-                                    type="submit"
-                                    disabled={!chatInput.trim() || isBotTyping}
-                                    className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 bg-fiber-orange text-white rounded-full hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
+                                <button onClick={() => sendMessage(chatInput)} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-fiber-orange rounded-full text-white hover:bg-orange-600 transition-colors">
                                     <Send size={16} />
                                 </button>
-                            </form>
-                        </div>
-                    </div>
-                )}
-
-                {/* VIEW: OPTIONS (Security/Settings) */}
-                {activeTab === 'options' && (
-                    <div className="animate-fadeIn space-y-6">
-                        <div className="bg-fiber-card border border-white/10 rounded-xl p-6 md:p-8">
-                            <h2 className="text-xl font-bold text-white flex items-center gap-2 mb-6"><Settings className="text-fiber-orange" /> Opções & Configurações</h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="bg-neutral-900 p-6 rounded-xl border border-white/5 flex flex-col justify-between">
-                                    <div>
-                                        <div className="flex items-center gap-3 mb-3"><div className="p-2 bg-fiber-blue/10 rounded-lg text-fiber-blue"><Lock size={20} /></div><h3 className="text-white font-bold">Segurança</h3></div>
-                                        <p className="text-gray-400 text-sm mb-6">Mantenha sua conta segura alterando sua senha periodicamente.</p>
-                                    </div>
-                                    <Button variant="outline" fullWidth onClick={() => setIsChangePasswordOpen(true)}>Trocar Senha</Button>
-                                </div>
-                                <div className="bg-neutral-900 p-6 rounded-xl border border-white/5 opacity-50 flex flex-col justify-between">
-                                     <div>
-                                        <div className="flex items-center gap-3 mb-3"><div className="p-2 bg-gray-800 rounded-lg text-gray-500"><MoreHorizontal size={20} /></div><h3 className="text-gray-400 font-bold">Outras Opções</h3></div>
-                                        <p className="text-gray-500 text-sm mb-6">Novas funcionalidades em breve.</p>
-                                    </div>
-                                    <Button variant="outline" fullWidth disabled className="cursor-not-allowed">Em Breve</Button>
-                                </div>
                             </div>
                         </div>
                     </div>
                 )}
+
+                {/* TAB: OPTIONS */}
+                {activeTab === 'options' && (
+                    <div className="bg-fiber-card border border-white/10 rounded-xl p-6 animate-fadeIn">
+                        <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                            <Settings className="text-fiber-orange" /> Configurações da Conta
+                        </h2>
+                        <div className="max-w-2xl">
+                            <div className="bg-neutral-900 rounded-lg border border-white/5 overflow-hidden">
+                                <div className="p-4 border-b border-white/5 flex justify-between items-center">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-neutral-800 rounded text-fiber-orange"><KeyRound size={20} /></div>
+                                        <div>
+                                            <h4 className="font-bold text-white text-sm">Alterar Senha</h4>
+                                            <p className="text-xs text-gray-500">Atualize sua senha de acesso à central</p>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setIsChangePasswordOpen(!isChangePasswordOpen)} className="text-gray-400 hover:text-white"><ChevronRight /></button>
+                                </div>
+                                {isChangePasswordOpen && (
+                                    <div className="p-6 bg-black/20 border-t border-white/5 space-y-4">
+                                        <input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} placeholder="Senha Atual" className="w-full bg-fiber-dark border border-white/10 rounded px-3 py-2 text-white text-sm" />
+                                        <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Nova Senha" className="w-full bg-fiber-dark border border-white/10 rounded px-3 py-2 text-white text-sm" />
+                                        <Button onClick={handleChangePassword} disabled={passwordLoading} fullWidth className="h-10 text-sm">
+                                            {passwordLoading ? 'Alterando...' : 'Confirmar Alteração'}
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
             </div>
 
-            {/* PIX Modal */}
+            {/* PIX MODAL */}
             {activePixCode && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
                     <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={closePixModal}></div>
                     <div className="relative bg-fiber-card border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl">
                         <button onClick={closePixModal} className="absolute top-4 right-4 text-gray-400 hover:text-white"><X size={20} /></button>
-                        <div className="text-center mb-4"><QrCode size={40} className="text-fiber-green mx-auto mb-2" /><h3 className="text-xl font-bold text-white">Pagamento via PIX</h3></div>
-                        <div className="bg-neutral-900 p-3 rounded border border-white/5 mb-4"><p className="text-gray-500 text-xs break-all font-mono line-clamp-6">{activePixCode}</p></div>
-                        <button onClick={copyPixCode} className="w-full py-3 bg-fiber-green text-white font-bold rounded hover:bg-green-600 flex justify-center items-center gap-2">{isPixCopied ? <CheckCircle size={18} /> : <Copy size={18} />} {isPixCopied ? 'Copiado!' : 'Copiar Código'}</button>
-                    </div>
-                </div>
-            )}
-
-            {/* Password Change Modal */}
-            {isChangePasswordOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
-                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsChangePasswordOpen(false)}></div>
-                    <div className="relative bg-fiber-card border border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-float">
-                        <button onClick={() => setIsChangePasswordOpen(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white"><X size={20} /></button>
-                        <h3 className="text-xl font-bold text-white mb-1">Trocar Senha</h3>
-                        <p className="text-gray-400 text-sm mb-6">Digite sua senha atual e a nova senha desejada.</p>
-                        <div className="space-y-4">
-                            <div><label className="text-xs text-gray-500 uppercase font-bold">Senha Atual</label><input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-fiber-orange outline-none mt-1 transition-all" placeholder="••••••" /></div>
-                            <div><label className="text-xs text-gray-500 uppercase font-bold">Nova Senha</label><input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full bg-neutral-900 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-fiber-orange outline-none mt-1 transition-all" placeholder="••••••" /></div>
-                            {changePassMessage && (<div className={`text-sm p-3 rounded border ${changePassMessage.type === 'success' ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>{changePassMessage.text}</div>)}
-                            <Button fullWidth onClick={handleChangePassword} disabled={changePassLoading}>{changePassLoading ? <Loader2 className="animate-spin" /> : 'Confirmar Alteração'}</Button>
+                        <div className="text-center mb-6">
+                            <div className="inline-flex p-3 bg-fiber-green/10 rounded-full text-fiber-green mb-3"><QrCode size={32} /></div>
+                            <h3 className="text-xl font-bold text-white">Pagamento via PIX</h3>
+                            <p className="text-gray-400 text-sm mt-1">Copie o código abaixo e cole no seu banco.</p>
                         </div>
+                        <div className="bg-neutral-900 p-3 rounded-lg border border-white/5 mb-6">
+                            <p className="text-gray-500 text-xs break-all font-mono line-clamp-6">{activePixCode}</p>
+                        </div>
+                        <button onClick={copyPixCode} className="w-full py-3 px-4 bg-fiber-green text-white font-bold rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center gap-2">
+                            {isPixCopied ? <CheckCircle size={20} /> : <Copy size={20} />}
+                            {isPixCopied ? 'Copiado!' : 'Copiar Chave PIX'}
+                        </button>
                     </div>
                 </div>
             )}
