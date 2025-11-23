@@ -134,7 +134,8 @@ const ClientArea: React.FC = () => {
     // === AUTO SCROLL CHAT ===
     useEffect(() => {
         if (activeTab === 'chat') {
-            chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            // block: 'nearest' evita que a página inteira pule, rolando apenas o container do chat
+            chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
         }
     }, [messages, isBotTyping, activeTab]);
 
@@ -260,105 +261,87 @@ const ClientArea: React.FC = () => {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Accept': 'application/json',
-                    'Content-Type': 'application/json'
                 },
             });
 
-            if (!response.ok) {
-                throw new Error(`Erro ${response.status}`);
-            }
+            if (!response.ok) throw new Error('Sessão expirada');
 
             const raw = await response.json();
-            const apiData = raw.data || raw;
+            console.log('%cAPI RESPONSE COMPLETA:', 'background: #000; color: #0f0; font-size: 16px;', raw);
 
-            if (!apiData || Object.keys(apiData).length === 0) {
-                throw new Error("Dados vazios");
-            }
+            // A SUA API HOJE RETORNA DESSA FORMA → raw.data.dados
+            const dados = raw?.data?.dados || raw?.dados || raw?.data || raw;
 
-            // Helper to safely get string from potential objects
-            const getString = (val: any, fallback: string) => {
-                if (val === null || val === undefined) return fallback;
-                if (typeof val === 'string') return val;
-                if (typeof val === 'number') return String(val);
-                if (typeof val === 'object') {
-                    return val.nome || val.descricao || val.valor || val.label || val.text || fallback;
-                }
-                return fallback;
-            };
+            if (!dados) throw new Error('Dados não encontrados');
 
-            // NOME
-            const nomeObj = apiData.cliente?.nome || apiData.nome || 'Cliente';
-            const nomeCompleto = getString(nomeObj, 'Cliente');
-            setClientName(nomeCompleto.split(' ')[0]);
+            // === NOME DO CLIENTE ===
+            const nomeCliente = dados.cliente?.nome || dados.nome || dados.cliente_nome || 'Carlos';
+            setClientName(nomeCliente.split(' ')[0]);
 
-            // FATURAS
-            const faturasRaw = apiData.faturas || apiData.boletos || [];
-            setInvoices(faturasRaw.map((f: any) => ({
+            // === FATURAS ===
+            const faturas = dados.faturas || dados.boletos || [];
+            setInvoices(faturas.map((f: any) => ({
                 id: f.id || f.codigo || Date.now(),
-                vencimento: getString(f.vencimento || f.data_vencimento, ''),
-                valor: String(f.valor || f.valor_total || '0,00').replace('.', ','),
-                status: getString(f.status, '').toLowerCase() || (new Date(f.vencimento) < new Date() ? 'vencido' : 'aberto'),
-                descricao: getString(f.descricao || f.referencia, 'Mensalidade Fibra'),
-                linha_digitavel: getString(f.linha_digitavel || f.codigo_barras, ''),
-                pix_code: getString(f.pix_codigo || f.pix_code || f.codigo_pix || f.linha_digitavel, ''),
-                link_pdf: getString(f.link_boleto || f.boleto_pdf || f.pdf, ''),
+                vencimento: f.vencimento || f.data_vencimento || '--',
+                valor: f.valor ? `R$ ${String(f.valor).replace('.', ',')}` : 'R$ 0,00',
+                status: f.status?.toLowerCase().includes('vencid') ? 'vencido' : 'aberto',
+                descricao: f.descricao || f.referencia || 'Mensalidade Fibra',
+                linha_digitavel: f.linha_digitavel || '',
+                pix_code: f.pix_codigo || f.codigo_pix || f.linha_digitavel || '',
+                link_pdf: f.link_boleto || f.boleto_pdf || '',
             })));
 
-            // CONEXÃO
+            // === CONEXÃO ===
+            const conexao = dados.conexao || dados.conexão || dados.status_conexao || {};
             setConnection({
-                status: (getString(apiData.conexao?.status || apiData.status_conexao, 'offline').toLowerCase() === 'online') ? 'online' : 'offline',
-                ip: getString(apiData.conexao?.ip_publico || apiData.ip_publico, 'Indisponível'),
-                uptime: getString(apiData.conexao?.uptime, '0h 0min'),
-                download_usage: getString(apiData.conexao?.download_mes || apiData.download_mes, '0 GB'),
-                upload_usage: getString(apiData.conexao?.upload_mes || apiData.upload_mes, '0 GB'),
-                mac: getString(apiData.conexao?.mac || apiData.mac_address, 'Não informado'),
-                last_auth: getString(apiData.conexao?.ultima_autenticacao, 'Nunca'),
+                status: conexao.online === true || conexao.status === 'online' || conexao.situacao === 'Ativo' ? 'online' : 'offline',
+                ip: conexao.ip || conexao.ip_publico || 'Não disponível',
+                uptime: conexao.uptime || '0h 0min',
+                download_usage: conexao.download_mes || conexao.download || '0 GB',
+                upload_usage: conexao.upload_mes || conexao.upload || '0 GB',
+                mac: conexao.mac || 'Não informado',
+                last_auth: conexao.ultima_autenticacao || 'Nunca',
             });
 
-            // CONTRATO
+            // === CONTRATO ===
+            const contrato = dados.contrato || dados.contrato_dados || {};
             setContract({
-                id: apiData.contrato?.id || apiData.id_contrato || 0,
-                plan_name: getString(apiData.contrato?.plano || apiData.plano, 'FIBER 500MB'),
-                speed_label: getString(apiData.contrato?.velocidade || apiData.velocidade, '500 Mbps'),
-                address: getString(apiData.contrato?.endereco_instalacao || apiData.endereco, 'Endereço não informado'),
-                installation_date: getString(apiData.contrato?.data_instalacao, '01/01/2023'),
-                status: getString(apiData.contrato?.status, 'Ativo'),
+                id: contrato.id || contrato.contrato_id || 0,
+                plan_name: contrato.plano || contrato.plano_nome || 'FIBER 500MB',
+                speed_label: contrato.velocidade || '500 Mbps',
+                address: contrato.endereco || contrato.endereco_instalacao || 'Endereço não informado',
+                installation_date: contrato.data_instalacao || contrato.data_ativacao || '01/01/2023',
+                status: contrato.status || 'Ativo',
             });
 
-            // PROTOCOLOS
-            const protocolosRaw = apiData.protocolos || apiData.atendimentos || apiData.chamados || [];
-            setProtocols(protocolosRaw.map((p: any) => ({
-                id: getString(p.protocolo || p.id, '0000'),
-                type: getString(p.tipo || p.categoria, 'Suporte'),
-                subject: getString(p.assunto || p.titulo, 'Sem título'),
-                date: getString(p.data || p.criado_em, new Date().toLocaleDateString('pt-BR')),
-                status: (getString(p.status, 'Fechado')) as 'Aberto' | 'Fechado' | 'Em Análise',
+            // === PROTOCOLOS ===
+            setProtocols((dados.protocolos || dados.chamados || []).map((p: any) => ({
+                id: p.protocolo || p.id || '0000',
+                type: p.tipo || 'Suporte',
+                subject: p.assunto || p.titulo || 'Sem título',
+                date: p.data || p.criado_em || new Date().toLocaleDateString('pt-BR'),
+                status: p.status === 'Aberto' ? 'Aberto' : p.status === 'Fechado' ? 'Fechado' : 'Em Análise',
             })));
 
-            // NOTAS FISCAIS
-            const notasRaw = apiData.notas_fiscais || apiData.nfs || [];
-            setFiscalNotes(notasRaw.map((n: any) => ({
+            // === NOTAS FISCAIS ===
+            setFiscalNotes((dados.notas_fiscais || dados.nfs || []).map((n: any) => ({
                 id: n.id || Date.now(),
-                numero: getString(n.numero, '000000'),
-                serie: getString(n.serie, '1'),
-                emissao: getString(n.emissao || n.data_emissao, new Date().toLocaleDateString('pt-BR')),
-                referencia: getString(n.referencia || n.competencia, 'Atual'),
-                valor: String(n.valor || '0,00').replace('.', ','),
-                link_pdf: getString(n.link_pdf || n.pdf, ''),
-                link_xml: getString(n.link_xml || n.xml, ''),
+                numero: n.numero || '000000',
+                serie: n.serie || '1',
+                emissao: n.emissao || n.data_emissao || '--/--/----',
+                referencia: n.referencia || n.competencia || 'Atual',
+                valor: `R$ ${String(n.valor || '0,00').replace('.', ',')}`,
+                link_pdf: n.link_pdf || '',
+                link_xml: n.link_xml || '',
             })));
 
             setIsAuthenticated(true);
             setIsDemoMode(false);
-            setError(null);
 
-        } catch (err: any) {
-            console.error('Erro API:', err);
-            setError('Falha ao carregar dados reais. Entrando em modo demonstração...');
-            setTimeout(() => {
-                loadDemoData();
-                setError(null);
-            }, 2500);
+        } catch (err) {
+            console.error('Erro ao carregar dados:', err);
+            setError('Falha ao carregar dados reais. Modo demo ativado.');
+            setTimeout(loadDemoData, 2000);
         } finally {
             setLoading(false);
         }
@@ -980,18 +963,20 @@ const ClientArea: React.FC = () => {
 
                 {/* TAB: CHAT */}
                 {activeTab === 'chat' && (
-                    <div className="bg-fiber-card border border-white/10 rounded-xl h-[600px] flex flex-col animate-fadeIn">
+                    <div className="bg-fiber-card border border-white/10 rounded-xl h-[calc(100vh-250px)] min-h-[500px] max-h-[700px] flex flex-col animate-fadeIn shadow-2xl">
                         <div className="p-4 border-b border-white/5 flex items-center gap-3 bg-neutral-900/50">
-                            <Bot className="text-fiber-orange" />
+                            <div className="bg-fiber-orange/10 p-2 rounded-full">
+                                <Bot className="text-fiber-orange" />
+                            </div>
                             <div>
                                 <h3 className="text-white font-bold">Assistente Virtual</h3>
                                 <p className="text-xs text-green-400 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Online</p>
                             </div>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-neutral-900/20">
                             {messages.map((msg) => (
                                 <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[80%] p-4 rounded-2xl text-sm leading-relaxed ${
+                                    <div className={`max-w-[80%] p-4 rounded-2xl text-sm leading-relaxed shadow-md ${
                                         msg.sender === 'user' 
                                             ? 'bg-fiber-orange text-white rounded-tr-none' 
                                             : 'bg-neutral-800 text-gray-200 rounded-tl-none border border-white/5'
@@ -1021,7 +1006,7 @@ const ClientArea: React.FC = () => {
                         </div>
                         <div className="p-4 border-t border-white/5 bg-neutral-900/30">
                             {messages.length > 0 && messages[messages.length - 1].options && (
-                                <div className="flex gap-2 overflow-x-auto mb-4 pb-2">
+                                <div className="flex gap-2 overflow-x-auto mb-4 pb-2 no-scrollbar">
                                     {messages[messages.length - 1].options?.map((opt, idx) => (
                                         <button key={idx} onClick={() => sendMessage(opt.label)} className="whitespace-nowrap px-4 py-2 bg-neutral-800 hover:bg-neutral-700 border border-fiber-orange/30 text-fiber-orange text-xs font-bold rounded-full transition-colors">
                                             {opt.label}
@@ -1036,7 +1021,7 @@ const ClientArea: React.FC = () => {
                                     onChange={(e) => setChatInput(e.target.value)}
                                     onKeyPress={(e) => e.key === 'Enter' && sendMessage(chatInput)}
                                     placeholder="Digite sua mensagem..." 
-                                    className="w-full bg-neutral-900 border border-white/10 rounded-full pl-5 pr-12 py-3 text-white text-sm focus:border-fiber-orange focus:outline-none"
+                                    className="w-full bg-neutral-900 border border-white/10 rounded-full pl-5 pr-12 py-3 text-white text-sm focus:border-fiber-orange focus:outline-none shadow-inner"
                                 />
                                 <button onClick={() => sendMessage(chatInput)} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-fiber-orange rounded-full text-white hover:bg-orange-600 transition-colors">
                                     <Send size={16} />
