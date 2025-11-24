@@ -31,12 +31,18 @@ const FAQ_DATA: Record<string, { question: string; answer: string }[]> = {
       answer: 'A rede FTTH (Fiber To The Home) é uma tecnologia que leva o cabo de fibra óptica diretamente da nossa central até dentro da sua casa. Diferente de tecnologias antigas, a Fiber.Net garante fibra de ponta a ponta, oferecendo velocidade real e estabilidade superior.'
     },
     {
-      question: 'Como melhorar o sinal do Wi-Fi?',
-      answer: 'Posicione o roteador em local alto e central, longe de micro-ondas e espelhos. Para residências grandes, recomendamos o uso de tecnologia Mesh, que cria uma rede única e inteligente em toda a casa. Entre em contato para saber sobre nossos planos com Mesh.'
-    },
-    {
       question: 'Diferença entre 2.4GHz e 5GHz',
       answer: 'A rede 2.4GHz tem maior alcance (atravessa mais paredes), mas menor velocidade máxima. A rede 5GHz entrega altíssima velocidade, ideal para Streaming 4K e Jogos, mas tem menor alcance. Sempre que possível, conecte-se à rede 5GHz se estiver no mesmo cômodo do roteador.'
+    }
+  ],
+  "Redes Wi-Fi": [
+    {
+      question: 'Como otimizar o alcance do meu Wi-Fi?',
+      answer: 'Para otimizar o alcance, certifique-se de que o roteador está em um local central e elevado, longe de obstáculos e interferências. Considere o uso de repetidores ou kits Mesh para cobrir áreas maiores.'
+    },
+    {
+      question: 'O que é Wi-Fi Mesh e como funciona?',
+      answer: 'Wi-Fi Mesh utiliza múltiplos pontos de acesso para criar uma única rede Wi-Fi ampla e estável em toda a sua casa, eliminando zonas de sombra e garantindo conexão de alta velocidade em qualquer lugar.'
     }
   ],
   "Streaming e Apps (IPTV)": [

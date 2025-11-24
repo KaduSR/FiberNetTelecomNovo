@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Plan } from '../types';
-import { Check, Wifi, Zap, Headphones, Smartphone, Globe, Gamepad2, Wrench } from 'lucide-react';
+import { Check, Wifi, Zap, Headphones, Smartphone, Globe, Gamepad2, Wrench, Tv } from 'lucide-react';
 import Button from './Button';
 
 interface PlanCardProps {
@@ -20,12 +20,29 @@ const getBenefitIcon = (text: string) => {
   return Check;
 };
 
+const getPlanIcon = (plan: Plan) => {
+  const text = (plan.description + ' ' + plan.benefits.join(' ')).toLowerCase();
+
+  if (text.includes('gamer') || text.includes('jogos') || text.includes('ping')) {
+    return Gamepad2;
+  }
+  if (text.includes('streaming') || text.includes('4k') || text.includes('tv') || text.includes('filmes')) {
+    return Tv;
+  }
+  if (text.includes('wi-fi') || text.includes('wifi')) {
+    return Wifi;
+  }
+  return Check;
+};
+
 const PlanCard: React.FC<PlanCardProps> = ({ plan }) => {
+  const MainIcon = getPlanIcon(plan);
+
   return (
     <div 
       className={`relative flex flex-col p-8 bg-fiber-card rounded-2xl transition-all duration-300 group hover:bg-neutral-900 
       ${plan.highlight 
-        ? 'border-2 border-fiber-orange scale-105 z-20 shadow-2xl shadow-fiber-orange/20 ring-1 ring-fiber-orange/50' 
+        ? 'border-2 border-fiber-orange scale-105 z-20 shadow-[0_0_40px_rgba(255,107,0,0.3)] ring-1 ring-fiber-orange/50 bg-neutral-900' 
         : 'border border-white/10 hover:border-fiber-orange/50 z-0 hover:z-10 hover:shadow-lg hover:shadow-black/40'
       }`}
     >
@@ -39,7 +56,7 @@ const PlanCard: React.FC<PlanCardProps> = ({ plan }) => {
       <div className="text-center mb-8">
         <div className="flex justify-center mb-6">
             <div className={`p-4 rounded-2xl ${plan.highlight ? 'bg-fiber-orange/10 text-fiber-orange' : 'bg-neutral-800 text-gray-400 group-hover:text-fiber-orange group-hover:bg-fiber-orange/10 transition-colors'}`}>
-                <Wifi size={36} aria-hidden="true" />
+                <MainIcon size={36} aria-hidden="true" />
             </div>
         </div>
         <h3 className="text-gray-400 font-medium uppercase tracking-widest text-xs mb-2">Internet Fibra</h3>

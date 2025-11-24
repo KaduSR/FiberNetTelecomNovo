@@ -5,8 +5,9 @@
 // Safely determine API Base URL
 // We check if import.meta.env exists before accessing it to prevent "Cannot read properties of undefined"
 const getApiBaseUrl = () => {
-  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE_URL) {
-    return import.meta.env.VITE_API_BASE_URL;
+  const _importMeta = import.meta as any;
+  if (typeof _importMeta !== 'undefined' && _importMeta.env && _importMeta.env.VITE_API_BASE_URL) {
+    return _importMeta.env.VITE_API_BASE_URL;
   }
   return 'https://api.centralfiber.online/api';
 };

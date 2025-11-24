@@ -1,10 +1,25 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Button from './Button';
 import { ArrowRight } from 'lucide-react';
 import FiberNetTextLogo from './FiberNetTextLogo'; // Import the text logo component
 
 const Hero: React.FC = () => {
+  const [offsetY, setOffsetY] = useState(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      // Calculate offset based on scroll position (speed factor 0.15 for subtle parallax)
+      setOffsetY(window.scrollY * 0.15);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
   return (
     <div className="relative bg-fiber-dark pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
       {/* Background Pattern */}
@@ -55,8 +70,11 @@ const Hero: React.FC = () => {
                 </div>
             </div>
 
-            {/* Image Content */}
-            <div className="relative order-1 lg:order-2 mb-10 lg:mb-0 flex justify-center">
+            {/* Image Content with Parallax Effect */}
+            <div 
+                className="relative order-1 lg:order-2 mb-10 lg:mb-0 flex justify-center will-change-transform"
+                style={{ transform: `translateY(${offsetY}px)` }}
+            >
                 <div className="absolute inset-0 bg-fiber-orange/20 blur-3xl rounded-full transform translate-y-10 opacity-60"></div>
                 <img 
                     src="https://res.cloudinary.com/dbblxiya7/image/upload/v1763728839/3_wmk7t6.svg"

@@ -55,7 +55,7 @@ export const PLANS: Plan[] = [
     benefits: [
       'Roteador Wi-Fi 6 (Incluso)',
       'Rota Gamer (Ping Baixo)',
-      'IP Público Dinâmico',
+      'IP Público Dinâmico (Jogos)',
       'Suporte Técnico VIP'
     ],
     highlight: false
@@ -71,4 +71,6 @@ export const CONTACT_INFO = {
 
 export const HISTORY_TEXT = `A Fiber.Net foi fundada em Rio das Flores em 2017. Nessa época, o que levou ao seu surgimento foi a vontade dos donos de ter um acesso de qualidade à internet. Logo viram que as empresas não ligam muito para seus assinantes e surgiu a ideia de montar um provedor diferente, um provedor que além de prestar o serviço de ISP também fosse uma empresa amiga, que além de ver o lado financeiro da coisa vise o lado humano.
 
-Assim surgiu a Fiber.Net, fundada por um Valenciano e um Rio Florense que queriam fazer algo diferente em nossa cidade. Hoje atendemos um grande volume de residências na região com aceitação de 100% dos nossos clientes. Praticamente 90% dos nossos assinantes chegaram pela indicação - um serviço bem prestado se torna de sucesso por si só.`;
+Assim surgiu a Fiber.Net, fundada por um Valenciano e um Rio Florense que queriam fazer algo diferente em nossa cidade. Hoje atendemos um grande volume de residências na região com aceitação de 100% dos nossos clientes. Praticamente 90% dos nossos assinantes chegaram pela indicação - um serviço bem prestado se torna de sucesso por si só.
+
+Nossa infraestrutura técnica é robusta e projetada para alta disponibilidade. Utilizamos um núcleo de rede baseado em BGP, CGNAT e BRAS, garantindo estabilidade e segurança na navegação. Contamos com trânsito IP de alta qualidade através da K2 Telecom, o que nos permite oferecer rotas otimizadas e baixa latência para serviços críticos e jogos.`;
