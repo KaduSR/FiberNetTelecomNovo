@@ -42,3 +42,15 @@ export interface Invoice {
   link_pdf?: string;
   descricao?: string;
 }
+
+export interface ConsumptionPoint {
+  label: string;
+  download: number; // in GB
+  upload: number; // in GB
+}
+
+export interface ConsumptionHistory {
+  daily: ConsumptionPoint[];
+  weekly: ConsumptionPoint[];
+  monthly: ConsumptionPoint[];
+}

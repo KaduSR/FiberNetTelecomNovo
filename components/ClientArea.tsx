@@ -2,13 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   User, Lock, FileText, Download, Copy, CheckCircle, AlertCircle, Loader2, 
   QrCode, X, LogOut, Shield, Eye, EyeOff, Mail, Wifi, Activity, 
-  Router, Unlock, Clock, MapPin, Settings, KeyRound, Home, ArrowUp, ArrowDown, Globe, MessageSquare, Bot, Send
+  Router, Unlock, Clock, MapPin, Settings, KeyRound, Home, ArrowUp, ArrowDown, Globe, MessageSquare, Bot, Send, LayoutDashboard, Ban, ChevronRight, Star,
+  FileSignature, BarChart3, ScrollText, DownloadCloud
 } from 'lucide-react';
 import Button from './Button';
-import { Invoice } from '../types';
+import { Invoice, ConsumptionHistory, ConsumptionPoint } from '../types';
+
+// === API Configuration ===
+const API_BASE_URL = '/api'; // Uses the Vite proxy in development
 
 // === HELPERS & TYPES ===
-
 const safeString = (value: any, fallback = ''): string => {
     if (value === null || value === undefined) return fallback;
     return String(value);
@@ -24,41 +27,18 @@ const formatBytes = (bytes: number | string, decimals = 2) => {
     return `${parseFloat((val / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 };
 
-const getStatusFatura = (status: string, vencimento: string) => {
-    const s = String(status).toUpperCase();
-    if (['P', 'R', 'PAGO'].includes(s)) return 'pago';
-    if (['C', 'CANCELADO'].includes(s)) return 'cancelado';
-    
-    if (vencimento) {
-        const [day, month, year] = vencimento.split('/').map(Number);
-        if (year > 2000) {
-            const dueDate = new Date(year, month - 1, day);
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            if (dueDate < today) return 'vencido';
-        }
-    }
-    return 'aberto';
-};
-
 const getStatusContrato = (status: string) => {
     const map: Record<string, string> = { 'A': 'Ativo', 'S': 'Suspenso', 'C': 'Cancelado' };
     return map[String(status).toUpperCase()] || 'Indefinido';
 };
 
-interface ConnectionData {
-    status: 'online' | 'offline';
-    ip: string;
-    uptime: string;
-    download_usage: string;
-    upload_usage: string;
-}
-
-interface ContractData {
-    plan_name: string;
-    speed_label: string;
-    address: string;
-    status: string;
+interface DashboardData {
+    cliente: { nome: string; endereco: string; };
+    contrato: { plano: string; velocidade: string; status: string; };
+    conexao: { online: boolean; ip: string; uptime: string; };
+    consumo: { total_download_bytes: number; total_upload_bytes: number; history: ConsumptionHistory; };
+    faturas: Invoice[];
+    contratoPdf: string | null;
 }
 
 interface ChatMessage {
@@ -67,379 +47,574 @@ interface ChatMessage {
     sender: 'user' | 'bot';
 }
 
-const API_BASE_URL = 'https://api.centralfiber.online/api/v1'; // Conforme arquivos do backend
+// === SUB-COMPONENT: CONSUMPTION CHART ===
+const ConsumptionChart: React.FC<{ history?: ConsumptionHistory }> = ({ history }) => {
+    const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+    const [activePoint, setActivePoint] = useState<ConsumptionPoint | null>(null);
 
-// === MAIN COMPONENT ===
-const ClientArea: React.FC = () => {
-    // Auth State
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [login, setLogin] = useState('');
-    const [password, setPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
-    const [loading, setLoading] = useState(true); // Start loading to check token
-    const [error, setError] = useState<string | null>(null);
-
-    // Data State
-    const [clientName, setClientName] = useState('Cliente');
-    const [invoices, setInvoices] = useState<Invoice[]>([]);
-    const [connection, setConnection] = useState<ConnectionData | null>(null);
-    const [contract, setContract] = useState<ContractData | null>(null);
-
-    // UI State
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'invoices' | 'support' | 'settings'>('dashboard');
-    const [copiedId, setCopiedId] = useState<string | null>(null);
-    const [activePixCode, setActivePixCode] = useState<string | null>(null);
-    const [unlocking, setUnlocking] = useState(false);
-    const [unlockedSuccess, setUnlockedSuccess] = useState(false);
-
-    // Change Password State
-    const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
-    const [currentPassword, setCurrentPassword] = useState('');
-    const [newPassword, setNewPassword] = useState('');
-    const [passwordLoading, setPasswordLoading] = useState(false);
-    const [passwordMessage, setPasswordMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
+    const data = history?.[period] || [];
     
-    // Chat State
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
-    const [isBotTyping, setIsBotTyping] = useState(false);
-    const [chatInput, setChatInput] = useState('');
-    const chatEndRef = useRef<HTMLDivElement>(null);
-
-
-    // === EFFECTS ===
-    useEffect(() => {
-        const token = localStorage.getItem('fiber_auth_token');
-        if (token) {
-            fetchDashboardData(token);
-        } else {
-            setLoading(false);
-        }
-        const savedLogin = localStorage.getItem('fiber_client_login');
-        if(savedLogin) setLogin(savedLogin);
-    }, []);
-    
-    useEffect(() => {
-        if (activeTab === 'support' && messages.length === 0) {
-            setMessages([{ id: 1, sender: 'bot', text: `Olá! Sou o assistente virtual da Fiber.Net. Como posso te ajudar hoje? (Ex: 2ª via, desbloqueio)` }]);
-        }
-    }, [activeTab]);
-
-    useEffect(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages, isBotTyping]);
-
-
-    // === DATA FETCHING ===
-    const fetchDashboardData = async (token: string) => {
-        setLoading(true);
-        setError(null);
-        try {
-            const response = await fetch(`${API_BASE_URL}/dashboard/dados`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (response.status === 401) {
-                handleLogout();
-                throw new Error("Sessão expirada. Faça login novamente.");
-            }
-            if (!response.ok) throw new Error("Não foi possível carregar os dados. Tente novamente.");
-
-            const data = await response.json();
-            
-            // Map Client Data
-            setClientName(data.cliente?.nome || 'Cliente');
-
-            // Map Contract Data
-            setContract({
-                plan_name: data.contrato?.plano || 'Plano não informado',
-                speed_label: `${data.contrato?.velocidade || '--'} Mbps`,
-                address: data.cliente?.endereco || 'Endereço não informado',
-                status: getStatusContrato(data.contrato?.status),
-            });
-            
-            // Map Connection Data
-            setConnection({
-                status: (data.conexao?.online === true || String(data.conexao?.online).toLowerCase() === 's') ? 'online' : 'offline',
-                ip: data.conexao?.ip || 'N/A',
-                uptime: data.conexao?.uptime || '--',
-                download_usage: formatBytes(data.consumo?.total_download_bytes || 0),
-                upload_usage: formatBytes(data.consumo?.total_upload_bytes || 0),
-            });
-
-            // Map Invoices
-            const faturas = (data.faturas || []).map((f: any) => ({
-                id: f.id,
-                vencimento: new Date(f.vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }),
-                valor: `R$ ${parseFloat(f.valor || 0).toFixed(2).replace('.', ',')}`,
-                status: getStatusFatura(f.status, new Date(f.vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' })),
-                linha_digitavel: f.linha_digitavel,
-                pix_code: f.pix_code || f.linha_digitavel,
-                link_pdf: f.link_pdf,
-            }));
-            setInvoices(faturas);
-            
-            setIsAuthenticated(true);
-        } catch (err: any) {
-            setError(err.message);
-            if(err.message.includes("Sessão expirada")) handleLogout(false);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-
-    // === ACTIONS ===
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoading(true);
-        setError(null);
-        try {
-            const response = await fetch(`${API_BASE_URL}/auth/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ login, senha: password }),
-            });
-            if (!response.ok) throw new Error('Credenciais inválidas.');
-
-            const data = await response.json();
-            localStorage.setItem('fiber_auth_token', data.token);
-            localStorage.setItem('fiber_client_login', login);
-            await fetchDashboardData(data.token);
-        } catch (err: any) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-    
-    const handleLogout = (clearLogin = true) => {
-        setIsAuthenticated(false);
-        localStorage.removeItem('fiber_auth_token');
-        if(clearLogin) localStorage.removeItem('fiber_client_login');
-        setPassword('');
-    };
-
-    const handleUnlockTrust = () => {
-        setUnlocking(true);
-        setTimeout(() => {
-            setUnlocking(false);
-            setUnlockedSuccess(true);
-        }, 2000);
-    };
-
-    const handleChangePassword = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setPasswordLoading(true);
-        setPasswordMessage(null);
-        try {
-            const token = localStorage.getItem('fiber_auth_token');
-            const res = await fetch(`${API_BASE_URL}/dashboard/trocar-senha`, {
-                method: "POST",
-                headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-                body: JSON.stringify({ senhaAtual: currentPassword, novaSenha: newPassword })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Erro desconhecido.");
-
-            setPasswordMessage({ type: 'success', text: 'Senha alterada com sucesso!' });
-            setCurrentPassword('');
-            setNewPassword('');
-            setTimeout(() => setIsChangePasswordOpen(false), 2000);
-        } catch (err: any) {
-            setPasswordMessage({ type: 'error', text: err.message });
-        } finally {
-            setPasswordLoading(false);
-        }
-    };
-    
-    const sendChatMessage = (text: string) => {
-        if (!text.trim() || isBotTyping) return;
-        
-        const userMsg: ChatMessage = { id: Date.now(), text, sender: 'user' };
-        setMessages(prev => [...prev, userMsg]);
-        setChatInput('');
-        setIsBotTyping(true);
-
-        // Simulação de resposta do Bot
-        setTimeout(() => {
-            const lowerText = text.toLowerCase();
-            let botText = "Não entendi sua solicitação. Você pode pedir ajuda sobre '2ª via', 'desbloqueio' ou 'suporte técnico'.";
-            if(lowerText.includes('fatura') || lowerText.includes('2ª via')) {
-                const openInvoice = invoices.find(i => i.status === 'aberto' || i.status === 'vencido');
-                botText = openInvoice ? `Encontrei uma fatura com vencimento em ${openInvoice.vencimento}. Use o menu "Faturas" para pagar.` : "Ótima notícia! Você não possui faturas em aberto.";
-            } else if (lowerText.includes('desbloqueio')) {
-                botText = "Para solicitar o desbloqueio, vá para a 'Visão Geral' e use o botão 'Liberar Internet Agora' se estiver disponível.";
-            } else if (lowerText.includes('internet') || lowerText.includes('suporte')) {
-                botText = "Se estiver sem conexão, tente reiniciar seu roteador da tomada por 1 minuto. Se não resolver, entre em contato via WhatsApp no nosso site.";
-            }
-            const botMsg: ChatMessage = { id: Date.now() + 1, text: botText, sender: 'bot' };
-            setMessages(prev => [...prev, botMsg]);
-            setIsBotTyping(false);
-        }, 1500);
-    };
-
-    const copyToClipboard = (text: string, id: string) => {
-        navigator.clipboard.writeText(text);
-        setCopiedId(id);
-        setTimeout(() => setCopiedId(null), 2000);
-    };
-
-    // === RENDER LOGIC ===
-    if (loading && !isAuthenticated) {
-        return <div className="min-h-screen bg-fiber-dark flex items-center justify-center"><Loader2 className="animate-spin text-fiber-orange" size={48} /></div>;
-    }
-
-    if (!isAuthenticated) {
+    if(!history || data.length === 0){
         return (
-            <div className="min-h-screen bg-fiber-dark flex flex-col pt-24 pb-12">
-                <div className="flex-grow flex items-center justify-center px-4">
-                    <div className="max-w-md w-full bg-fiber-card border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
-                        <div className="bg-neutral-900 p-8 text-center border-b border-white/5">
-                            <div className="inline-flex items-center justify-center p-4 bg-fiber-orange/10 rounded-full text-fiber-orange mb-4">
-                                <User size={32} />
-                            </div>
-                            <h1 className="text-2xl font-bold text-white">Central do Assinante</h1>
-                            <p className="text-gray-400 mt-2 text-sm">Acesse sua conta com segurança</p>
-                        </div>
-                        <div className="p-8">
-                            <form onSubmit={handleLogin} className="space-y-5">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-400 mb-2">E-mail</label>
-                                    <div className="relative">
-                                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
-                                        <input type="email" value={login} onChange={(e) => setLogin(e.target.value)} placeholder="seu@email.com" className="w-full h-12 pl-11 pr-4 bg-fiber-dark border border-white/10 rounded-lg text-white focus:border-fiber-orange focus:ring-1 focus:ring-fiber-orange" required />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-400 mb-2">Senha</label>
-                                    <div className="relative">
-                                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
-                                        <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full h-12 pl-11 pr-12 bg-fiber-dark border border-white/10 rounded-lg text-white focus:border-fiber-orange focus:ring-1 focus:ring-fiber-orange" required />
-                                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-fiber-orange">
-                                            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                                        </button>
-                                    </div>
-                                </div>
-                                {error && <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 p-3 rounded-lg border border-red-500/20"><AlertCircle size={16} />{error}</div>}
-                                <Button type="submit" variant="primary" fullWidth disabled={loading} className="h-12 text-base mt-2">
-                                    {loading ? <Loader2 className="animate-spin mx-auto" /> : 'Entrar na Central'}
-                                </Button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
+            <div className="h-64 flex items-center justify-center text-gray-500 bg-black/20 rounded-xl mt-6">
+                Histórico de consumo indisponível.
             </div>
         );
     }
     
-    const hasOverdue = invoices?.some(i => i.status === 'vencido');
+    const maxVal = Math.max(...data.map(d => Math.max(d.download, d.upload)), 1);
+    const width = 100, height = 100, padding = 10;
+    
+    const getX = (index: number) => (index / (data.length - 1)) * (width - (padding * 2)) + padding;
+    const getY = (value: number) => height - padding - (value / maxVal) * (height - (padding * 2));
 
-    // === DASHBOARD RENDER ===
+    const getPath = (key: 'download' | 'upload') => {
+        let d = `M ${getX(0)} ${getY(data[0][key])}`;
+        for (let i = 1; i < data.length; i++) d += ` L ${getX(i)} ${getY(data[i][key])}`;
+        return d;
+    };
+    
+    const getAreaPath = (key: 'download' | 'upload') => `${getPath(key)} L ${getX(data.length - 1)} ${height - padding} L ${getX(0)} ${height - padding} Z`;
+
     return (
-        <div className="min-h-screen bg-fiber-dark pt-24 pb-12">
-            <header className="bg-fiber-card border-y border-white/5 mb-8 sticky top-16 z-40 shadow-lg">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between items-center py-4">
-                        <div className="flex items-center gap-4">
-                             <div className="bg-neutral-800 p-3 rounded-full text-gray-300 border border-white/5">
-                                <User size={24} />
-                            </div>
-                            <div>
-                                <h1 className="text-xl font-bold text-white truncate max-w-[200px] sm:max-w-xs">Olá, {clientName}</h1>
-                                <p className="text-sm text-fiber-orange flex items-center gap-1.5">
-                                    <span className={`w-2 h-2 rounded-full animate-pulse ${connection?.status === 'online' ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                                    {connection?.status === 'online' ? 'Conectado' : 'Offline'}
-                                </p>
-                            </div>
-                        </div>
-                        <Button variant="outline" onClick={() => handleLogout()} className="!py-2 !px-4 !text-xs border-white/20 text-gray-300 hover:bg-white/5">
-                            <LogOut size={14} className="mr-2" /> Sair
-                        </Button>
-                    </div>
-                    <nav className="flex gap-1 sm:gap-6 overflow-x-auto no-scrollbar border-t border-white/5 pt-2">
-                        {[
-                            { id: 'dashboard', label: 'Visão Geral', icon: Home },
-                            { id: 'invoices', label: 'Faturas', icon: FileText },
-                            { id: 'support', label: 'Suporte', icon: MessageSquare },
-                            { id: 'settings', label: 'Configurações', icon: Settings },
-                        ].map(tab => (
-                            <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex items-center gap-2 pb-3 text-sm font-bold transition-all border-b-2 whitespace-nowrap px-2 sm:px-0 ${activeTab === tab.id ? 'text-fiber-orange border-fiber-orange' : 'text-gray-400 border-transparent hover:text-white'}`}>
-                                <tab.icon size={16} /> {tab.label}
-                            </button>
-                        ))}
-                    </nav>
+        <div className="bg-black/20 border border-white/5 rounded-2xl p-6 mt-6 relative overflow-hidden">
+            <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
+                <h3 className="text-white font-bold flex items-center gap-2"><Activity size={18} className="text-fiber-orange" /> Histórico de Consumo</h3>
+                <div className="flex bg-white/5 p-1 rounded-full border border-white/10">
+                    {(['daily', 'weekly', 'monthly'] as const).map(p => (
+                        <button key={p} onClick={() => setPeriod(p)} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${period === p ? 'bg-fiber-orange text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
+                            {p === 'daily' ? 'Diário' : p === 'weekly' ? 'Semanal' : 'Mensal'}
+                        </button>
+                    ))}
                 </div>
-            </header>
+            </div>
+            <div className="h-64 w-full relative group">
+                <div className="absolute left-0 top-0 bottom-8 flex flex-col justify-between text-[10px] text-gray-500 font-mono pointer-events-none z-0">
+                    <span>{Math.round(maxVal)} GB</span><span>{Math.round(maxVal / 2)} GB</span><span>0 GB</span>
+                </div>
+                <div className="ml-8 h-full">
+                    <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="w-full h-full overflow-visible">
+                        <defs>
+                            <linearGradient id="gradDownload" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#1E90FF" stopOpacity="0.3" /><stop offset="100%" stopColor="#1E90FF" stopOpacity="0" /></linearGradient>
+                            <linearGradient id="gradUpload" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#FF6B00" stopOpacity="0.3" /><stop offset="100%" stopColor="#FF6B00" stopOpacity="0" /></linearGradient>
+                        </defs>
+                        <path d={getAreaPath('download')} fill="url(#gradDownload)" className="transition-all duration-500" />
+                        <path d={getPath('download')} fill="none" stroke="#1E90FF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="transition-all duration-500 drop-shadow-lg" />
+                        <path d={getAreaPath('upload')} fill="url(#gradUpload)" className="transition-all duration-500" />
+                        <path d={getPath('upload')} fill="none" stroke="#FF6B00" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="transition-all duration-500 drop-shadow-lg" />
+                        {data.map((d, i) => (
+                            <g key={i} className="group/point">
+                                <rect x={getX(i) - 2} y="0" width="4" height="100" fill="transparent" className="cursor-pointer" onMouseEnter={() => setActivePoint(d)} onMouseLeave={() => setActivePoint(null)} />
+                                <circle cx={getX(i)} cy={getY(d.download)} r="1.5" className="fill-[#1E90FF] opacity-0 group-hover/point:opacity-100" />
+                                <circle cx={getX(i)} cy={getY(d.upload)} r="1.5" className="fill-[#FF6B00] opacity-0 group-hover/point:opacity-100" />
+                            </g>
+                        ))}
+                    </svg>
+                </div>
+                <div className="absolute bottom-0 left-8 right-0 flex justify-between text-[10px] text-gray-400 font-medium px-2">
+                    {data.map((d, i) => <span key={i} className="text-center w-8 truncate">{d.label}</span>)}
+                </div>
+                {activePoint && (
+                    <div className="absolute top-0 left-1/2 transform -translate-x-1/2 bg-neutral-900 border border-white/20 p-3 rounded-lg shadow-2xl z-10 pointer-events-none animate-fadeIn backdrop-blur-md">
+                        <div className="text-xs font-bold text-white mb-1 border-b border-white/10 pb-1">{activePoint.label}</div>
+                        <div className="flex items-center gap-2 text-xs text-fiber-blue"><ArrowDown size={12} /> {activePoint.download.toFixed(2)} GB</div>
+                        <div className="flex items-center gap-2 text-xs text-fiber-orange"><ArrowUp size={12} /> {activePoint.upload.toFixed(2)} GB</div>
+                    </div>
+                )}
+            </div>
+            <div className="flex justify-center gap-6 mt-4">
+                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-fiber-blue"></div><span className="text-xs text-gray-400">Download</span></div>
+                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-fiber-orange"></div><span className="text-xs text-gray-400">Upload</span></div>
+            </div>
+        </div>
+    );
+};
 
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                {activeTab === 'dashboard' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fadeIn">
-                        <div className="lg:col-span-2 space-y-8">
-                            {hasOverdue && !unlockedSuccess && (
-                                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 animate-pulse">
-                                    <div className="flex items-center gap-3 mb-3 text-red-400"><Unlock size={24} /><h3 className="font-bold">Aviso Importante</h3></div>
-                                    <p className="text-sm text-gray-300 mb-4">Detectamos faturas vencidas. Se sua conexão foi bloqueada, use o desbloqueio de confiança para liberá-la por 48 horas.</p>
-                                    <Button onClick={handleUnlockTrust} disabled={unlocking} variant='primary' className='bg-red-600 hover:bg-red-700'>
-                                        {unlocking ? <Loader2 className="animate-spin" /> : <Unlock size={16} />}
-                                        {unlocking ? 'Liberando...' : 'Liberar Internet Agora'}
-                                    </Button>
+
+// === MAIN COMPONENT ===
+const ClientArea: React.FC = () => {
+    // === STATE MANAGEMENT ===
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+    const [loginError, setLoginError] = useState('');
+    const [showLoginPass, setShowLoginPass] = useState(false);
+    const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+    const [activeTab, setActiveTab] = useState('dashboard');
+    const [isPixModalOpen, setPixModalOpen] = useState(false);
+    const [activePixCode, setActivePixCode] = useState('');
+    const [isPixCopied, setIsPixCopied] = useState(false);
+    const [copiedBarcodeId, setCopiedBarcodeId] = useState<string | null>(null);
+    const [invoiceStatusFilter, setInvoiceStatusFilter] = useState('aberto');
+    const [favoriteInvoices, setFavoriteInvoices] = useState<Set<string>>(() => {
+        const saved = localStorage.getItem('favoriteInvoices');
+        return saved ? new Set(JSON.parse(saved)) : new Set();
+    });
+
+    // Chat states
+    const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+    const [chatInput, setChatInput] = useState('');
+    const [isBotTyping, setIsBotTyping] = useState(false);
+    const chatContainerRef = useRef<HTMLDivElement>(null);
+
+    // Password change states
+    const [showNewPass, setShowNewPass] = useState(false);
+    const [passwordChangeStatus, setPasswordChangeStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+    // === API FUNCTIONS ===
+    
+    const fetchDashboardData = async () => {
+        try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch(`${API_BASE_URL}/dashboard`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error('Failed to fetch dashboard data');
+            const data = await response.json();
+            setDashboardData(data);
+        } catch (error) {
+            console.error(error);
+            handleLogout(); // Log out if data fetch fails
+        }
+    };
+
+    const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        setIsLoading(true);
+        setLoginError('');
+        const formData = new FormData(e.currentTarget);
+        const email = formData.get('email') as string;
+        const password = formData.get('password') as string;
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Login failed');
+            
+            localStorage.setItem('authToken', data.token);
+            setIsAuthenticated(true);
+            await fetchDashboardData();
+            setActiveTab('dashboard');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        } catch (error: any) {
+            setLoginError(error.message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleLogout = () => {
+        localStorage.removeItem('authToken');
+        setIsAuthenticated(false);
+        setDashboardData(null);
+    };
+
+    const handleDownloadBoleto = async (id: string | number) => {
+        try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch(`${API_BASE_URL}/boleto/${id}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error('Failed to download boleto');
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `fatura_${id}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        } catch (error) {
+            console.error(error);
+            alert('Não foi possível baixar o boleto.');
+        }
+    };
+    
+    const handlePasswordChange = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        setPasswordChangeStatus(null);
+        const formData = new FormData(e.currentTarget);
+        const newPassword = formData.get('novaSenha') as string;
+
+        try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch(`${API_BASE_URL}/trocar-senha`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ newPassword })
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Failed to change password');
+            setPasswordChangeStatus({ type: 'success', message: data.message });
+            e.currentTarget.reset();
+        } catch (error: any) {
+            setPasswordChangeStatus({ type: 'error', message: error.message });
+        } finally {
+            setTimeout(() => setPasswordChangeStatus(null), 5000);
+        }
+    };
+
+    // === EFFECTS ===
+
+    useEffect(() => {
+        const token = localStorage.getItem('authToken');
+        if (token) {
+            setIsAuthenticated(true);
+            fetchDashboardData().finally(() => setIsLoading(false));
+        } else {
+            setIsLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        localStorage.setItem('favoriteInvoices', JSON.stringify(Array.from(favoriteInvoices)));
+    }, [favoriteInvoices]);
+
+    useEffect(() => {
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        }
+    }, [chatMessages, isBotTyping]);
+
+    // === OTHER HANDLERS ===
+
+    const handleCopy = (text: string, id: string) => {
+        navigator.clipboard.writeText(text);
+        setCopiedBarcodeId(id);
+        setTimeout(() => setCopiedBarcodeId(null), 2000);
+    };
+
+    const handleOpenPixModal = (code: string) => {
+        setActivePixCode(code);
+        setPixModalOpen(true);
+        setIsPixCopied(false);
+    };
+    
+    const handleCopyPix = () => {
+        navigator.clipboard.writeText(activePixCode);
+        setIsPixCopied(true);
+        setTimeout(() => setIsPixCopied(false), 2000);
+    };
+
+    const toggleFavorite = (id: string) => {
+        setFavoriteInvoices(prev => {
+            const newFavorites = new Set(prev);
+            newFavorites.has(id) ? newFavorites.delete(id) : newFavorites.add(id);
+            return newFavorites;
+        });
+    };
+
+    const handleChatSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!chatInput.trim() || isBotTyping) return;
+
+        const newUserMessage: ChatMessage = { id: Date.now(), text: chatInput, sender: 'user' };
+        setChatMessages(prev => [...prev, newUserMessage]);
+        setChatInput('');
+        setIsBotTyping(true);
+
+        setTimeout(() => {
+            const botResponse: ChatMessage = { 
+                id: Date.now() + 1, 
+                text: "Olá! Sou o assistente virtual. Para um atendimento completo, por favor, entre em contato pelo nosso WhatsApp.",
+                sender: 'bot' 
+            };
+            setChatMessages(prev => [...prev, botResponse]);
+            setIsBotTyping(false);
+        }, 1500);
+    };
+
+    // === RENDER LOGIC ===
+    const filteredInvoices = (dashboardData?.faturas || []).filter(invoice => {
+        if (invoiceStatusFilter === 'todas') return true;
+        return invoice.status === invoiceStatusFilter;
+    });
+
+    const sortedAndFilteredInvoices = filteredInvoices.sort((a, b) => {
+        const aIsFav = favoriteInvoices.has(String(a.id));
+        const bIsFav = favoriteInvoices.has(String(b.id));
+        if (aIsFav && !bIsFav) return -1;
+        if (!aIsFav && bIsFav) return 1;
+        return 0;
+    });
+
+    const getInvoiceStatusProps = (status: Invoice['status']) => {
+        switch (status) {
+            case 'pago': return { icon: CheckCircle, color: 'green', label: 'Pago' };
+            case 'vencido': return { icon: AlertCircle, color: 'red', label: 'Vencido' };
+            case 'cancelado': return { icon: Ban, color: 'gray', label: 'Cancelado' };
+            default: return { icon: Clock, color: 'blue', label: 'Em Aberto' };
+        }
+    };
+
+    const TABS = [
+      { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
+      { id: 'invoices', label: 'Faturas', icon: FileText },
+      { id: 'consumption', label: 'Extrato', icon: BarChart3 },
+      { id: 'contracts', label: 'Contratos', icon: FileSignature },
+      { id: 'support', label: 'Suporte', icon: MessageSquare },
+      { id: 'settings', label: 'Configurações', icon: Settings },
+    ];
+    
+    // === RENDER ===
+    if (isLoading) {
+        return <div className="min-h-screen bg-fiber-dark flex items-center justify-center"><Loader2 size={48} className="text-fiber-orange animate-spin" /></div>;
+    }
+
+    if (!isAuthenticated) {
+        return (
+            <div className="min-h-screen bg-fiber-dark flex items-center justify-center p-4 animate-fadeIn">
+                <div className="w-full max-w-md bg-fiber-card p-8 rounded-2xl border border-white/10 shadow-2xl">
+                    <h2 className="text-3xl font-bold text-white text-center mb-2">Área do Cliente</h2>
+                    <p className="text-gray-400 text-center mb-8">Acesse sua conta para gerenciar seus serviços.</p>
+                    <form onSubmit={handleLogin} className="space-y-6">
+                        <div className="relative">
+                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                            <input type="email" name="email" placeholder="Seu e-mail" required className="w-full bg-neutral-900 border border-white/10 rounded-lg p-3 pl-12 text-white focus:outline-none focus:ring-1 focus:ring-fiber-orange" />
+                        </div>
+                        <div className="relative">
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                            <input type={showLoginPass ? 'text' : 'password'} name="password" placeholder="Sua senha" required className="w-full bg-neutral-900 border border-white/10 rounded-lg p-3 pl-12 pr-10 text-white focus:outline-none focus:ring-1 focus:ring-fiber-orange" />
+                            <button type="button" onClick={() => setShowLoginPass(!showLoginPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-fiber-card focus:ring-fiber-orange rounded-full p-1">
+                                {showLoginPass ? <EyeOff size={18}/> : <Eye size={18}/>}
+                            </button>
+                        </div>
+                        {loginError && <p className="text-red-400 text-sm text-center">{loginError}</p>}
+                        <Button type="submit" variant="primary" fullWidth disabled={isLoading}>
+                           {isLoading ? <Loader2 className="animate-spin mx-auto" /> : 'Acessar'}
+                        </Button>
+                    </form>
+                    <p className="text-center text-sm text-gray-500 mt-6">
+                       Problemas para acessar? <a href="#" onClick={(e) => { e.preventDefault(); alert('Por favor, entre em contato com o suporte via WhatsApp.'); }} className="text-fiber-orange hover:underline font-semibold">Fale com o suporte</a>.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    // Authenticated View
+    return (
+        <div className="min-h-screen bg-black pt-24 pb-20">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                {/* Header */}
+                <header className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-10">
+                    <div>
+                        <h1 className="text-3xl font-bold text-white">Olá, {dashboardData?.cliente.nome.split(' ')[0]}!</h1>
+                        <p className="text-gray-400">Bem-vindo(a) de volta à sua central de controle.</p>
+                    </div>
+                    <Button onClick={handleLogout} variant="secondary" className="!py-2 !px-4 text-sm gap-2">
+                        <LogOut size={16} /> Sair
+                    </Button>
+                </header>
+
+                {/* Main Layout: Sidebar + Content */}
+                <div className="flex flex-col lg:flex-row gap-8">
+                    {/* Sidebar */}
+                    <aside className="w-full lg:w-1/4 lg:sticky top-24 self-start">
+                        <div className="bg-fiber-card border border-white/10 rounded-2xl p-4 space-y-2">
+                            {TABS.map(tab => (
+                                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                                    className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors font-medium text-sm ${activeTab === tab.id ? 'bg-fiber-orange text-white' : 'text-gray-300 hover:bg-white/5'}`}>
+                                    <tab.icon size={18} />
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
+                    </aside>
+
+                    {/* Content Area */}
+                    <main className="w-full lg:w-3/4">
+                        <div className="bg-fiber-card border border-white/10 rounded-2xl p-6 md:p-8 min-h-[500px] animate-fadeIn">
+                            {/* Render active tab content */}
+                            
+                            {/* DASHBOARD TAB */}
+                            {activeTab === 'dashboard' && dashboardData && (
+                                <div>
+                                    <h2 className="text-2xl font-bold text-white mb-8">Visão Geral</h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {/* Connection Status */}
+                                        <div className="bg-neutral-900 p-6 rounded-xl border border-white/5">
+                                            <div className="flex items-center gap-3 mb-4 text-fiber-orange"><Wifi size={20} /> <h3 className="text-white font-bold">Status da Conexão</h3></div>
+                                            <div className={`flex items-center gap-2 font-bold ${dashboardData.conexao.online ? 'text-fiber-green' : 'text-red-500'}`}>
+                                                {dashboardData.conexao.online ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+                                                {dashboardData.conexao.online ? 'Online' : 'Offline'}
+                                            </div>
+                                            <div className="text-sm text-gray-400 mt-2">IP: <span className="font-mono">{dashboardData.conexao.ip}</span></div>
+                                            <div className="text-sm text-gray-400">Uptime: {dashboardData.conexao.uptime}</div>
+                                        </div>
+                                        {/* Contract */}
+                                        <div className="bg-neutral-900 p-6 rounded-xl border border-white/5">
+                                            <div className="flex items-center gap-3 mb-4 text-fiber-orange"><FileSignature size={20} /> <h3 className="text-white font-bold">Seu Plano</h3></div>
+                                            <p className="text-xl font-semibold text-white">{dashboardData.contrato.plano}</p>
+                                            <div className="text-sm text-gray-400 mt-2">Status: <span className="font-bold">{getStatusContrato(dashboardData.contrato.status)}</span></div>
+                                            <div className="text-sm text-gray-400">Velocidade: {dashboardData.contrato.velocidade}</div>
+                                        </div>
+                                        {/* Consumption */}
+                                        <div className="bg-neutral-900 p-6 rounded-xl border border-white/5 md:col-span-2">
+                                            <div className="flex items-center gap-3 mb-4 text-fiber-orange"><BarChart3 size={20} /> <h3 className="text-white font-bold">Consumo (Mês Atual)</h3></div>
+                                            <div className="flex flex-col sm:flex-row gap-8">
+                                                <div className="flex items-center gap-3">
+                                                    <ArrowDown className="text-fiber-blue" />
+                                                    <div><span className="text-gray-400 text-sm">Download</span><p className="text-white font-bold text-lg">{formatBytes(dashboardData.consumo.total_download_bytes)}</p></div>
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <ArrowUp className="text-fiber-orange" />
+                                                    <div><span className="text-gray-400 text-sm">Upload</span><p className="text-white font-bold text-lg">{formatBytes(dashboardData.consumo.total_upload_bytes)}</p></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
-                            {unlockedSuccess && (
-                                <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-6"><div className="flex items-center gap-2 text-green-400 font-bold mb-2"><CheckCircle size={20} /> Desbloqueio Solicitado!</div><p className="text-sm text-gray-300">Sua conexão deve ser restabelecida em até 5 minutos. Reinicie seu roteador.</p></div>
+
+                            {/* INVOICES TAB */}
+                            {activeTab === 'invoices' && (
+                                <div>
+                                    <h2 className="text-2xl font-bold text-white mb-6">Minhas Faturas</h2>
+                                    <div className="flex items-center gap-2 mb-6 bg-neutral-900 p-1.5 rounded-full border border-white/10 w-fit">
+                                        {['aberto', 'pago', 'todas'].map(status => (
+                                            <button key={status} onClick={() => setInvoiceStatusFilter(status)} className={`px-4 py-1.5 text-xs font-bold rounded-full transition-colors ${invoiceStatusFilter === status ? 'bg-fiber-orange text-white' : 'text-gray-400 hover:bg-white/10'}`}>
+                                                {status.charAt(0).toUpperCase() + status.slice(1)}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="space-y-4">
+                                        {sortedAndFilteredInvoices.length > 0 ? sortedAndFilteredInvoices.map(invoice => {
+                                            const { icon: Icon, color, label } = getInvoiceStatusProps(invoice.status);
+                                            const isFav = favoriteInvoices.has(String(invoice.id));
+                                            return (
+                                                <div key={invoice.id} className="bg-neutral-900 border border-white/10 rounded-xl p-4 md:p-6 flex flex-col md:flex-row items-start md:items-center gap-4 relative">
+                                                    <button onClick={() => toggleFavorite(String(invoice.id))} className="text-gray-500 hover:text-yellow-400 absolute right-4 top-4 md:relative md:right-auto md:top-auto md:order-first md:mr-4">
+                                                        <Star size={18} className={`transition-colors ${isFav ? 'fill-yellow-400 text-yellow-400' : ''}`} />
+                                                    </button>
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <Icon size={16} className={`text-fiber-${color}`} />
+                                                            <span className={`text-sm font-bold text-fiber-${color}`}>{label}</span>
+                                                            <span className="text-gray-500 text-xs">| Venc.: {invoice.vencimento}</span>
+                                                        </div>
+                                                        <p className="text-white font-semibold">R$ {invoice.valor}</p>
+                                                        <p className="text-xs text-gray-400">{invoice.descricao || 'Referente ao serviço de internet'}</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        {invoice.linha_digitavel && <Button onClick={() => handleCopy(invoice.linha_digitavel!, String(invoice.id))} variant="secondary" className="!text-xs !py-1.5 !px-3 gap-1.5"><Copy size={12} /> {copiedBarcodeId === String(invoice.id) ? 'Copiado!' : 'Código'}</Button>}
+                                                        {invoice.pix_code && <Button onClick={() => handleOpenPixModal(invoice.pix_code!)} className="!bg-fiber-green/10 !text-fiber-green !text-xs !py-1.5 !px-3 gap-1.5"><QrCode size={12} /> Pagar PIX</Button>}
+                                                        <Button onClick={() => handleDownloadBoleto(invoice.id)} variant="outline" className="!text-xs !py-1.5 !px-3 gap-1.5"><Download size={12} /> PDF</Button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }) : (
+                                            <p className="text-gray-500 text-center py-8">Nenhuma fatura encontrada com este status.</p>
+                                        )}
+                                    </div>
+                                </div>
                             )}
-                            <div className="bg-fiber-card border border-white/10 rounded-xl p-6"><h3 className="text-white font-bold mb-4 flex items-center gap-2"><FileText size={18} className="text-fiber-orange" />Próxima Fatura</h3>
-                                {invoices.find(i => i.status === 'aberto' || i.status === 'vencido') ? 
-                                    invoices.filter(i => i.status === 'aberto' || i.status === 'vencido').slice(0, 1).map(invoice => (
-                                    <div key={invoice.id} className="bg-neutral-900/50 p-4 rounded-lg flex flex-col sm:flex-row justify-between items-center gap-4"><div className="text-center sm:text-left"><span className={`text-xs font-bold uppercase px-2 py-1 rounded ${invoice.status === 'vencido' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'}`}>{invoice.status}</span><p className="text-white text-2xl font-bold mt-1">{invoice.valor}</p><p className="text-gray-400 text-sm">Vencimento: {invoice.vencimento}</p></div><Button onClick={() => setActiveTab('invoices')}>Ver Detalhes</Button></div>
-                                )) : <div className="text-center py-8 text-gray-400"><CheckCircle className="mx-auto text-green-500 mb-2" />Tudo em dia!</div>}
-                            </div>
+
+                            {/* CONSUMPTION TAB */}
+                            {activeTab === 'consumption' && (
+                                <div>
+                                    <h2 className="text-2xl font-bold text-white mb-2">Extrato de Conexão</h2>
+                                    <p className="text-gray-400 text-sm">Acompanhe seu uso de dados ao longo do tempo.</p>
+                                    <ConsumptionChart history={dashboardData?.consumo.history} />
+                                </div>
+                            )}
+
+                            {/* CONTRACTS TAB */}
+                            {activeTab === 'contracts' && (
+                                 <div>
+                                    <h2 className="text-2xl font-bold text-white mb-6">Meus Contratos</h2>
+                                    <div className="bg-neutral-900 border border-white/10 rounded-xl p-6 flex flex-col sm:flex-row justify-between items-center">
+                                        <div>
+                                            <h3 className="text-white font-bold">Contrato de Prestação de Serviço</h3>
+                                            <p className="text-sm text-gray-400">Plano: {dashboardData?.contrato.plano}</p>
+                                        </div>
+                                        {dashboardData?.contratoPdf ? (
+                                            <Button onClick={() => window.open(dashboardData.contratoPdf!, '_blank')} variant="primary" className="mt-4 sm:mt-0 gap-2">
+                                                <DownloadCloud size={16} /> Baixar Contrato
+                                            </Button>
+                                        ) : (
+                                            <p className="text-sm text-gray-500">Contrato digital indisponível.</p>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* SUPPORT TAB */}
+                            {activeTab === 'support' && (
+                                 <div className="flex flex-col h-[600px]">
+                                    <h2 className="text-2xl font-bold text-white mb-4">Suporte via Chat</h2>
+                                    <div className="bg-neutral-900 border border-white/10 rounded-xl flex-grow flex flex-col overflow-hidden">
+                                        <div ref={chatContainerRef} className="flex-grow p-4 space-y-4 overflow-y-auto">
+                                            {chatMessages.map(msg => (
+                                                <div key={msg.id} className={`flex items-end gap-2 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                                    {msg.sender === 'bot' && <div className="w-8 h-8 bg-fiber-orange rounded-full flex items-center justify-center flex-shrink-0"><Bot size={18} /></div>}
+                                                    <div className={`max-w-xs md:max-w-md p-3 rounded-2xl ${msg.sender === 'user' ? 'bg-fiber-blue text-white rounded-br-none' : 'bg-neutral-800 text-gray-300 rounded-bl-none'}`}>
+                                                        <p className="text-sm">{msg.text}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {isBotTyping && <div className="flex items-end gap-2 justify-start"><div className="w-8 h-8 bg-fiber-orange rounded-full flex items-center justify-center flex-shrink-0"><Bot size={18} /></div><div className="p-3 rounded-2xl bg-neutral-800"><Loader2 className="animate-spin text-gray-400" size={16}/></div></div>}
+                                        </div>
+                                        <form onSubmit={handleChatSubmit} className="p-4 border-t border-white/10 flex items-center gap-2 bg-black/20">
+                                            <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Digite sua mensagem..." className="w-full bg-neutral-800 border border-white/10 rounded-full py-2 px-4 text-white focus:outline-none focus:ring-1 focus:ring-fiber-orange" />
+                                            <Button type="submit" variant="primary" className="!p-3 rounded-full"><Send size={18} /></Button>
+                                        </form>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* SETTINGS TAB */}
+                            {activeTab === 'settings' && (
+                                <div>
+                                    <h2 className="text-2xl font-bold text-white mb-6">Configurações da Conta</h2>
+                                    <div className="bg-neutral-900 border border-white/10 rounded-xl p-6">
+                                        <h3 className="text-lg font-bold text-white mb-4">Trocar Senha da Área do Cliente</h3>
+                                        <form onSubmit={handlePasswordChange} className="space-y-4 max-w-sm">
+                                            <div className="relative">
+                                                <input type={showNewPass ? 'text' : 'password'} name="novaSenha" placeholder="Nova senha" required className="w-full bg-fiber-dark border border-white/10 rounded-lg p-3 pr-10 text-white focus:outline-none focus:ring-1 focus:ring-fiber-orange" />
+                                                <button type="button" onClick={() => setShowNewPass(!showNewPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white">{showNewPass ? <EyeOff size={18}/> : <Eye size={18}/>}</button>
+                                            </div>
+                                            <Button type="submit" variant="primary">Alterar Senha</Button>
+                                        </form>
+                                        {passwordChangeStatus && (
+                                            <div className={`mt-4 text-sm p-3 rounded-lg flex items-center gap-2 ${passwordChangeStatus.type === 'success' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                                                {passwordChangeStatus.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+                                                {passwordChangeStatus.message}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
                         </div>
-                        <div className="space-y-6">
-                            <div className="bg-fiber-card border border-white/10 rounded-xl p-6"><h3 className="text-white font-bold mb-4 flex items-center gap-2"><Activity size={18} className="text-fiber-orange" />Status da Rede</h3><div className="space-y-3 text-sm"><div className="flex justify-between items-center bg-neutral-900/50 p-2 rounded"><span className="text-gray-400">IP Público</span><span className="text-white font-mono text-xs">{connection?.ip}</span></div><div className="flex justify-between items-center bg-neutral-900/50 p-2 rounded"><span className="text-gray-400">Uptime</span><span className="text-white font-mono">{connection?.uptime}</span></div><div className="flex justify-between items-center bg-neutral-900/50 p-2 rounded"><span className="text-gray-400 flex items-center gap-1.5"><ArrowDown size={14} className='text-cyan-400'/>Download</span><span className="text-white font-mono">{connection?.download_usage}</span></div><div className="flex justify-between items-center bg-neutral-900/50 p-2 rounded"><span className="text-gray-400 flex items-center gap-1.5"><ArrowUp size={14} className='text-orange-400'/>Upload</span><span className="text-white font-mono">{connection?.upload_usage}</span></div></div></div>
-                            <div className="bg-fiber-card border border-white/10 rounded-xl p-6"><h3 className="text-white font-bold mb-4 flex items-center gap-2"><Router size={18} className="text-fiber-orange" />Meu Plano</h3><div className="space-y-3 text-sm"><div className="flex justify-between items-center bg-neutral-900/50 p-2 rounded"><span className="text-gray-400">Plano</span><span className="text-white font-bold">{contract?.plan_name}</span></div><div className="flex justify-between items-center bg-neutral-900/50 p-2 rounded"><span className="text-gray-400">Velocidade</span><span className="text-white font-bold">{contract?.speed_label}</span></div><div className="flex justify-between items-center bg-neutral-900/50 p-2 rounded"><span className="text-gray-400">Status</span><span className={`font-bold ${contract?.status === 'Ativo' ? 'text-green-400' : 'text-red-400'}`}>{contract?.status}</span></div></div></div>
+                    </main>
+                </div>
+            </div>
+
+            {/* PIX Modal */}
+            {isPixModalOpen && (
+                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+                    <div className="bg-fiber-card border border-white/10 rounded-2xl p-6 max-w-md w-full relative">
+                        <button onClick={() => setPixModalOpen(false)} className="absolute top-3 right-3 text-gray-500 hover:text-white"><X size={20}/></button>
+                        <h3 className="text-xl font-bold text-white text-center mb-4">Pagamento via PIX</h3>
+                        <div className="bg-white p-4 rounded-lg mx-auto w-fit mb-4">
+                            {/* Placeholder for QR Code image */}
+                             <div className="w-48 h-48 bg-neutral-800 flex items-center justify-center"><QrCode size={100} className="text-white"/></div>
                         </div>
+                        <p className="text-center text-sm text-gray-400 mb-4">Use o Pix Copia e Cola para pagar.</p>
+                        <Button onClick={handleCopyPix} fullWidth className="gap-2 !bg-fiber-green hover:!bg-green-600">
+                            {isPixCopied ? <><CheckCircle size={16}/> Copiado!</> : <><Copy size={16}/> Copiar Código PIX</>}
+                        </Button>
                     </div>
-                )}
-
-                {activeTab === 'invoices' && (
-                    <div className="bg-fiber-card border border-white/10 rounded-xl p-6 animate-fadeIn"><h2 className="text-xl font-bold text-white mb-6">Minhas Faturas</h2><div className="space-y-4">
-                        {invoices.length > 0 ? invoices.map((invoice, idx) => (
-                            <div key={idx} className="bg-fiber-dark border border-white/10 rounded-xl p-4 flex flex-col md:flex-row justify-between items-center gap-4">
-                                <div className="flex-1"><div className="flex items-center gap-4 mb-2"><span className={`px-3 py-1 text-xs font-bold uppercase rounded-full ${{'pago': 'bg-green-500/10 text-green-400', 'vencido': 'bg-red-500/10 text-red-400', 'aberto': 'bg-blue-500/10 text-blue-400', 'cancelado': 'bg-gray-500/10 text-gray-400'}[invoice.status] || ''}`}>{invoice.status}</span><span className="text-gray-500 text-sm">Vencimento: {invoice.vencimento}</span></div><p className="text-white font-bold text-lg">{invoice.valor}</p></div>
-                                <div className="flex flex-wrap gap-2">{invoice.status !== 'pago' && invoice.pix_code && (<button onClick={() => { setActivePixCode(invoice.pix_code!)}} className="flex items-center px-3 py-2 bg-fiber-green/10 text-fiber-green rounded-lg text-sm font-bold border border-fiber-green/20 hover:bg-fiber-green/20"><QrCode size={16} className="mr-2"/>PIX</button>)}{invoice.status !== 'pago' && invoice.linha_digitavel && (<button onClick={() => copyToClipboard(invoice.linha_digitavel!, `bar-${idx}`)} className="flex items-center px-3 py-2 bg-neutral-800 text-white rounded-lg text-sm border border-white/10 hover:bg-neutral-700">{copiedId === `bar-${idx}` ? <CheckCircle size={16} className="mr-2 text-green-500" /> : <Copy size={16} className="mr-2" />}{copiedId === `bar-${idx}` ? 'Copiado!' : 'Código'}</button>)}{invoice.link_pdf && (<Button variant="outline" className="!py-2 !px-3 !text-sm" onClick={() => window.open(invoice.link_pdf, '_blank')}><Download size={16} className="mr-2"/>PDF</Button>)}</div>
-                            </div>
-                        )) : <div className="text-center py-10 text-gray-500">Nenhuma fatura encontrada.</div>}
-                    </div></div>
-                )}
-                
-                {activeTab === 'support' && (
-                     <div className="bg-fiber-card border border-white/10 rounded-xl h-[calc(100vh-250px)] min-h-[500px] flex flex-col animate-fadeIn">
-                        <div className="p-4 border-b border-white/5 flex items-center gap-3"><div className="bg-fiber-orange/10 p-2 rounded-full"><Bot className="text-fiber-orange" /></div><div><h3 className="text-white font-bold">Assistente Virtual</h3><p className="text-xs text-green-400">Online</p></div></div>
-                        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-neutral-900/30">
-                            {messages.map(msg => (<div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[80%] p-3 rounded-2xl text-sm ${msg.sender === 'user' ? 'bg-fiber-orange text-white rounded-br-none' : 'bg-neutral-800 text-gray-200 rounded-bl-none'}`}>{msg.text}</div></div>))}
-                            {isBotTyping && (<div className="flex justify-start"><div className="bg-neutral-800 p-3 rounded-2xl rounded-bl-none flex gap-1.5"><span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></span><span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-75"></span><span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-150"></span></div></div>)}
-                            <div ref={chatEndRef} />
-                        </div>
-                        <div className="p-4 border-t border-white/5"><div className="relative"><input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && sendChatMessage(chatInput)} placeholder="Digite sua mensagem..." className="w-full bg-neutral-900 border border-white/10 rounded-full pl-4 pr-12 py-3 text-white text-sm focus:border-fiber-orange" /><button onClick={() => sendChatMessage(chatInput)} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-fiber-orange rounded-full text-white"><Send size={16} /></button></div></div>
-                    </div>
-                )}
-
-                {activeTab === 'settings' && (
-                    <div className="bg-fiber-card border border-white/10 rounded-xl p-6 animate-fadeIn"><h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2"><Settings className="text-fiber-orange" />Configurações</h2><div className="max-w-md space-y-6">
-                        <div className="bg-neutral-900/50 rounded-lg p-4 border border-white/5"><div className="flex justify-between items-center"><div className="flex items-center gap-3"><KeyRound size={20} className="text-gray-400"/><h4 className="font-bold text-white">Alterar Senha</h4></div><Button variant="secondary" className="!text-xs !py-1 !px-3" onClick={()=> setIsChangePasswordOpen(!isChangePasswordOpen)}>{isChangePasswordOpen ? 'Fechar' : 'Alterar'}</Button></div>
-                            {isChangePasswordOpen && (<form onSubmit={handleChangePassword} className="mt-4 pt-4 border-t border-white/10 space-y-3"><input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} placeholder="Senha Atual" className="w-full bg-fiber-dark border border-white/10 rounded px-3 py-2 text-white" required /><input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Nova Senha" className="w-full bg-fiber-dark border border-white/10 rounded px-3 py-2 text-white" required /><Button type="submit" disabled={passwordLoading}>{passwordLoading ? <Loader2 className='animate-spin'/> : 'Salvar Nova Senha'}</Button>
-                            {passwordMessage && <p className={`text-sm mt-2 ${passwordMessage.type === 'success' ? 'text-green-400' : 'text-red-400'}`}>{passwordMessage.text}</p>}
-                            </form>)}
-                        </div>
-                        <div className="bg-neutral-900/50 rounded-lg p-4 border border-white/5"><h4 className="font-bold text-white mb-2">Seus Dados</h4><div className="text-sm space-y-2"><div className="flex justify-between"><span className="text-gray-400">Endereço</span><span className="text-white text-right truncate ml-4">{contract?.address}</span></div></div></div>
-                    </div></div>
-                )}
-            </main>
-
-            {/* PIX MODAL */}
-            {activePixCode && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center px-4" onClick={() => setActivePixCode(null)}><div className="absolute inset-0 bg-black/80 backdrop-blur-sm"></div><div className="relative bg-fiber-card border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl" onClick={e => e.stopPropagation()}><button onClick={() => setActivePixCode(null)} className="absolute top-4 right-4 text-gray-400 hover:text-white"><X size={20} /></button><div className="text-center mb-6"><div className="inline-flex p-3 bg-fiber-green/10 rounded-full text-fiber-green mb-3"><QrCode size={32} /></div><h3 className="text-xl font-bold text-white">Pagamento via PIX</h3><p className="text-gray-400 text-sm mt-1">Copie o código e cole no seu app bancário.</p></div><div className="bg-neutral-900 p-3 rounded-lg border border-white/5 mb-6"><p className="text-gray-400 text-xs break-all font-mono line-clamp-4">{activePixCode}</p></div><Button onClick={() => copyToClipboard(activePixCode, 'pix-modal')} fullWidth variant='whatsapp'>{copiedId === 'pix-modal' ? <><CheckCircle size={20} className='mr-2'/>Copiado!</> : <><Copy size={20} className='mr-2'/>Copiar Código PIX</>}</Button></div></div>
+                </div>
             )}
         </div>
     );
