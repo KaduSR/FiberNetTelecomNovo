@@ -7,25 +7,12 @@ const resourceName = "v1/cliente";
  * Classe para gerenciar clientes
  */
 export class Clientes extends QueryBase {
-    // FIX: Added constructor to properly initialize the base class, making inherited methods like `request` available.
     constructor(config: { token: string; baseUrl: string; }) {
         super(config);
     }
+    
     /**
      * Filtra clientes com base nos atributos fornecidos.
-     *
-     * @param attr - Um objeto onde as chaves são atributos de `Cliente` e os valores são os valores correspondentes para filtragem.
-     * @param oper - A operação para comparar o atributo com o valor. Pode ser '>', '<', '=', ou 'like'. O valor padrão é '='.
-     * @param page - O número da página para paginação. O valor padrão é 1.
-     * @param sortAttr - O atributo de `Cliente` pelo qual os resultados serão ordenados. O valor padrão é 'cnpj_cpf'.
-     * @param sortorder - A ordem de ordenação, pode ser 'desc' (decrescente) ou 'asc' (crescente). O valor padrão é 'desc'.
-     * @returns Uma promessa que resolve para um array de objetos `Cliente` que correspondem aos critérios de filtragem especificados.
-     *
-     * @example
-     * const clientes = await clientes.filtrarClientes({
-     *     cnpj_cpf: '12345678901'
-     * }, 'like', 1, 'razao', 'asc');
-     * // clientes = [{ id: 1, razao: 'Fulano', cnpj_cpf: '12345678901', ... }, ...]
      */
     async filtrarClientes(
         attr: { [K in ClienteAttrs]?: string | number | boolean },
@@ -47,20 +34,11 @@ export class Clientes extends QueryBase {
             sortorder: sortorder,
         });
 
-        // Retornar apenas os registros
         return response.registros;
     }
 
-
     /**
      * Busca clientes com base em um CPF/CNPJ.
-     *
-     * @param cpfCnpj - O CPF/CNPJ para busca.
-     * @returns Uma promessa que resolve para um array de objetos `Cliente` que correspondem ao CPF/CNPJ especificado.
-     *
-     * @example
-     * const clientes = await clientes.buscarClientesPorCpfCnpj('12345678901');
-     * // clientes = { id: 1, nome: 'Fulano', cpf_cnpj: '12345678901', ... }
      */
     async buscarClientesPorCpfCnpj(cpfCnpj: string): Promise<Cliente | null> {
         const query: QueryBody = {
@@ -73,18 +51,11 @@ export class Clientes extends QueryBase {
         }
 
         const response = await this.request<ClienteResponse>(resourceName, query);
-        return response.registros[0]
+        return response.registros[0] || null;
     }
 
     /**
      * Busca um cliente pelo seu id.
-     *
-     * @param id - O id do cliente a ser buscado.
-     * @returns Uma promessa que resolve para um objeto `Cliente` correspondente ao id especificado.
-     *
-     * @example
-     * const cliente = await clientes.buscarClientesPorId(1);
-     * // cliente = { id: 1, nome: 'Fulano', cpf_cnpj: '12345678901', ... }
      */
     async buscarClientesPorId(id: number): Promise<Cliente> {
         const query: QueryBody = {
@@ -97,6 +68,15 @@ export class Clientes extends QueryBase {
         }
 
         const cliente = await this.request<ClienteResponse>(resourceName, query);
-        return cliente.registros[0]
+        return cliente.registros[0];
+    }
+
+    /**
+     * Altera a senha do hotsite (Área do Cliente) para um cliente.
+     * @param id - O ID do cliente.
+     * @param novaSenha - A nova senha em texto plano.
+     */
+    async alterarSenhaHotsite(id: number, novaSenha: string): Promise<any> {
+        return this.update(resourceName, id, { senha: novaSenha });
     }
 }

@@ -9,31 +9,15 @@ const resourceName = "v1/cliente_contrato";
  */
 export class Contratos extends QueryBase {
 
-    // FIX: Added constructor to properly initialize the base class. Without it, methods from QueryBase like `request` are not available.
     constructor(config: { token: string; baseUrl: string; }) {
         super(config);
     }
 
     /**
      * Filtra contratos com base em um atributo.
-     *
-     * @param attr - O atributo e valor para busca.
-     * @param oper - O operador para a busca. Pode ser: `>`, `<`, `=`, `like`.
-     * @param page - A página dos resultados a ser retornada. Padrão: `1`.
-     * @param sortAttr - O atributo para ordenação dos resultados. Padrão: `id_cliente`.
-     * @param sortorder - A ordenação dos resultados. Pode ser: `desc`, `asc`. Padrão: `desc`.
-     * @returns Uma promessa que resolve para um array de objetos `Contrato` que correspondem ao valor especificado.
-     *
-     * @example
-     * const contratos = await contratos.filtrarContratos({
-     *     id_cliente: 1
-     * }, '>', 1, 'id_contrato', 'asc');
-     * // contratos = [{ id: 1, id_cliente: 1, ... }]
      */
     async filtrarContratos(
-        attr: { 
-            [K in ContratoAttrs]?: string | number | boolean 
-        },
+        attr: { [K in ContratoAttrs]?: string | number | boolean },
         oper: '>' | '<' | '=' | 'like' = '=',  
         page: number = 1,  
         sortAttr: ContratoAttrs = 'id_cliente',  
@@ -55,17 +39,8 @@ export class Contratos extends QueryBase {
         return response.registros;
     }
 
-
-
     /**
      * Busca um contrato pelo seu id.
-     *
-     * @param id - O id do contrato a ser buscado.
-     * @returns Uma promessa que resolve para um objeto `Contrato` correspondente ao id especificado.
-     *
-     * @example
-     * const contratos = await contratos.buscarContratosPorId(123);
-     * // contratos = [{ id: 123, id_cliente: 1, ... }]
      */
     async buscarContratosPorId(id: number): Promise<Contrato> {
         const query: QueryBody = {
@@ -81,16 +56,8 @@ export class Contratos extends QueryBase {
         return response.registros[0];
     }
 
-
     /**
      * Busca contratos por id de cliente.
-     *
-     * @param id - O id do cliente a ser buscado.
-     * @returns Uma promessa que resolve para um array de objetos `Contrato` que correspondem ao id especificado.
-     *
-     * @example
-     * const contratos = await contratos.buscarContratosPorIdCliente(123);
-     * // contratos = [{ id: 1, id_cliente: 123, ... }, ...]
      */
     async buscarContratosPorIdCliente(id: number): Promise<Contrato[]> {
         const query: QueryBody = {
@@ -104,10 +71,20 @@ export class Contratos extends QueryBase {
 
         const contratos = await this.request<ContratoResponse>(resourceName, query);
 
-        if (contratos.registros.length === 0 || !contratos) {
+        if (!contratos || !contratos.registros || contratos.registros.length === 0) {
             return [];
         };
 
         return contratos.registros;
+    }
+
+    /**
+     * Solicita o desbloqueio de confiança para um contrato.
+     * @param id - O ID do contrato.
+     */
+    async desbloqueioConfianca(id: number): Promise<any> {
+        // A API IXC para desbloqueio geralmente envolve um PUT com um campo específico.
+        // Simulando a atualização do campo `desbloqueio_confianca` para 'S'.
+        return this.update(resourceName, id, { desbloqueio_confianca: 'S' });
     }
 }
