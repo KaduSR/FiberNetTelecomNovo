@@ -91,13 +91,13 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, onOpenSupport 
                   aria-current={isLinkActive(item.href) ? 'page' : undefined}
                   className={`text-sm font-medium transition-all relative group py-2 ${
                     isLinkActive(item.href)
-                      ? 'text-fiber-orange'
-                      : 'text-gray-300 hover:text-white'
+                      ? 'text-fiber-orange drop-shadow-[0_0_8px_rgba(255,107,0,0.4)]'
+                      : 'text-gray-300 hover:text-white hover:drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]'
                   }`}
                 >
                   {item.label}
                   {/* Active/Hover Indicator */}
-                  <span className={`absolute bottom-0 left-0 w-full h-0.5 bg-fiber-orange transform origin-left transition-transform duration-300 ${
+                  <span className={`absolute bottom-0 left-0 w-full h-0.5 bg-fiber-orange transform origin-left transition-transform duration-300 shadow-[0_0_8px_rgba(255,107,0,0.8)] ${
                       isLinkActive(item.href) ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
                   }`}></span>
                 </a>
@@ -158,8 +158,8 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, onOpenSupport 
                 aria-current={isLinkActive(item.href) ? 'page' : undefined}
                 className={`block px-4 py-3 rounded-lg text-base font-medium transition-all ${
                    isLinkActive(item.href)
-                    ? 'text-fiber-orange bg-white/5' 
-                    : 'text-gray-300 hover:text-white hover:bg-white/5'
+                    ? 'text-fiber-orange bg-white/5 border-l-4 border-fiber-orange pl-3' 
+                    : 'text-gray-300 hover:text-white hover:bg-white/5 border-l-4 border-transparent'
                 }`}
               >
                 {item.label}

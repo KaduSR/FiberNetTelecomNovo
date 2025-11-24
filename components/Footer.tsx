@@ -1,8 +1,8 @@
 
 import React from 'react';
-import { Instagram, MapPin, MessageCircle } from 'lucide-react'; // Removed Facebook, Linkedin, Twitter
+import { Instagram, MapPin, MessageCircle, ChevronRight } from 'lucide-react';
 import { CONTACT_INFO } from '../constants';
-import FiberNetLogo from './FiberNetLogo'; // Import the new image logo component
+import FiberNetLogo from './FiberNetLogo';
 
 interface FooterProps {
   onNavigate?: (page: string) => void;
@@ -16,26 +16,35 @@ const Footer: React.FC<FooterProps> = ({ onNavigate, currentPage, onOpenSupport 
     if (!onNavigate) return;
 
     if (href.startsWith('#')) {
-      // If it's a section link (like #planos)
       if (currentPage !== 'home') {
-        // Navigate to home first
         onNavigate('home');
-        // Wait for home to render then scroll
         setTimeout(() => {
           const element = document.querySelector(href);
           if (element) element.scrollIntoView({ behavior: 'smooth' });
         }, 100);
       } else {
-        // Already on home, just scroll
         const element = document.querySelector(href);
         if (element) element.scrollIntoView({ behavior: 'smooth' });
       }
     } else {
-      // It's a page link (home, help, ethics)
       onNavigate(href);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
+
+  // Reusable Link Component for animated hover effect
+  const FooterLink = ({ href, label, onClick }: { href: string, label: string, onClick?: (e: React.MouseEvent) => void }) => (
+    <li>
+      <a 
+        href={href} 
+        onClick={onClick} 
+        className="group flex items-center text-gray-400 hover:text-fiber-orange transition-all duration-300 ease-in-out hover:translate-x-2 focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded px-1 py-1"
+      >
+        <ChevronRight size={14} className="opacity-0 -ml-3 group-hover:opacity-100 group-hover:ml-0 transition-all duration-300 text-fiber-orange mr-1" />
+        {label}
+      </a>
+    </li>
+  );
 
   return (
     <footer className="bg-fiber-card text-white pt-20 pb-10 border-t border-white/5">
@@ -63,7 +72,7 @@ const Footer: React.FC<FooterProps> = ({ onNavigate, currentPage, onOpenSupport 
                 target="_blank" 
                 rel="noreferrer" 
                 aria-label="Instagram" 
-                className="text-gray-400 hover:text-fiber-orange transition-colors focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded"
+                className="text-gray-400 hover:text-fiber-orange hover:scale-110 transition-all focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded"
               >
                 <Instagram size={20} />
               </a>
@@ -73,21 +82,21 @@ const Footer: React.FC<FooterProps> = ({ onNavigate, currentPage, onOpenSupport 
           {/* Links Column */}
           <div>
             <h4 className="text-base font-bold mb-6 text-white">Links Rápidos</h4>
-            <ul className="space-y-3 text-gray-400 text-sm">
-              <li><a href="home" onClick={(e) => handleNav(e, 'home')} className="hover:text-fiber-orange transition-colors focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded px-1">Início</a></li>
-              <li><a href="#planos" onClick={(e) => handleNav(e, '#planos')} className="hover:text-fiber-orange transition-colors focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded px-1">Serviços</a></li>
-              <li><a href="help" onClick={(e) => handleNav(e, 'help')} className="hover:text-fiber-orange transition-colors focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded px-1">Central de Ajuda</a></li>
-              <li><a href="client-guide" onClick={(e) => handleNav(e, 'client-guide')} className="hover:text-fiber-orange transition-colors focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded px-1">Guia do Cliente</a></li>
+            <ul className="space-y-2 text-sm">
+              <FooterLink href="home" label="Início" onClick={(e) => handleNav(e, 'home')} />
+              <FooterLink href="#planos" label="Serviços" onClick={(e) => handleNav(e, '#planos')} />
+              <FooterLink href="help" label="Central de Ajuda" onClick={(e) => handleNav(e, 'help')} />
+              <FooterLink href="client-guide" label="Guia do Cliente" onClick={(e) => handleNav(e, 'client-guide')} />
             </ul>
           </div>
 
            {/* Legal Column */}
            <div>
             <h4 className="text-base font-bold mb-6 text-white">Legal</h4>
-            <ul className="space-y-3 text-gray-400 text-sm">
-              <li><a href="#" className="hover:text-fiber-orange transition-colors focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded px-1">Política de Privacidade</a></li>
-              <li><a href="ethics" onClick={(e) => handleNav(e, 'ethics')} className="hover:text-fiber-orange transition-colors focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded px-1">Código de Ética</a></li>
-              <li><a href="#" className="hover:text-fiber-orange transition-colors focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded px-1">Termos de Uso</a></li>
+            <ul className="space-y-2 text-sm">
+              <FooterLink href="#" label="Política de Privacidade" />
+              <FooterLink href="ethics" label="Código de Ética" onClick={(e) => handleNav(e, 'ethics')} />
+              <FooterLink href="#" label="Termos de Uso" />
             </ul>
           </div>
 
@@ -97,20 +106,30 @@ const Footer: React.FC<FooterProps> = ({ onNavigate, currentPage, onOpenSupport 
             <ul className="space-y-4 text-gray-400 text-sm">
               <li>
                 <button 
-                  className="flex items-center hover:text-fiber-green transition-colors w-full text-left focus:outline-none focus:ring-2 focus:ring-fiber-green rounded px-1"
+                  className="flex items-center hover:text-fiber-green transition-colors w-full text-left focus:outline-none focus:ring-2 focus:ring-fiber-green rounded px-1 group"
                   onClick={onOpenSupport}
                   aria-label={`Entrar em contato via WhatsApp: ${CONTACT_INFO.whatsapp}`}
                 >
-                  <MessageCircle className="w-4 h-4 mr-3 text-fiber-green flex-shrink-0" />
-                  <span>WhatsApp: {CONTACT_INFO.whatsapp}</span>
+                  <div className="w-8 h-8 bg-neutral-800 rounded-lg flex items-center justify-center mr-3 group-hover:bg-fiber-green/20 transition-colors">
+                    <MessageCircle className="w-4 h-4 text-fiber-green" />
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-500 mb-0.5">Atendimento WhatsApp</span>
+                    <span className="font-medium text-white group-hover:text-fiber-green transition-colors">{CONTACT_INFO.whatsapp}</span>
+                  </div>
                 </button>
               </li>
-              <li className="flex items-start px-1">
-                <MapPin className="w-4 h-4 mr-3 text-fiber-orange flex-shrink-0 mt-1" />
-                <span>{CONTACT_INFO.address}</span>
+              <li className="flex items-start px-1 group">
+                <div className="w-8 h-8 bg-neutral-800 rounded-lg flex items-center justify-center mr-3 mt-1 group-hover:bg-fiber-orange/20 transition-colors flex-shrink-0">
+                    <MapPin className="w-4 h-4 text-fiber-orange" />
+                </div>
+                <span className="group-hover:text-gray-200 transition-colors">{CONTACT_INFO.address}</span>
               </li>
             </ul>
-            <p className="mt-6 text-red-500 text-xs font-bold uppercase tracking-wider px-1">NÃO ACEITAMOS LIGAÇÕES!!</p>
+            <p className="mt-6 text-red-500 text-xs font-bold uppercase tracking-wider px-1 flex items-center gap-2">
+                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                NÃO ACEITAMOS LIGAÇÕES!!
+            </p>
           </div>
         </div>
 
@@ -122,7 +141,7 @@ const Footer: React.FC<FooterProps> = ({ onNavigate, currentPage, onOpenSupport 
           <div className="flex flex-col md:flex-row gap-2 md:gap-6 items-center">
              <span>
                Desenvolvido e Gerenciado por{' '}
-               <a href="https://kadudev.com" target="_blank" rel="noreferrer" aria-label="Visitar site da KaduDev" className="inline-block align-middle focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded">
+               <a href="https://kadudev.com" target="_blank" rel="noreferrer" aria-label="Visitar site da KaduDev" className="inline-block align-middle focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded hover:opacity-80 transition-opacity">
                  <img 
                    src="https://images.unsplash.com/vector-1763657979649-8d8d789164df?q=80&w=880&auto=format&fit=crop&fm=webp&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" 
                    alt="KaduDev Logo" 
