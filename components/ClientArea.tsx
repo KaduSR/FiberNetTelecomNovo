@@ -1,15 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { 
   User, Lock, FileText, Download, Copy, CheckCircle, AlertCircle, Loader2, 
-  QrCode, X, LogOut, Shield, Eye, EyeOff, Mail, Wifi, Activity, 
-  Router, Unlock, Clock, MapPin, Settings, KeyRound, Home, ArrowUp, ArrowDown, Globe, MessageSquare, Bot, Send, LayoutDashboard, Ban, ChevronRight, Star,
-  FileSignature, BarChart3, ScrollText, DownloadCloud, Zap, Power, Server, Link2, HelpCircle
+  QrCode, X, LogOut, Wifi, Activity, 
+  Clock, Settings, Eye, EyeOff, Mail, ArrowUp, ArrowDown, LayoutDashboard, Ban,
+  FileSignature, BarChart3, ScrollText, Zap, Power, Server, Link2, ThumbsUp, Printer, Trash2
 } from 'lucide-react';
 import Button from './Button';
-import { Invoice, ConsumptionHistory, ConsumptionPoint, DashboardData, Login } from '../types';
-
-// === API Configuration ===
-const API_BASE_URL = '/api'; // Uses the Vite proxy in development
+import { Invoice, ConsumptionHistory, ConsumptionPoint, DashboardData } from '../types';
+import { ENDPOINTS } from '../src/config';
 
 // === HELPERS & TYPES ===
 const formatBytes = (bytes: number | string | undefined, decimals = 2) => {
@@ -19,20 +18,9 @@ const formatBytes = (bytes: number | string | undefined, decimals = 2) => {
     const dm = decimals < 0 ? 0 : decimals;
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(val) / Math.log(k));
-    // Handle large values that might exceed 'TB'
     const sizeIndex = Math.min(i, sizes.length - 1);
     return `${parseFloat((val / Math.pow(k, sizeIndex)).toFixed(dm))} ${sizes[sizeIndex]}`;
 };
-
-const getStatusContrato = (status: string) => {
-    const map: Record<string, { label: string, color: string }> = { 
-      'A': { label: 'Ativo', color: 'text-fiber-green' }, 
-      'S': { label: 'Suspenso', color: 'text-yellow-400' }, 
-      'C': { label: 'Cancelado', color: 'text-red-500' } 
-    };
-    return map[String(status).toUpperCase()] || { label: 'Indefinido', color: 'text-gray-500' };
-};
-
 
 // === SUB-COMPONENT: CONSUMPTION CHART ===
 const ConsumptionChart: React.FC<{ history?: ConsumptionHistory }> = ({ history }) => {
@@ -133,7 +121,7 @@ const ClientArea: React.FC = () => {
     const [invoiceStatusFilter, setInvoiceStatusFilter] = useState('aberto');
     const [passwordChangeStatus, setPasswordChangeStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
     const [showNewPass, setShowNewPass] = useState(false);
-    const [actionStatus, setActionStatus] = useState<{ [key: string]: { status: 'loading' | 'success' | 'error', message?: string } }>({});
+    const [actionStatus, setActionStatus] = useState<{ [key: string]: { status: 'idle' | 'loading' | 'success' | 'error', message?: string } }>({});
      const [diagResult, setDiagResult] = useState<{ download: string, upload: string } | null>(null);
 
 
@@ -142,7 +130,7 @@ const ClientArea: React.FC = () => {
     const fetchDashboardData = async () => {
         try {
             const token = localStorage.getItem('authToken');
-            const response = await fetch(`${API_BASE_URL}/dashboard`, {
+            const response = await fetch(ENDPOINTS.DASHBOARD, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (!response.ok) throw new Error('Falha ao carregar dados do painel');
@@ -163,7 +151,7 @@ const ClientArea: React.FC = () => {
         const password = formData.get('password') as string;
 
         try {
-            const response = await fetch(`${API_BASE_URL}/login`, {
+            const response = await fetch(ENDPOINTS.LOGIN, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
@@ -198,7 +186,7 @@ const ClientArea: React.FC = () => {
 
         try {
             const token = localStorage.getItem('authToken');
-            const response = await fetch(`${API_BASE_URL}/trocar-senha`, {
+            const response = await fetch(ENDPOINTS.CHANGE_PASSWORD, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -218,12 +206,12 @@ const ClientArea: React.FC = () => {
     };
 
     const performLoginAction = async (loginId: string | number, action: 'limpar-mac' | 'desconectar' | 'diagnostico') => {
-        setActionStatus(prev => ({ ...prev, [loginId]: { status: 'loading' } }));
+        setActionStatus(prev => ({ ...prev, [loginId]: { status: 'loading' as const } }));
         setDiagResult(null);
 
         try {
             const token = localStorage.getItem('authToken');
-            const response = await fetch(`${API_BASE_URL}/logins/${loginId}/${action}`, {
+            const response = await fetch(ENDPOINTS.LOGIN_ACTION(loginId, action), {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -234,11 +222,11 @@ const ClientArea: React.FC = () => {
                 setDiagResult(data.consumo);
             }
             
-            setActionStatus(prev => ({ ...prev, [loginId]: { status: 'success', message: data.message } }));
+            setActionStatus(prev => ({ ...prev, [loginId]: { status: 'success' as const, message: data.message } }));
         } catch (error: any) {
-            setActionStatus(prev => ({ ...prev, [loginId]: { status: 'error', message: error.message } }));
+            setActionStatus(prev => ({ ...prev, [loginId]: { status: 'error' as const, message: error.message } }));
         } finally {
-             setTimeout(() => setActionStatus(prev => ({ ...prev, [loginId]: { status: 'idle' as any } })), 3000);
+             setTimeout(() => setActionStatus(prev => ({ ...prev, [loginId]: { status: 'idle' as const } })), 3000);
         }
     };
     
@@ -292,6 +280,7 @@ const ClientArea: React.FC = () => {
       { id: 'connections', label: 'Conexões', icon: Wifi },
       { id: 'consumption', label: 'Extrato', icon: BarChart3 },
       { id: 'contracts', label: 'Contratos', icon: FileSignature },
+      { id: 'notes', label: 'Notas Fiscais', icon: ScrollText },
       { id: 'settings', label: 'Configurações', icon: Settings },
     ];
     
@@ -323,12 +312,6 @@ const ClientArea: React.FC = () => {
                            {isLoading ? <Loader2 className="animate-spin mx-auto" /> : 'Acessar'}
                         </Button>
                     </form>
-                     <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-center">
-                        <p className="text-yellow-400 font-bold text-sm">Modo Desenvolvedor</p>
-                        <p className="text-yellow-500 text-xs mt-1">
-                            Use <strong className="font-mono">dev@fibernet.com</strong> / <strong className="font-mono">dev</strong> para testar.
-                        </p>
-                    </div>
                 </div>
             </div>
         );
@@ -477,27 +460,142 @@ const ClientArea: React.FC = () => {
 
                             {/* CONTRACTS TAB */}
                             {activeTab === 'contracts' && dashboardData && (
-                                 <div>
-                                    <h2 className="text-2xl font-bold text-white mb-6">Meus Contratos ({dashboardData.contratos.length})</h2>
-                                    <div className="space-y-4">
-                                        {dashboardData.contratos.map(contrato => {
-                                            const status = getStatusContrato(contrato.status);
-                                            return(
-                                                <div key={contrato.id} className="bg-neutral-900 border border-white/10 rounded-xl p-6 flex flex-col sm:flex-row justify-between items-center">
-                                                    <div>
-                                                        <h3 className="text-white font-bold">{contrato.plano}</h3>
-                                                        <p className={`text-sm font-bold ${status.color}`}>{status.label}</p>
-                                                    </div>
-                                                    {contrato.pdf_link ? (
-                                                        <Button onClick={() => window.open(contrato.pdf_link!, '_blank')} variant="primary" className="mt-4 sm:mt-0 gap-2 !text-xs !py-2 !px-4">
-                                                            <DownloadCloud size={16} /> Baixar Contrato
-                                                        </Button>
-                                                    ) : (
-                                                        <p className="text-sm text-gray-500 mt-4 sm:mt-0">Contrato digital indisponível.</p>
-                                                    )}
+                                <div className="space-y-8">
+                                    {/* Contracts Section */}
+                                    <div className="bg-white text-gray-800 rounded-lg overflow-hidden shadow-lg font-sans">
+                                        {/* Header */}
+                                        <div className="bg-nubank-primary p-6 flex justify-between items-center text-white">
+                                            <div className="flex items-center gap-4">
+                                                <FileText size={40} className="opacity-80" />
+                                                <div>
+                                                    <h2 className="text-2xl font-bold">Contratos</h2>
+                                                    <p className="text-purple-200 text-sm">Gerencie seus contratos.</p>
                                                 </div>
-                                            )
-                                        })}
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-3xl font-bold">{dashboardData.contratos.filter(c => c.status === 'A').length}</div>
+                                                <div className="text-xs text-purple-200 uppercase tracking-wider">contratos ativos listados</div>
+                                            </div>
+                                        </div>
+
+                                        {/* List Header */}
+                                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 border-b border-gray-200 bg-gray-50 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                                            <div className="text-center md:text-left">Status</div>
+                                            <div className="md:col-span-2">Contrato</div>
+                                            <div>Pago até</div>
+                                            <div>Data do Contrato</div>
+                                            <div className="text-center">Ações</div>
+                                        </div>
+
+                                        {/* List Items */}
+                                        {dashboardData.contratos.map((contrato) => (
+                                            <div key={contrato.id} className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 border-b border-gray-100 items-center hover:bg-gray-50 transition-colors">
+                                                <div className="flex justify-center md:justify-start">
+                                                    <div className={`w-8 h-8 rounded flex items-center justify-center ${contrato.status === 'A' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
+                                                        <ThumbsUp size={16} fill="currentColor" />
+                                                    </div>
+                                                </div>
+                                                <div className="md:col-span-2 font-medium text-gray-700">
+                                                    {contrato.plano}
+                                                </div>
+                                                <div className="text-gray-500 text-sm">
+                                                    {contrato.pago_ate || '-'}
+                                                </div>
+                                                <div className="text-gray-500 text-sm">
+                                                    {contrato.data_contrato || '-'}
+                                                </div>
+                                                <div className="flex justify-center gap-3 text-gray-400">
+                                                    <button 
+                                                        onClick={() => contrato.pdf_link && window.open(contrato.pdf_link, '_blank')}
+                                                        className="hover:text-gray-600 transition-colors" 
+                                                        title="Imprimir Contrato"
+                                                        disabled={!contrato.pdf_link}
+                                                    >
+                                                        <Printer size={18} />
+                                                    </button>
+                                                    <button className="hover:text-red-500 transition-colors" title="Ação indisponível" disabled>
+                                                        <Trash2 size={18} className="opacity-50 cursor-not-allowed" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Terms Section */}
+                                    <div className="bg-white text-gray-800 rounded-lg overflow-hidden shadow-lg font-sans">
+                                         {/* Header */}
+                                         <div className="bg-nubank-primary p-6 flex justify-between items-center text-white">
+                                            <div className="flex items-center gap-4">
+                                                <FileText size={40} className="opacity-80" />
+                                                <div>
+                                                    <h2 className="text-2xl font-bold">Termos</h2>
+                                                    <p className="text-purple-200 text-sm">Gerencie seus termos.</p>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-3xl font-bold">0</div>
+                                                <div className="text-xs text-purple-200 uppercase tracking-wider">Termos listados</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="p-12 text-center text-gray-500">
+                                            <p className="text-lg">Olá, você ainda não tem <strong className="text-purple-600">TERMOS</strong> 😳</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* FISCAL NOTES TAB (NEW) */}
+                            {activeTab === 'notes' && dashboardData && (
+                                <div className="space-y-8">
+                                    <div className="bg-white text-gray-800 rounded-lg overflow-hidden shadow-lg font-sans">
+                                        {/* Header */}
+                                        <div className="bg-gray-600 p-6 flex justify-between items-center text-white">
+                                            <div className="flex items-center gap-4">
+                                                <ScrollText size={40} className="opacity-80" />
+                                                <div>
+                                                    <h2 className="text-2xl font-bold">Notas</h2>
+                                                    <p className="text-gray-200 text-sm">Gerencie suas notas.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* List Header */}
+                                        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 p-4 border-b border-gray-200 bg-gray-50 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                                            <div>Status</div>
+                                            <div>Documento</div>
+                                            <div>Data de emissão</div>
+                                            <div>Data de saída</div>
+                                            <div>Valor</div>
+                                            <div className="text-center">Ações</div>
+                                        </div>
+
+                                        {/* Content */}
+                                        {dashboardData.notas && dashboardData.notas.length > 0 ? (
+                                            dashboardData.notas.map(nota => (
+                                                <div key={nota.id} className="grid grid-cols-1 md:grid-cols-6 gap-4 p-4 border-b border-gray-100 items-center hover:bg-gray-50 transition-colors text-sm">
+                                                    <div className="font-medium text-green-600">{nota.status}</div>
+                                                    <div className="text-gray-600">{nota.documento}</div>
+                                                    <div className="text-gray-500">{nota.data_emissao}</div>
+                                                    <div className="text-gray-500">{nota.data_saida}</div>
+                                                    <div className="font-bold text-gray-700">R$ {nota.valor}</div>
+                                                    <div className="flex justify-center gap-3 text-gray-400">
+                                                        <button 
+                                                            onClick={() => nota.link_pdf && window.open(nota.link_pdf, '_blank')}
+                                                            className="hover:text-gray-600 transition-colors"
+                                                            title="Baixar PDF"
+                                                            disabled={!nota.link_pdf}
+                                                        >
+                                                            <Printer size={18} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="p-12 text-center text-gray-500">
+                                                <p className="text-lg">Olá, você ainda não tem <strong className="text-gray-700">NOTAS</strong> 😳</p>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}

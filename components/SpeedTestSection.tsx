@@ -2,6 +2,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Play, RefreshCw, Wifi, CheckCircle2, Activity, ArrowDown, ArrowUp, Clock, AlertTriangle } from 'lucide-react';
 import FiberNetLogo from './FiberNetLogo';
+import { ENDPOINTS } from '../src/config';
 
 const SpeedTestSection: React.FC = () => {
     const [status, setStatus] = useState<'idle' | 'running' | 'completed' | 'error'>('idle');
@@ -72,9 +73,8 @@ const SpeedTestSection: React.FC = () => {
                 if (fakeProgress < 90) setProgress(fakeProgress);
             }, 200);
 
-            // Chamada ao Backend (Endpoint /api/v1/speedtest/run)
-            // Certifique-se de que a URL base (https://api.centralfiber.online) está correta
-            const response = await fetch('https://api.centralfiber.online/api/v1/speedtest/run', {
+            // Chamada ao Backend usando configuração centralizada
+            const response = await fetch(ENDPOINTS.SPEEDTEST_RUN, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             });

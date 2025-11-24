@@ -4,10 +4,11 @@ import { NavItem, Plan } from './types';
 export const NAV_ITEMS: NavItem[] = [
   { label: 'Início', href: 'home' },
   { label: 'Serviços', href: '#planos' },
-  { label: 'Teste de Velocidade', href: 'https://www.speedtest.net/' },
+  { label: 'Teste de Velocidade', href: 'speedtest' }, // Link interno para a nova seção
   { label: 'Notícias', href: 'news' },
-  { label: 'Central de Ajuda', href: 'help' }, // Changed to route identifier
+  { label: 'Central de Ajuda', href: 'help' },
   { label: 'Ética', href: 'ethics' },
+  { label: 'Guia do Cliente', href: 'client-guide' }, // Added explicit link for consistency
 ];
 
 export const PLANS: Plan[] = [
@@ -18,12 +19,12 @@ export const PLANS: Plan[] = [
     cents: '90',
     period: '/mês',
     fullPrice: '89,90',
-    description: 'Ideal para famílias pequenas',
+    description: 'O Básico que Funciona',
     benefits: [
       'Instalação Grátis',
-      'Wi-Fi 5 Dual Band',
-      'Acesso a Apps',
-      'Suporte Especializado'
+      'Ideal para Redes Sociais',
+      'Filmes e Séries em HD',
+      'Wi-Fi 5 Estável'
     ],
     highlight: false
   },
@@ -34,12 +35,12 @@ export const PLANS: Plan[] = [
     cents: '90',
     period: '/mês',
     fullPrice: '109,90',
-    description: 'Melhor Custo x Benefício',
+    description: 'Casa Conectada (Família)',
     benefits: [
       'Instalação Grátis',
-      'Wi-Fi 5 Dual Band',
-      'Upload Turbo',
-      'Suporte Prioritário'
+      'Wi-Fi 5 Dual Band (5Ghz)',
+      'Streaming 4K sem travar',
+      'Ideal para Home Office'
     ],
     highlight: true
   },
@@ -50,12 +51,12 @@ export const PLANS: Plan[] = [
     cents: '90',
     period: '/mês',
     fullPrice: '129,90',
-    description: 'Plano Gamer',
+    description: 'Performance Máxima Wi-Fi 6',
     benefits: [
-      'Instalação Grátis',
-      'Wi-Fi 6 Mesh',
+      'Roteador Wi-Fi 6 (Incluso)',
+      'Rota Gamer (Ping Baixo)',
       'IP Público Dinâmico',
-      'Baixa Latência'
+      'Suporte Técnico VIP'
     ],
     highlight: false
   }

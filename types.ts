@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 export interface Plan {
@@ -72,6 +73,19 @@ export interface ContratoInfo {
     plano: string;
     status: 'A' | 'S' | 'C'; // Ativo, Suspenso, Cancelado
     pdf_link?: string;
+    pago_ate?: string;
+    data_contrato?: string;
+}
+
+export interface FiscalNote {
+    id: string | number;
+    status: string; // e.g., 'Autorizada'
+    documento: string; // e.g., '000.001.234'
+    data_emissao: string;
+    data_saida: string;
+    valor: string;
+    link_pdf?: string;
+    link_xml?: string;
 }
 
 export interface ClienteInfo {
@@ -85,6 +99,7 @@ export interface DashboardData {
     contratos: ContratoInfo[];
     faturas: Invoice[];
     logins: Login[];
+    notas: FiscalNote[];
     consumo: {
         total_download_bytes: number;
         total_upload_bytes: number;

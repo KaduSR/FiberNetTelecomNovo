@@ -63,12 +63,12 @@ const App: React.FC = () => {
                     <div className="relative h-full min-h-[300px] order-1 lg:order-2 group">
                         <div className="absolute inset-0 bg-blue-500/10 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
                         <img 
-                            src="https://images.unsplash.com/photo-1529234774845-b90fd07f1d23?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-                            alt="Sede Fiber.Net"
+                            src="https://res.cloudinary.com/dbblxiya7/image/upload/v1763993086/Gemini_Generated_Image_6m5kop6m5kop6m5k_urxmoq.png"
+                            alt="Cidade à noite - Fiber.Net"
                             className="relative w-full h-full object-cover rounded-xl shadow-2xl border border-white/10"
                             loading="lazy"
-                            width="1000" // Original width from URL
-                            height="667" // Original height from URL (aspect ratio 1.5)
+                            width="1000"
+                            height="667"
                         />
                     </div>
                  </div>

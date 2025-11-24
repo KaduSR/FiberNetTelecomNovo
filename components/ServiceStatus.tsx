@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Activity, AlertTriangle, Smartphone, DollarSign, Gamepad2, Tv, ShieldCheck, RefreshCw, Server, Wifi, CheckCircle2, ArrowLeft, Zap } from 'lucide-react';
+import { ENDPOINTS } from '../src/config';
 
 // ===== TIPAGEM DA SUA API REAL (2025) =====
 interface ServiceDetail {
@@ -24,8 +25,6 @@ interface ServiceStatusProps {
   onNavigate?: (page: string) => void;
 }
 
-const API_URL = 'https://api.centralfiber.online/api/v1/status';
-
 const ServiceStatus: React.FC<ServiceStatusProps> = ({ onNavigate }) => {
   const [data, setData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -46,7 +45,7 @@ const ServiceStatus: React.FC<ServiceStatusProps> = ({ onNavigate }) => {
       setLoading(true);
       setError(false);
 
-      const res = await fetch(`${API_URL}?t=${Date.now()}`, { cache: 'no-store' });
+      const res = await fetch(`${ENDPOINTS.SERVICE_STATUS}?t=${Date.now()}`, { cache: 'no-store' });
       
       if (!res.ok) throw new Error('API offline');
 

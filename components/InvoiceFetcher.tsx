@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Search, FileText, Download, Copy, CheckCircle, AlertCircle, CreditCard, Loader2, QrCode, X } from 'lucide-react';
 import Button from './Button';
 import { Invoice } from '../types';
+import { ENDPOINTS } from '../src/config';
 
 const InvoiceFetcher: React.FC = () => {
   const [cpf, setCpf] = useState('');
@@ -41,8 +42,8 @@ const InvoiceFetcher: React.FC = () => {
     setInvoices(null);
 
     try {
-      // Using the requested backend
-      const response = await fetch('https://api.centralfiber.online/api/faturas', {
+      // Using centralized endpoint configuration
+      const response = await fetch(ENDPOINTS.INVOICES, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
