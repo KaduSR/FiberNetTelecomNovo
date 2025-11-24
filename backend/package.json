@@ -21,12 +21,12 @@
   ],
   "author": "LSaints",
   "license": "MIT",
-"devDependencies": {
+  "devDependencies": {
     "@babel/preset-typescript": "^7.26.0",
     "@eslint/js": "^9.17.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
-    "@types/jest": "^2.5.14",
+    "@types/jest": "^29.5.14",
     "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "^22.10.4",
     "eslint": "^9.17.0",
