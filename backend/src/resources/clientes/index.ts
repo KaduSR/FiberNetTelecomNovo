@@ -7,7 +7,7 @@ const resourceName = "v1/cliente";
  * Classe para gerenciar clientes
  */
 export class Clientes extends QueryBase {
-    // FIX: Added constructor to properly initialize the base class and make its methods available.
+    // FIX: Added constructor to properly initialize the base class, making inherited methods like `request` available.
     constructor(config: { token: string; baseUrl: string; }) {
         super(config);
     }

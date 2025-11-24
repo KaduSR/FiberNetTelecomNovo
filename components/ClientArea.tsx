@@ -3,53 +3,40 @@ import {
   User, Lock, FileText, Download, Copy, CheckCircle, AlertCircle, Loader2, 
   QrCode, X, LogOut, Shield, Eye, EyeOff, Mail, Wifi, Activity, 
   Router, Unlock, Clock, MapPin, Settings, KeyRound, Home, ArrowUp, ArrowDown, Globe, MessageSquare, Bot, Send, LayoutDashboard, Ban, ChevronRight, Star,
-  FileSignature, BarChart3, ScrollText, DownloadCloud
+  FileSignature, BarChart3, ScrollText, DownloadCloud, Zap, Power, Server, Link2, HelpCircle
 } from 'lucide-react';
 import Button from './Button';
-import { Invoice, ConsumptionHistory, ConsumptionPoint } from '../types';
+import { Invoice, ConsumptionHistory, ConsumptionPoint, DashboardData, Login } from '../types';
 
 // === API Configuration ===
 const API_BASE_URL = '/api'; // Uses the Vite proxy in development
 
 // === HELPERS & TYPES ===
-const safeString = (value: any, fallback = ''): string => {
-    if (value === null || value === undefined) return fallback;
-    return String(value);
-};
-
-const formatBytes = (bytes: number | string, decimals = 2) => {
+const formatBytes = (bytes: number | string | undefined, decimals = 2) => {
     const val = Number(bytes);
     if (isNaN(val) || val === 0) return '0 GB';
     const k = 1024;
     const dm = decimals < 0 ? 0 : decimals;
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(val) / Math.log(k));
-    return `${parseFloat((val / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+    // Handle large values that might exceed 'TB'
+    const sizeIndex = Math.min(i, sizes.length - 1);
+    return `${parseFloat((val / Math.pow(k, sizeIndex)).toFixed(dm))} ${sizes[sizeIndex]}`;
 };
 
 const getStatusContrato = (status: string) => {
-    const map: Record<string, string> = { 'A': 'Ativo', 'S': 'Suspenso', 'C': 'Cancelado' };
-    return map[String(status).toUpperCase()] || 'Indefinido';
+    const map: Record<string, { label: string, color: string }> = { 
+      'A': { label: 'Ativo', color: 'text-fiber-green' }, 
+      'S': { label: 'Suspenso', color: 'text-yellow-400' }, 
+      'C': { label: 'Cancelado', color: 'text-red-500' } 
+    };
+    return map[String(status).toUpperCase()] || { label: 'Indefinido', color: 'text-gray-500' };
 };
 
-interface DashboardData {
-    cliente: { nome: string; endereco: string; };
-    contrato: { plano: string; velocidade: string; status: string; };
-    conexao: { online: boolean; ip: string; uptime: string; };
-    consumo: { total_download_bytes: number; total_upload_bytes: number; history: ConsumptionHistory; };
-    faturas: Invoice[];
-    contratoPdf: string | null;
-}
-
-interface ChatMessage {
-    id: number;
-    text: string;
-    sender: 'user' | 'bot';
-}
 
 // === SUB-COMPONENT: CONSUMPTION CHART ===
 const ConsumptionChart: React.FC<{ history?: ConsumptionHistory }> = ({ history }) => {
-    const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+    const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'annual'>('daily');
     const [activePoint, setActivePoint] = useState<ConsumptionPoint | null>(null);
 
     const data = history?.[period] || [];
@@ -81,9 +68,9 @@ const ConsumptionChart: React.FC<{ history?: ConsumptionHistory }> = ({ history 
             <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
                 <h3 className="text-white font-bold flex items-center gap-2"><Activity size={18} className="text-fiber-orange" /> Histórico de Consumo</h3>
                 <div className="flex bg-white/5 p-1 rounded-full border border-white/10">
-                    {(['daily', 'weekly', 'monthly'] as const).map(p => (
+                    {(['daily', 'weekly', 'monthly', 'annual'] as const).map(p => (
                         <button key={p} onClick={() => setPeriod(p)} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${period === p ? 'bg-fiber-orange text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
-                            {p === 'daily' ? 'Diário' : p === 'weekly' ? 'Semanal' : 'Mensal'}
+                            {p === 'daily' ? 'Diário' : p === 'weekly' ? 'Semanal' : p === 'monthly' ? 'Mensal' : 'Anual' }
                         </button>
                     ))}
                 </div>
@@ -130,7 +117,6 @@ const ConsumptionChart: React.FC<{ history?: ConsumptionHistory }> = ({ history 
     );
 };
 
-
 // === MAIN COMPONENT ===
 const ClientArea: React.FC = () => {
     // === STATE MANAGEMENT ===
@@ -145,20 +131,11 @@ const ClientArea: React.FC = () => {
     const [isPixCopied, setIsPixCopied] = useState(false);
     const [copiedBarcodeId, setCopiedBarcodeId] = useState<string | null>(null);
     const [invoiceStatusFilter, setInvoiceStatusFilter] = useState('aberto');
-    const [favoriteInvoices, setFavoriteInvoices] = useState<Set<string>>(() => {
-        const saved = localStorage.getItem('favoriteInvoices');
-        return saved ? new Set(JSON.parse(saved)) : new Set();
-    });
-
-    // Chat states
-    const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-    const [chatInput, setChatInput] = useState('');
-    const [isBotTyping, setIsBotTyping] = useState(false);
-    const chatContainerRef = useRef<HTMLDivElement>(null);
-
-    // Password change states
-    const [showNewPass, setShowNewPass] = useState(false);
     const [passwordChangeStatus, setPasswordChangeStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+    const [showNewPass, setShowNewPass] = useState(false);
+    const [actionStatus, setActionStatus] = useState<{ [key: string]: { status: 'loading' | 'success' | 'error', message?: string } }>({});
+     const [diagResult, setDiagResult] = useState<{ download: string, upload: string } | null>(null);
+
 
     // === API FUNCTIONS ===
     
@@ -168,12 +145,12 @@ const ClientArea: React.FC = () => {
             const response = await fetch(`${API_BASE_URL}/dashboard`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            if (!response.ok) throw new Error('Failed to fetch dashboard data');
+            if (!response.ok) throw new Error('Falha ao carregar dados do painel');
             const data = await response.json();
             setDashboardData(data);
         } catch (error) {
             console.error(error);
-            handleLogout(); // Log out if data fetch fails
+            handleLogout();
         }
     };
 
@@ -193,7 +170,7 @@ const ClientArea: React.FC = () => {
             });
 
             const data = await response.json();
-            if (!response.ok) throw new Error(data.error || 'Login failed');
+            if (!response.ok) throw new Error(data.error || 'Login falhou');
             
             localStorage.setItem('authToken', data.token);
             setIsAuthenticated(true);
@@ -213,28 +190,6 @@ const ClientArea: React.FC = () => {
         setDashboardData(null);
     };
 
-    const handleDownloadBoleto = async (id: string | number) => {
-        try {
-            const token = localStorage.getItem('authToken');
-            const response = await fetch(`${API_BASE_URL}/boleto/${id}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (!response.ok) throw new Error('Failed to download boleto');
-
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `fatura_${id}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-        } catch (error) {
-            console.error(error);
-            alert('Não foi possível baixar o boleto.');
-        }
-    };
-    
     const handlePasswordChange = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setPasswordChangeStatus(null);
@@ -252,7 +207,7 @@ const ClientArea: React.FC = () => {
                 body: JSON.stringify({ newPassword })
             });
             const data = await response.json();
-            if (!response.ok) throw new Error(data.error || 'Failed to change password');
+            if (!response.ok) throw new Error(data.error || 'Falha ao trocar senha');
             setPasswordChangeStatus({ type: 'success', message: data.message });
             e.currentTarget.reset();
         } catch (error: any) {
@@ -262,6 +217,31 @@ const ClientArea: React.FC = () => {
         }
     };
 
+    const performLoginAction = async (loginId: string | number, action: 'limpar-mac' | 'desconectar' | 'diagnostico') => {
+        setActionStatus(prev => ({ ...prev, [loginId]: { status: 'loading' } }));
+        setDiagResult(null);
+
+        try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch(`${API_BASE_URL}/logins/${loginId}/${action}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || `Falha ao executar ação`);
+
+            if (action === 'diagnostico') {
+                setDiagResult(data.consumo);
+            }
+            
+            setActionStatus(prev => ({ ...prev, [loginId]: { status: 'success', message: data.message } }));
+        } catch (error: any) {
+            setActionStatus(prev => ({ ...prev, [loginId]: { status: 'error', message: error.message } }));
+        } finally {
+             setTimeout(() => setActionStatus(prev => ({ ...prev, [loginId]: { status: 'idle' as any } })), 3000);
+        }
+    };
+    
     // === EFFECTS ===
 
     useEffect(() => {
@@ -274,76 +254,27 @@ const ClientArea: React.FC = () => {
         }
     }, []);
 
-    useEffect(() => {
-        localStorage.setItem('favoriteInvoices', JSON.stringify(Array.from(favoriteInvoices)));
-    }, [favoriteInvoices]);
-
-    useEffect(() => {
-        if (chatContainerRef.current) {
-            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-        }
-    }, [chatMessages, isBotTyping]);
-
     // === OTHER HANDLERS ===
-
     const handleCopy = (text: string, id: string) => {
         navigator.clipboard.writeText(text);
         setCopiedBarcodeId(id);
         setTimeout(() => setCopiedBarcodeId(null), 2000);
     };
-
     const handleOpenPixModal = (code: string) => {
         setActivePixCode(code);
         setPixModalOpen(true);
         setIsPixCopied(false);
     };
-    
     const handleCopyPix = () => {
         navigator.clipboard.writeText(activePixCode);
         setIsPixCopied(true);
         setTimeout(() => setIsPixCopied(false), 2000);
     };
 
-    const toggleFavorite = (id: string) => {
-        setFavoriteInvoices(prev => {
-            const newFavorites = new Set(prev);
-            newFavorites.has(id) ? newFavorites.delete(id) : newFavorites.add(id);
-            return newFavorites;
-        });
-    };
-
-    const handleChatSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!chatInput.trim() || isBotTyping) return;
-
-        const newUserMessage: ChatMessage = { id: Date.now(), text: chatInput, sender: 'user' };
-        setChatMessages(prev => [...prev, newUserMessage]);
-        setChatInput('');
-        setIsBotTyping(true);
-
-        setTimeout(() => {
-            const botResponse: ChatMessage = { 
-                id: Date.now() + 1, 
-                text: "Olá! Sou o assistente virtual. Para um atendimento completo, por favor, entre em contato pelo nosso WhatsApp.",
-                sender: 'bot' 
-            };
-            setChatMessages(prev => [...prev, botResponse]);
-            setIsBotTyping(false);
-        }, 1500);
-    };
-
     // === RENDER LOGIC ===
     const filteredInvoices = (dashboardData?.faturas || []).filter(invoice => {
         if (invoiceStatusFilter === 'todas') return true;
         return invoice.status === invoiceStatusFilter;
-    });
-
-    const sortedAndFilteredInvoices = filteredInvoices.sort((a, b) => {
-        const aIsFav = favoriteInvoices.has(String(a.id));
-        const bIsFav = favoriteInvoices.has(String(b.id));
-        if (aIsFav && !bIsFav) return -1;
-        if (!aIsFav && bIsFav) return 1;
-        return 0;
     });
 
     const getInvoiceStatusProps = (status: Invoice['status']) => {
@@ -358,9 +289,9 @@ const ClientArea: React.FC = () => {
     const TABS = [
       { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
       { id: 'invoices', label: 'Faturas', icon: FileText },
+      { id: 'connections', label: 'Conexões', icon: Wifi },
       { id: 'consumption', label: 'Extrato', icon: BarChart3 },
       { id: 'contracts', label: 'Contratos', icon: FileSignature },
-      { id: 'support', label: 'Suporte', icon: MessageSquare },
       { id: 'settings', label: 'Configurações', icon: Settings },
     ];
     
@@ -392,9 +323,12 @@ const ClientArea: React.FC = () => {
                            {isLoading ? <Loader2 className="animate-spin mx-auto" /> : 'Acessar'}
                         </Button>
                     </form>
-                    <p className="text-center text-sm text-gray-500 mt-6">
-                       Problemas para acessar? <a href="#" onClick={(e) => { e.preventDefault(); alert('Por favor, entre em contato com o suporte via WhatsApp.'); }} className="text-fiber-orange hover:underline font-semibold">Fale com o suporte</a>.
-                    </p>
+                     <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-center">
+                        <p className="text-yellow-400 font-bold text-sm">Modo Desenvolvedor</p>
+                        <p className="text-yellow-500 text-xs mt-1">
+                            Use <strong className="font-mono">dev@fibernet.com</strong> / <strong className="font-mono">dev</strong> para testar.
+                        </p>
+                    </div>
                 </div>
             </div>
         );
@@ -407,8 +341,8 @@ const ClientArea: React.FC = () => {
                 {/* Header */}
                 <header className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-10">
                     <div>
-                        <h1 className="text-3xl font-bold text-white">Olá, {dashboardData?.cliente.nome.split(' ')[0]}!</h1>
-                        <p className="text-gray-400">Bem-vindo(a) de volta à sua central de controle.</p>
+                        <h1 className="text-3xl font-bold text-white">Olá, {dashboardData?.clientes[0]?.nome.split(' ')[0]}!</h1>
+                        <p className="text-gray-400">Bem-vindo(a) à sua central de controle unificada.</p>
                     </div>
                     <Button onClick={handleLogout} variant="secondary" className="!py-2 !px-4 text-sm gap-2">
                         <LogOut size={16} /> Sair
@@ -422,7 +356,7 @@ const ClientArea: React.FC = () => {
                         <div className="bg-fiber-card border border-white/10 rounded-2xl p-4 space-y-2">
                             {TABS.map(tab => (
                                 <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                                    className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors font-medium text-sm ${activeTab === tab.id ? 'bg-fiber-orange text-white' : 'text-gray-300 hover:bg-white/5'}`}>
+                                    className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors font-medium text-sm ${activeTab === tab.id ? 'bg-fiber-orange text-white shadow-md' : 'text-gray-300 hover:bg-white/5'}`}>
                                     <tab.icon size={18} />
                                     {tab.label}
                                 </button>
@@ -433,49 +367,36 @@ const ClientArea: React.FC = () => {
                     {/* Content Area */}
                     <main className="w-full lg:w-3/4">
                         <div className="bg-fiber-card border border-white/10 rounded-2xl p-6 md:p-8 min-h-[500px] animate-fadeIn">
-                            {/* Render active tab content */}
-                            
+                           
                             {/* DASHBOARD TAB */}
                             {activeTab === 'dashboard' && dashboardData && (
                                 <div>
                                     <h2 className="text-2xl font-bold text-white mb-8">Visão Geral</h2>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        {/* Connection Status */}
-                                        <div className="bg-neutral-900 p-6 rounded-xl border border-white/5">
-                                            <div className="flex items-center gap-3 mb-4 text-fiber-orange"><Wifi size={20} /> <h3 className="text-white font-bold">Status da Conexão</h3></div>
-                                            <div className={`flex items-center gap-2 font-bold ${dashboardData.conexao.online ? 'text-fiber-green' : 'text-red-500'}`}>
-                                                {dashboardData.conexao.online ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-                                                {dashboardData.conexao.online ? 'Online' : 'Offline'}
-                                            </div>
-                                            <div className="text-sm text-gray-400 mt-2">IP: <span className="font-mono">{dashboardData.conexao.ip}</span></div>
-                                            <div className="text-sm text-gray-400">Uptime: {dashboardData.conexao.uptime}</div>
-                                        </div>
-                                        {/* Contract */}
-                                        <div className="bg-neutral-900 p-6 rounded-xl border border-white/5">
-                                            <div className="flex items-center gap-3 mb-4 text-fiber-orange"><FileSignature size={20} /> <h3 className="text-white font-bold">Seu Plano</h3></div>
-                                            <p className="text-xl font-semibold text-white">{dashboardData.contrato.plano}</p>
-                                            <div className="text-sm text-gray-400 mt-2">Status: <span className="font-bold">{getStatusContrato(dashboardData.contrato.status)}</span></div>
-                                            <div className="text-sm text-gray-400">Velocidade: {dashboardData.contrato.velocidade}</div>
-                                        </div>
-                                        {/* Consumption */}
                                         <div className="bg-neutral-900 p-6 rounded-xl border border-white/5 md:col-span-2">
-                                            <div className="flex items-center gap-3 mb-4 text-fiber-orange"><BarChart3 size={20} /> <h3 className="text-white font-bold">Consumo (Mês Atual)</h3></div>
+                                            <div className="flex items-center gap-3 mb-4 text-fiber-orange"><User size={20} /> <h3 className="text-white font-bold">Clientes Vinculados ({dashboardData.clientes.length})</h3></div>
+                                            {dashboardData.clientes.map(c => <p key={c.id} className="text-sm text-gray-400">{c.nome} - <span className="text-xs">{c.endereco}</span></p>)}
+                                        </div>
+                                        <div className="bg-neutral-900 p-6 rounded-xl border border-white/5">
+                                            <div className="flex items-center gap-3 mb-4 text-fiber-orange"><FileSignature size={20} /> <h3 className="text-white font-bold">Contratos Ativos</h3></div>
+                                            <p className="text-3xl font-bold text-white">{dashboardData.contratos.filter(c => c.status === 'A').length}</p>
+                                        </div>
+                                        <div className="bg-neutral-900 p-6 rounded-xl border border-white/5">
+                                             <div className="flex items-center gap-3 mb-4 text-fiber-orange"><Link2 size={20} /> <h3 className="text-white font-bold">Conexões</h3></div>
+                                             <p className="text-3xl font-bold text-white">{dashboardData.logins.length}</p>
+                                        </div>
+                                        <div className="bg-neutral-900 p-6 rounded-xl border border-white/5 md:col-span-2">
+                                            <div className="flex items-center gap-3 mb-4 text-fiber-orange"><BarChart3 size={20} /> <h3 className="text-white font-bold">Consumo Total (Mês Atual)</h3></div>
                                             <div className="flex flex-col sm:flex-row gap-8">
-                                                <div className="flex items-center gap-3">
-                                                    <ArrowDown className="text-fiber-blue" />
-                                                    <div><span className="text-gray-400 text-sm">Download</span><p className="text-white font-bold text-lg">{formatBytes(dashboardData.consumo.total_download_bytes)}</p></div>
-                                                </div>
-                                                <div className="flex items-center gap-3">
-                                                    <ArrowUp className="text-fiber-orange" />
-                                                    <div><span className="text-gray-400 text-sm">Upload</span><p className="text-white font-bold text-lg">{formatBytes(dashboardData.consumo.total_upload_bytes)}</p></div>
-                                                </div>
+                                                <div className="flex items-center gap-3"><ArrowDown className="text-fiber-blue" /><p><span className="text-gray-400 text-sm">Download</span><br/><span className="text-white font-bold text-lg">{formatBytes(dashboardData.consumo.total_download_bytes)}</span></p></div>
+                                                <div className="flex items-center gap-3"><ArrowUp className="text-fiber-orange" /><p><span className="text-gray-400 text-sm">Upload</span><br/><span className="text-white font-bold text-lg">{formatBytes(dashboardData.consumo.total_upload_bytes)}</span></p></div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             )}
 
-                            {/* INVOICES TAB */}
+                             {/* INVOICES TAB */}
                             {activeTab === 'invoices' && (
                                 <div>
                                     <h2 className="text-2xl font-bold text-white mb-6">Minhas Faturas</h2>
@@ -487,14 +408,10 @@ const ClientArea: React.FC = () => {
                                         ))}
                                     </div>
                                     <div className="space-y-4">
-                                        {sortedAndFilteredInvoices.length > 0 ? sortedAndFilteredInvoices.map(invoice => {
+                                        {filteredInvoices.length > 0 ? filteredInvoices.map(invoice => {
                                             const { icon: Icon, color, label } = getInvoiceStatusProps(invoice.status);
-                                            const isFav = favoriteInvoices.has(String(invoice.id));
                                             return (
-                                                <div key={invoice.id} className="bg-neutral-900 border border-white/10 rounded-xl p-4 md:p-6 flex flex-col md:flex-row items-start md:items-center gap-4 relative">
-                                                    <button onClick={() => toggleFavorite(String(invoice.id))} className="text-gray-500 hover:text-yellow-400 absolute right-4 top-4 md:relative md:right-auto md:top-auto md:order-first md:mr-4">
-                                                        <Star size={18} className={`transition-colors ${isFav ? 'fill-yellow-400 text-yellow-400' : ''}`} />
-                                                    </button>
+                                                <div key={invoice.id} className="bg-neutral-900 border border-white/10 rounded-xl p-4 md:p-6 flex flex-col md:flex-row items-start md:items-center gap-4">
                                                     <div className="flex-1">
                                                         <div className="flex items-center gap-2 mb-2">
                                                             <Icon size={16} className={`text-fiber-${color}`} />
@@ -502,18 +419,49 @@ const ClientArea: React.FC = () => {
                                                             <span className="text-gray-500 text-xs">| Venc.: {invoice.vencimento}</span>
                                                         </div>
                                                         <p className="text-white font-semibold">R$ {invoice.valor}</p>
-                                                        <p className="text-xs text-gray-400">{invoice.descricao || 'Referente ao serviço de internet'}</p>
                                                     </div>
                                                     <div className="flex items-center gap-2 flex-wrap">
                                                         {invoice.linha_digitavel && <Button onClick={() => handleCopy(invoice.linha_digitavel!, String(invoice.id))} variant="secondary" className="!text-xs !py-1.5 !px-3 gap-1.5"><Copy size={12} /> {copiedBarcodeId === String(invoice.id) ? 'Copiado!' : 'Código'}</Button>}
                                                         {invoice.pix_code && <Button onClick={() => handleOpenPixModal(invoice.pix_code!)} className="!bg-fiber-green/10 !text-fiber-green !text-xs !py-1.5 !px-3 gap-1.5"><QrCode size={12} /> Pagar PIX</Button>}
-                                                        <Button onClick={() => handleDownloadBoleto(invoice.id)} variant="outline" className="!text-xs !py-1.5 !px-3 gap-1.5"><Download size={12} /> PDF</Button>
+                                                        {invoice.link_pdf && <Button onClick={() => window.open(invoice.link_pdf!, '_blank')} variant="outline" className="!text-xs !py-1.5 !px-3 gap-1.5"><Download size={12} /> PDF</Button>}
                                                     </div>
                                                 </div>
                                             );
                                         }) : (
                                             <p className="text-gray-500 text-center py-8">Nenhuma fatura encontrada com este status.</p>
                                         )}
+                                    </div>
+                                </div>
+                            )}
+
+                             {/* CONNECTIONS TAB */}
+                            {activeTab === 'connections' && dashboardData && (
+                                <div>
+                                    <h2 className="text-2xl font-bold text-white mb-6">Minhas Conexões</h2>
+                                    <div className="space-y-6">
+                                        {dashboardData.logins.map(login => (
+                                            <div key={login.id} className="bg-neutral-900 border border-white/10 rounded-xl p-6">
+                                                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 mb-4">
+                                                    <h3 className="text-lg font-bold text-white">{login.login}</h3>
+                                                    <div className={`flex items-center gap-2 font-bold text-sm ${login.status === 'online' ? 'text-fiber-green' : 'text-gray-500'}`}>
+                                                        <div className={`w-2.5 h-2.5 rounded-full ${login.status === 'online' ? 'bg-fiber-green animate-pulse' : 'bg-gray-500'}`}></div>
+                                                        {login.status === 'online' ? 'Online' : 'Offline'}
+                                                    </div>
+                                                </div>
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-6">
+                                                    <div className="flex items-center gap-2 text-gray-400"><Server size={14}/> <strong>ONT:</strong> <span className="text-white">{login.sinal_ont || 'N/A'}</span></div>
+                                                    <div className="flex items-center gap-2 text-gray-400"><Clock size={14}/> <strong>Uptime:</strong> <span className="text-white">{login.uptime || 'N/A'}</span></div>
+                                                </div>
+                                                <div className="flex flex-col sm:flex-row gap-3">
+                                                    <Button onClick={() => performLoginAction(login.id, 'limpar-mac')} variant="secondary" className="!text-xs !py-2 !px-4 gap-2" disabled={actionStatus[login.id]?.status === 'loading'}>{actionStatus[login.id]?.status === 'loading' ? <Loader2 size={14} className="animate-spin" /> : <X size={14}/>} Limpar MAC</Button>
+                                                    <Button onClick={() => performLoginAction(login.id, 'desconectar')} variant="secondary" className="!text-xs !py-2 !px-4 gap-2" disabled={actionStatus[login.id]?.status === 'loading'}>{actionStatus[login.id]?.status === 'loading' ? <Loader2 size={14} className="animate-spin" /> : <Power size={14}/>} Desconectar</Button>
+                                                    <Button onClick={() => performLoginAction(login.id, 'diagnostico')} variant="outline" className="!text-xs !py-2 !px-4 gap-2" disabled={actionStatus[login.id]?.status === 'loading'}>{actionStatus[login.id]?.status === 'loading' ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14}/>} Diagnóstico</Button>
+                                                </div>
+                                                {actionStatus[login.id]?.status === 'success' && <p className="text-green-500 text-xs mt-3">{actionStatus[login.id]?.message}</p>}
+                                                {actionStatus[login.id]?.status === 'error' && <p className="text-red-500 text-xs mt-3">{actionStatus[login.id]?.message}</p>}
+                                                {diagResult && <p className="text-blue-400 text-xs mt-3 font-mono">Consumo Atual: DL {diagResult.download} / UL {diagResult.upload}</p>}
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             )}
@@ -528,50 +476,33 @@ const ClientArea: React.FC = () => {
                             )}
 
                             {/* CONTRACTS TAB */}
-                            {activeTab === 'contracts' && (
+                            {activeTab === 'contracts' && dashboardData && (
                                  <div>
-                                    <h2 className="text-2xl font-bold text-white mb-6">Meus Contratos</h2>
-                                    <div className="bg-neutral-900 border border-white/10 rounded-xl p-6 flex flex-col sm:flex-row justify-between items-center">
-                                        <div>
-                                            <h3 className="text-white font-bold">Contrato de Prestação de Serviço</h3>
-                                            <p className="text-sm text-gray-400">Plano: {dashboardData?.contrato.plano}</p>
-                                        </div>
-                                        {dashboardData?.contratoPdf ? (
-                                            <Button onClick={() => window.open(dashboardData.contratoPdf!, '_blank')} variant="primary" className="mt-4 sm:mt-0 gap-2">
-                                                <DownloadCloud size={16} /> Baixar Contrato
-                                            </Button>
-                                        ) : (
-                                            <p className="text-sm text-gray-500">Contrato digital indisponível.</p>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* SUPPORT TAB */}
-                            {activeTab === 'support' && (
-                                 <div className="flex flex-col h-[600px]">
-                                    <h2 className="text-2xl font-bold text-white mb-4">Suporte via Chat</h2>
-                                    <div className="bg-neutral-900 border border-white/10 rounded-xl flex-grow flex flex-col overflow-hidden">
-                                        <div ref={chatContainerRef} className="flex-grow p-4 space-y-4 overflow-y-auto">
-                                            {chatMessages.map(msg => (
-                                                <div key={msg.id} className={`flex items-end gap-2 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                                    {msg.sender === 'bot' && <div className="w-8 h-8 bg-fiber-orange rounded-full flex items-center justify-center flex-shrink-0"><Bot size={18} /></div>}
-                                                    <div className={`max-w-xs md:max-w-md p-3 rounded-2xl ${msg.sender === 'user' ? 'bg-fiber-blue text-white rounded-br-none' : 'bg-neutral-800 text-gray-300 rounded-bl-none'}`}>
-                                                        <p className="text-sm">{msg.text}</p>
+                                    <h2 className="text-2xl font-bold text-white mb-6">Meus Contratos ({dashboardData.contratos.length})</h2>
+                                    <div className="space-y-4">
+                                        {dashboardData.contratos.map(contrato => {
+                                            const status = getStatusContrato(contrato.status);
+                                            return(
+                                                <div key={contrato.id} className="bg-neutral-900 border border-white/10 rounded-xl p-6 flex flex-col sm:flex-row justify-between items-center">
+                                                    <div>
+                                                        <h3 className="text-white font-bold">{contrato.plano}</h3>
+                                                        <p className={`text-sm font-bold ${status.color}`}>{status.label}</p>
                                                     </div>
+                                                    {contrato.pdf_link ? (
+                                                        <Button onClick={() => window.open(contrato.pdf_link!, '_blank')} variant="primary" className="mt-4 sm:mt-0 gap-2 !text-xs !py-2 !px-4">
+                                                            <DownloadCloud size={16} /> Baixar Contrato
+                                                        </Button>
+                                                    ) : (
+                                                        <p className="text-sm text-gray-500 mt-4 sm:mt-0">Contrato digital indisponível.</p>
+                                                    )}
                                                 </div>
-                                            ))}
-                                            {isBotTyping && <div className="flex items-end gap-2 justify-start"><div className="w-8 h-8 bg-fiber-orange rounded-full flex items-center justify-center flex-shrink-0"><Bot size={18} /></div><div className="p-3 rounded-2xl bg-neutral-800"><Loader2 className="animate-spin text-gray-400" size={16}/></div></div>}
-                                        </div>
-                                        <form onSubmit={handleChatSubmit} className="p-4 border-t border-white/10 flex items-center gap-2 bg-black/20">
-                                            <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Digite sua mensagem..." className="w-full bg-neutral-800 border border-white/10 rounded-full py-2 px-4 text-white focus:outline-none focus:ring-1 focus:ring-fiber-orange" />
-                                            <Button type="submit" variant="primary" className="!p-3 rounded-full"><Send size={18} /></Button>
-                                        </form>
+                                            )
+                                        })}
                                     </div>
                                 </div>
                             )}
 
-                            {/* SETTINGS TAB */}
+                             {/* SETTINGS TAB */}
                             {activeTab === 'settings' && (
                                 <div>
                                     <h2 className="text-2xl font-bold text-white mb-6">Configurações da Conta</h2>
@@ -591,9 +522,13 @@ const ClientArea: React.FC = () => {
                                             </div>
                                         )}
                                     </div>
+                                    <div className="bg-neutral-900 border border-white/10 rounded-xl p-6 mt-6">
+                                        <h3 className="text-lg font-bold text-white mb-4">Desbloqueio de Confiança</h3>
+                                        <p className="text-sm text-gray-400 mb-4">Se sua conexão foi bloqueada por falta de pagamento, você pode solicitar um desbloqueio temporário de 24h.</p>
+                                        <Button variant="outline">Solicitar Desbloqueio</Button>
+                                    </div>
                                 </div>
                             )}
-
                         </div>
                     </main>
                 </div>
@@ -606,8 +541,7 @@ const ClientArea: React.FC = () => {
                         <button onClick={() => setPixModalOpen(false)} className="absolute top-3 right-3 text-gray-500 hover:text-white"><X size={20}/></button>
                         <h3 className="text-xl font-bold text-white text-center mb-4">Pagamento via PIX</h3>
                         <div className="bg-white p-4 rounded-lg mx-auto w-fit mb-4">
-                            {/* Placeholder for QR Code image */}
-                             <div className="w-48 h-48 bg-neutral-800 flex items-center justify-center"><QrCode size={100} className="text-white"/></div>
+                            <div className="w-48 h-48 bg-neutral-800 flex items-center justify-center"><QrCode size={100} className="text-white"/></div>
                         </div>
                         <p className="text-center text-sm text-gray-400 mb-4">Use o Pix Copia e Cola para pagar.</p>
                         <Button onClick={handleCopyPix} fullWidth className="gap-2 !bg-fiber-green hover:!bg-green-600">

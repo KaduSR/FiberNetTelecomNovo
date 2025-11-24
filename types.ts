@@ -53,4 +53,41 @@ export interface ConsumptionHistory {
   daily: ConsumptionPoint[];
   weekly: ConsumptionPoint[];
   monthly: ConsumptionPoint[];
+  annual: ConsumptionPoint[];
+}
+
+// === NEW TYPES FOR FULL DASHBOARD ===
+
+export interface Login {
+    id: string | number;
+    login: string;
+    status: 'online' | 'offline';
+    sinal_ont?: string; // Ex: -21.5 dBm
+    uptime?: string; // Ex: '24d 10h 5m'
+    contrato_id: string | number;
+}
+
+export interface ContratoInfo {
+    id: string | number;
+    plano: string;
+    status: 'A' | 'S' | 'C'; // Ativo, Suspenso, Cancelado
+    pdf_link?: string;
+}
+
+export interface ClienteInfo {
+    id: string | number;
+    nome: string;
+    endereco: string;
+}
+
+export interface DashboardData {
+    clientes: ClienteInfo[];
+    contratos: ContratoInfo[];
+    faturas: Invoice[];
+    logins: Login[];
+    consumo: {
+        total_download_bytes: number;
+        total_upload_bytes: number;
+        history: ConsumptionHistory;
+    };
 }

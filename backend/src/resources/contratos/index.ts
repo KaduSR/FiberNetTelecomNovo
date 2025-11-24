@@ -9,7 +9,7 @@ const resourceName = "v1/cliente_contrato";
  */
 export class Contratos extends QueryBase {
 
-    // FIX: Added constructor to properly initialize the base class and make its methods available.
+    // FIX: Added constructor to properly initialize the base class. Without it, methods from QueryBase like `request` are not available.
     constructor(config: { token: string; baseUrl: string; }) {
         super(config);
     }
