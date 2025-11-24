@@ -1,20 +1,23 @@
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import PlanCard from './components/PlanCard';
 import Features from './components/Features';
 import Footer from './components/Footer';
-import Ethics from './components/Ethics';
-import HelpCenter from './components/HelpCenter';
-import ClientGuide from './components/ClientGuide';
 import SupportModal from './components/SupportModal';
 import SpeedTestSection from './components/SpeedTestSection';
 import ClientArea from './components/ClientArea';
-import NewsSection from './components/NewsSection'; // Import News Component
-import ServiceStatus from './components/ServiceStatus'; // Import new full page component
+import NewsSection from './components/NewsSection';
 import { PLANS, HISTORY_TEXT } from './constants';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, Loader2 } from 'lucide-react';
+import FiberNetTextLogo from './components/FiberNetTextLogo';
+
+// Lazy load heavier components
+const Ethics = React.lazy(() => import('./components/Ethics'));
+const HelpCenter = React.lazy(() => import('./components/HelpCenter'));
+const ClientGuide = React.lazy(() => import('./components/ClientGuide'));
+const CodeOfEthicsDocument = React.lazy(() => import('./components/CodeOfEthicsDocument'));
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState('home');
@@ -47,7 +50,7 @@ const App: React.FC = () => {
             <section id="sobre" className="py-20 bg-fiber-card border-y border-white/5">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                  <div className="text-center mb-12">
-                    <h2 className="text-3xl font-bold text-white mb-2">Sobre a <span className="text-fiber-orange">Fiber.Net</span></h2>
+                    <h2 className="text-3xl font-bold text-white mb-2">Sobre a <span className="text-fiber-orange"><FiberNetTextLogo /></span></h2>
                     <div className="w-20 h-1 bg-fiber-orange mx-auto rounded-full"></div>
                  </div>
                  
@@ -57,13 +60,13 @@ const App: React.FC = () => {
                           {HISTORY_TEXT}
                         </p>
                         <p className="mt-8 text-fiber-orange font-bold text-lg">
-                          FIBER.NET - Uma empresa Homologada pela ANATEL! É 100% regional. Conectando você ao mundo!
+                          <FiberNetTextLogo /> - Uma empresa Homologada pela ANATEL! É 100% regional. Conectando você ao mundo!
                         </p>
                     </div>
                     <div className="relative h-full min-h-[300px] order-1 lg:order-2 group">
                         <div className="absolute inset-0 bg-blue-500/10 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
                         <img 
-                            src="https://res.cloudinary.com/dbblxiya7/image/upload/v1763993086/Gemini_Generated_Image_6m5kop6m5kop6m5k_urxmoq.png"
+                            src="https://res.cloudinary.com/dbblxiya7/image/upload/f_auto,q_auto/v1763993086/Gemini_Generated_Image_6m5kop6m5kop6m5k_urxmoq.png"
                             alt="Cidade à noite - Fiber.Net"
                             className="relative w-full h-full object-cover rounded-xl shadow-2xl border border-white/10"
                             loading="lazy"
@@ -81,7 +84,7 @@ const App: React.FC = () => {
             {/* Why Choose Us Section */}
             <section className="py-16 bg-fiber-dark">
                 <div className="max-w-7xl mx-auto px-4 text-center">
-                    <h2 className="text-3xl font-bold text-white">Por que escolher a <span className="text-fiber-orange">Fiber.Net?</span></h2>
+                    <h2 className="text-3xl font-bold text-white">Por que escolher a <span className="text-fiber-orange"><FiberNetTextLogo />?</span></h2>
                     <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8">
                         <div className="p-6 border border-white/10 rounded-xl hover:border-fiber-orange/50 transition-colors">
                             <div className="w-12 h-12 bg-fiber-orange/10 text-fiber-orange rounded-lg flex items-center justify-center mx-auto mb-4">
@@ -146,17 +149,17 @@ const App: React.FC = () => {
         
         {currentPage === 'client-area' && <ClientArea />}
         
-        {currentPage === 'ethics' && <Ethics />}
-        
-        {currentPage === 'help' && <HelpCenter onNavigate={handleNavigate} />}
-
-        {currentPage === 'client-guide' && <ClientGuide />}
+        {/* Lazy Loaded Components with Suspense Fallback */}
+        <Suspense fallback={<div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="w-12 h-12 text-fiber-orange animate-spin" /></div>}>
+            {currentPage === 'ethics' && <Ethics />}
+            {currentPage === 'help' && <HelpCenter onNavigate={handleNavigate} />}
+            {currentPage === 'client-guide' && <ClientGuide />}
+            {currentPage === 'code-of-ethics' && <CodeOfEthicsDocument />}
+        </Suspense>
         
         {currentPage === 'news' && <NewsSection />}
         
         {currentPage === 'speedtest' && <SpeedTestSection />}
-        
-        {currentPage === 'status' && <ServiceStatus onNavigate={handleNavigate} />}
 
       </main>
 
@@ -178,6 +181,7 @@ const App: React.FC = () => {
         target="_blank"
         rel="noreferrer"
         className="fixed bottom-6 right-6 z-50 bg-fiber-green text-white p-4 rounded-full shadow-2xl hover:scale-110 transition-transform animate-bounce"
+        aria-label="Falar no WhatsApp"
       >
         <MessageCircle size={32} fill="white" />
       </a>

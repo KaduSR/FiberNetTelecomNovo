@@ -116,7 +116,7 @@ const NewsSection: React.FC = () => {
                     }
 
                     // Image Extraction Logic
-                    let img = 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=900&auto=format&fit=crop';
+                    let img = 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=900&auto=format&fit=crop&fm=webp';
                     
                     if (item.enclosure?.link) {
                         img = item.enclosure.link;
@@ -287,7 +287,7 @@ const NewsSection: React.FC = () => {
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-90 group-hover:opacity-100"
                     onError={(e) => {
                         // Fallback image if fetch fails
-                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=900&auto=format&fit=crop';
+                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=900&auto=format&fit=crop&fm=webp';
                     }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-fiber-card via-transparent to-transparent opacity-80"></div>
@@ -359,7 +359,7 @@ const NewsSection: React.FC = () => {
   );
 };
 
-// Fallback data update
+// Fallback data update with optimized images
 const FALLBACK_NEWS: NewsArticle[] = [
   {
     id: 1,
@@ -368,7 +368,7 @@ const FALLBACK_NEWS: NewsArticle[] = [
     date: 'Hoje, 10:00',
     timestamp: Date.now(),
     source: 'G1 Globo',
-    imageUrl: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=900&auto=format&fit=crop',
+    imageUrl: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=900&auto=format&fit=crop&fm=webp',
     link: 'https://g1.globo.com/tecnologia'
   },
   {
@@ -378,7 +378,7 @@ const FALLBACK_NEWS: NewsArticle[] = [
     date: 'Ontem, 14:30',
     timestamp: Date.now() - 86400000,
     source: 'Olhar Digital',
-    imageUrl: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=900&auto=format&fit=crop',
+    imageUrl: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=900&auto=format&fit=crop&fm=webp',
     link: 'https://olhardigital.com.br/'
   },
   {
@@ -388,7 +388,7 @@ const FALLBACK_NEWS: NewsArticle[] = [
     date: '2 dias atrás',
     timestamp: Date.now() - 172800000,
     source: 'Adrenaline',
-    imageUrl: 'https://images.unsplash.com/photo-1605901309584-818e25960b8f?q=80&w=900&auto=format&fit=crop',
+    imageUrl: 'https://images.unsplash.com/photo-1605901309584-818e25960b8f?q=80&w=900&auto=format&fit=crop&fm=webp',
     link: 'https://adrenaline.com.br/'
   }
 ];

@@ -4,11 +4,12 @@ import {
   User, Lock, FileText, Download, Copy, CheckCircle, AlertCircle, Loader2, 
   QrCode, X, LogOut, Wifi, Activity, 
   Clock, Settings, Eye, EyeOff, Mail, ArrowUp, ArrowDown, LayoutDashboard, Ban,
-  FileSignature, BarChart3, ScrollText, Zap, Power, Server, Link2, ThumbsUp, Printer, Trash2
+  FileSignature, BarChart3, ScrollText, Zap, Power, Server, Link2, ThumbsUp, Printer, Trash2, ArrowLeft, MessageCircle
 } from 'lucide-react';
 import Button from './Button';
 import { Invoice, ConsumptionHistory, ConsumptionPoint, DashboardData } from '../types';
 import { ENDPOINTS } from '../src/config';
+import { CONTACT_INFO } from '../constants'; // Import contact info for WhatsApp link
 
 // === HELPERS & TYPES ===
 const formatBytes = (bytes: number | string | undefined, decimals = 2) => {
@@ -122,7 +123,14 @@ const ClientArea: React.FC = () => {
     const [passwordChangeStatus, setPasswordChangeStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
     const [showNewPass, setShowNewPass] = useState(false);
     const [actionStatus, setActionStatus] = useState<{ [key: string]: { status: 'idle' | 'loading' | 'success' | 'error', message?: string } }>({});
-     const [diagResult, setDiagResult] = useState<{ download: string, upload: string } | null>(null);
+    const [diagResult, setDiagResult] = useState<{ download: string, upload: string } | null>(null);
+
+    // Login View States
+    const [loginView, setLoginView] = useState<'login' | 'forgot'>('login');
+    const [rememberMe, setRememberMe] = useState(false);
+    const [savedEmail, setSavedEmail] = useState('');
+    const [recoveryStatus, setRecoveryStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+    const [recoveryMessage, setRecoveryMessage] = useState('');
 
 
     // === API FUNCTIONS ===
@@ -161,6 +169,14 @@ const ClientArea: React.FC = () => {
             if (!response.ok) throw new Error(data.error || 'Login falhou');
             
             localStorage.setItem('authToken', data.token);
+            
+            // Handle "Remember Me"
+            if (rememberMe) {
+                localStorage.setItem('fiber_saved_email', email);
+            } else {
+                localStorage.removeItem('fiber_saved_email');
+            }
+
             setIsAuthenticated(true);
             await fetchDashboardData();
             setActiveTab('dashboard');
@@ -172,10 +188,40 @@ const ClientArea: React.FC = () => {
         }
     };
 
+    const handleRecovery = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        setRecoveryStatus('loading');
+        setRecoveryMessage('');
+        const formData = new FormData(e.currentTarget);
+        const email = formData.get('recoveryEmail') as string;
+
+        try {
+            const response = await fetch(ENDPOINTS.RECOVERY, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                // If API returns specific error (e.g., 404 Email not found)
+                throw new Error(data.error || 'Email não encontrado em nossa base.');
+            }
+
+            setRecoveryStatus('success');
+            setRecoveryMessage(data.message || 'Um link de redefinição foi enviado para seu e-mail.');
+        } catch (error: any) {
+            setRecoveryStatus('error');
+            setRecoveryMessage(error.message);
+        }
+    };
+
     const handleLogout = () => {
         localStorage.removeItem('authToken');
         setIsAuthenticated(false);
         setDashboardData(null);
+        setLoginView('login');
     };
 
     const handlePasswordChange = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -233,6 +279,13 @@ const ClientArea: React.FC = () => {
     // === EFFECTS ===
 
     useEffect(() => {
+        // Check for saved email
+        const saved = localStorage.getItem('fiber_saved_email');
+        if (saved) {
+            setSavedEmail(saved);
+            setRememberMe(true);
+        }
+
         const token = localStorage.getItem('authToken');
         if (token) {
             setIsAuthenticated(true);
@@ -293,25 +346,127 @@ const ClientArea: React.FC = () => {
         return (
             <div className="min-h-screen bg-fiber-dark flex items-center justify-center p-4 animate-fadeIn">
                 <div className="w-full max-w-md bg-fiber-card p-8 rounded-2xl border border-white/10 shadow-2xl">
-                    <h2 className="text-3xl font-bold text-white text-center mb-2">Área do Cliente</h2>
-                    <p className="text-gray-400 text-center mb-8">Acesse sua conta para gerenciar seus serviços.</p>
-                    <form onSubmit={handleLogin} className="space-y-6">
-                        <div className="relative">
-                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                            <input type="email" name="email" placeholder="Seu e-mail" required className="w-full bg-neutral-900 border border-white/10 rounded-lg p-3 pl-12 text-white focus:outline-none focus:ring-1 focus:ring-fiber-orange" />
-                        </div>
-                        <div className="relative">
-                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                            <input type={showLoginPass ? 'text' : 'password'} name="password" placeholder="Sua senha" required className="w-full bg-neutral-900 border border-white/10 rounded-lg p-3 pl-12 pr-10 text-white focus:outline-none focus:ring-1 focus:ring-fiber-orange" />
-                            <button type="button" onClick={() => setShowLoginPass(!showLoginPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-fiber-card focus:ring-fiber-orange rounded-full p-1">
-                                {showLoginPass ? <EyeOff size={18}/> : <Eye size={18}/>}
+                    
+                    {loginView === 'login' ? (
+                        <>
+                            <h2 className="text-3xl font-bold text-white text-center mb-2">Área do Cliente</h2>
+                            <p className="text-gray-400 text-center mb-8">Acesse sua conta para gerenciar seus serviços.</p>
+                            <form onSubmit={handleLogin} className="space-y-6">
+                                <div className="relative">
+                                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                                    <input 
+                                        type="email" 
+                                        name="email" 
+                                        placeholder="Seu e-mail" 
+                                        defaultValue={savedEmail}
+                                        required 
+                                        className="w-full bg-neutral-900 border border-white/10 rounded-lg p-3 pl-12 text-white focus:outline-none focus:ring-1 focus:ring-fiber-orange" 
+                                    />
+                                </div>
+                                <div className="relative">
+                                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                                    <input type={showLoginPass ? 'text' : 'password'} name="password" placeholder="Sua senha" required className="w-full bg-neutral-900 border border-white/10 rounded-lg p-3 pl-12 pr-10 text-white focus:outline-none focus:ring-1 focus:ring-fiber-orange" />
+                                    <button type="button" onClick={() => setShowLoginPass(!showLoginPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-fiber-card focus:ring-fiber-orange rounded-full p-1">
+                                        {showLoginPass ? <EyeOff size={18}/> : <Eye size={18}/>}
+                                    </button>
+                                </div>
+                                
+                                <div className="flex items-center justify-between text-sm">
+                                    <label className="flex items-center gap-2 text-gray-400 cursor-pointer hover:text-white transition-colors">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={rememberMe} 
+                                            onChange={(e) => setRememberMe(e.target.checked)}
+                                            className="form-checkbox h-4 w-4 text-fiber-orange rounded border-gray-600 bg-neutral-900 focus:ring-fiber-orange" 
+                                        />
+                                        Salvar login
+                                    </label>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => {
+                                            setLoginView('forgot');
+                                            setLoginError('');
+                                        }}
+                                        className="text-fiber-orange hover:underline"
+                                    >
+                                        Esqueci a senha
+                                    </button>
+                                </div>
+
+                                {loginError && <p className="text-red-400 text-sm text-center">{loginError}</p>}
+                                
+                                <Button type="submit" variant="primary" fullWidth disabled={isLoading}>
+                                {isLoading ? <Loader2 className="animate-spin mx-auto" /> : 'Acessar'}
+                                </Button>
+                            </form>
+                        </>
+                    ) : (
+                        <>
+                            <button 
+                                onClick={() => {
+                                    setLoginView('login');
+                                    setRecoveryStatus('idle');
+                                }} 
+                                className="mb-6 text-gray-400 hover:text-white flex items-center gap-2 text-sm transition-colors"
+                            >
+                                <ArrowLeft size={16} /> Voltar para o Login
                             </button>
-                        </div>
-                        {loginError && <p className="text-red-400 text-sm text-center">{loginError}</p>}
-                        <Button type="submit" variant="primary" fullWidth disabled={isLoading}>
-                           {isLoading ? <Loader2 className="animate-spin mx-auto" /> : 'Acessar'}
-                        </Button>
-                    </form>
+                            <h2 className="text-2xl font-bold text-white text-center mb-2">Recuperar Senha</h2>
+                            <p className="text-gray-400 text-center mb-8 text-sm">Digite seu e-mail cadastrado para redefinir sua senha.</p>
+                            
+                            {recoveryStatus !== 'success' ? (
+                                <form onSubmit={handleRecovery} className="space-y-6">
+                                    <div className="relative">
+                                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                                        <input 
+                                            type="email" 
+                                            name="recoveryEmail" 
+                                            placeholder="E-mail do cadastro" 
+                                            required 
+                                            className="w-full bg-neutral-900 border border-white/10 rounded-lg p-3 pl-12 text-white focus:outline-none focus:ring-1 focus:ring-fiber-orange" 
+                                        />
+                                    </div>
+
+                                    {recoveryStatus === 'error' && (
+                                        <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl text-center space-y-3 animate-fadeIn">
+                                            <p className="text-red-400 text-sm flex items-center justify-center gap-2">
+                                                <AlertCircle size={16} /> {recoveryMessage}
+                                            </p>
+                                            <Button 
+                                                type="button"
+                                                variant="whatsapp" 
+                                                fullWidth 
+                                                onClick={() => window.open(`https://wa.me/55${CONTACT_INFO.whatsapp.replace(/\D/g, '')}?text=Olá, não consigo recuperar minha senha da área do cliente.`, '_blank')}
+                                                className="!text-sm !py-2"
+                                            >
+                                                <MessageCircle size={16} className="mr-2" /> Falar no WhatsApp
+                                            </Button>
+                                        </div>
+                                    )}
+
+                                    <Button type="submit" variant="primary" fullWidth disabled={recoveryStatus === 'loading'}>
+                                        {recoveryStatus === 'loading' ? <Loader2 className="animate-spin mx-auto" /> : 'Enviar Instruções'}
+                                    </Button>
+                                </form>
+                            ) : (
+                                <div className="text-center space-y-4 animate-fadeIn">
+                                    <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto text-green-500">
+                                        <CheckCircle size={32} />
+                                    </div>
+                                    <h3 className="text-white font-bold text-lg">Verifique seu e-mail</h3>
+                                    <p className="text-gray-400 text-sm">{recoveryMessage}</p>
+                                    <Button 
+                                        variant="outline" 
+                                        fullWidth 
+                                        onClick={() => setLoginView('login')}
+                                        className="mt-4"
+                                    >
+                                        Voltar ao Login
+                                    </Button>
+                                </div>
+                            )}
+                        </>
+                    )}
                 </div>
             </div>
         );

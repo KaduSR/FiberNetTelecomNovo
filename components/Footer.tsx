@@ -78,7 +78,6 @@ const Footer: React.FC<FooterProps> = ({ onNavigate, currentPage, onOpenSupport 
               <li><a href="#planos" onClick={(e) => handleNav(e, '#planos')} className="hover:text-fiber-orange transition-colors focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded px-1">Serviços</a></li>
               <li><a href="help" onClick={(e) => handleNav(e, 'help')} className="hover:text-fiber-orange transition-colors focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded px-1">Central de Ajuda</a></li>
               <li><a href="client-guide" onClick={(e) => handleNav(e, 'client-guide')} className="hover:text-fiber-orange transition-colors focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded px-1">Guia do Cliente</a></li>
-              <li><a href="status" onClick={(e) => handleNav(e, 'status')} className="hover:text-fiber-orange transition-colors focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded px-1">Status dos Serviços</a></li>
             </ul>
           </div>
 
@@ -125,11 +124,12 @@ const Footer: React.FC<FooterProps> = ({ onNavigate, currentPage, onOpenSupport 
                Desenvolvido e Gerenciado por{' '}
                <a href="https://kadudev.com" target="_blank" rel="noreferrer" aria-label="Visitar site da KaduDev" className="inline-block align-middle focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded">
                  <img 
-                   src="https://images.unsplash.com/vector-1763657979649-8d8d789164df?q=80&w=880&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" 
+                   src="https://images.unsplash.com/vector-1763657979649-8d8d789164df?q=80&w=880&auto=format&fit=crop&fm=webp&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" 
                    alt="KaduDev Logo" 
                    className="h-20 sm:h-24 w-auto object-contain" 
                    width="880" 
                    height="200"
+                   loading="lazy"
                  />
                </a>
              </span>

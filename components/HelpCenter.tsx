@@ -138,7 +138,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ onNavigate }) => {
 
       {/* Quick Actions (Autoatendimento) */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 justify-center">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
           
           {/* Teste de Velocidade */}
           <button 
@@ -148,16 +148,6 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ onNavigate }) => {
           >
             <Gauge size={24} className="text-fiber-orange mb-2 group-hover:scale-110 transition-transform" aria-hidden="true" />
             <h3 className="text-white font-bold text-sm">Teste de Velocidade</h3>
-          </button>
-
-          {/* Status dos Serviços */}
-          <button 
-            className="bg-neutral-900 p-4 rounded-xl border border-white/5 hover:border-fiber-orange/50 transition-all cursor-pointer group flex flex-col items-center text-center focus:outline-none focus:ring-2 focus:ring-fiber-orange"
-            aria-label="Verificar status dos serviços"
-            onClick={() => onNavigate?.('status')}
-          >
-            <Activity size={24} className="text-fiber-orange mb-2 group-hover:scale-110 transition-transform" aria-hidden="true" />
-            <h3 className="text-white font-bold text-sm">Status Serviços</h3>
           </button>
 
            {/* Streaming & Apps */}

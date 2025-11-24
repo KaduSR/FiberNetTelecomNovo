@@ -19,9 +19,10 @@ export const ENDPOINTS = {
   LOGIN: `${API_BASE_URL}/login`,
   DASHBOARD: `${API_BASE_URL}/dashboard`,
   CHANGE_PASSWORD: `${API_BASE_URL}/trocar-senha`,
+  RECOVERY: `${API_BASE_URL}/recuperar-senha`, // Endpoint for password recovery
   INVOICES: `${API_BASE_URL}/faturas`,
-  SERVICE_STATUS: `${API_BASE_URL}/v1/status`,
-  SPEEDTEST_RUN: `${API_BASE_URL}/v1/speedtest/run`,
+  SERVICE_STATUS: `${API_BASE_URL}/status`, // Corrected: Removed /v1
+  SPEEDTEST_RUN: `${API_BASE_URL}/speedtest`, // Corrected: Removed /v1 and /run
   // Logins actions
   LOGIN_ACTION: (id: string | number, action: string) => `${API_BASE_URL}/logins/${id}/${action}`,
 };
