@@ -1,5 +1,6 @@
+
 import { DashboardResponse, LoginResponse, Task } from '../types/api';
-import { API_BASE_URL } from '../config';
+import { API_BASE_URL, ENDPOINTS } from '../config';
 
 class ApiService {
   private getHeaders(): HeadersInit {
@@ -16,56 +17,68 @@ class ApiService {
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    // Garante que não haja barras duplicadas
+    // Remove barra inicial extra se houver
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    // Remove barra final da Base URL se houver para evitar duplicidade
     const cleanBaseUrl = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+    
+    // Monta a URL: /api-proxy + /api/auth/login
+    // O Vercel vai transformar em: https://api.centralfiber.online/api/auth/login
     const url = `${cleanBaseUrl}${cleanEndpoint}`;
     
+    // Timeout de segurança de 15s
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
     try {
+      console.log(`[ApiService] Requesting: ${url}`); // Log para debug
+
       const response = await fetch(url, {
         ...options,
+        signal: controller.signal,
         headers: {
           ...this.getHeaders(),
           ...options.headers,
         },
       });
-
-      // 1. Obtém o texto bruto primeiro para debug em caso de erro de JSON
-      const text = await response.text();
       
+      clearTimeout(timeoutId);
+
+      // Tratamento de resposta
+      const text = await response.text();
       let data: any;
+      
       try {
-          // 2. Tenta fazer o parse do JSON
           data = text ? JSON.parse(text) : {};
       } catch (e) {
-          console.error(`[ApiService] Erro JSON. Status: ${response.status}. Resposta: ${text.substring(0, 200)}`);
-          throw new Error(`Erro de comunicação com o servidor (Status ${response.status}). Verifique a conexão.`);
+          console.error(`[ApiService] Erro JSON. Status: ${response.status}. Resposta: ${text.substring(0, 100)}`);
+          // Se receber HTML (como o erro 404), lança erro específico
+          if (text.trim().startsWith('<')) {
+             throw new Error(`Erro ${response.status}: Endpoint não encontrado ou erro de servidor.`);
+          }
+          throw new Error(`Erro de comunicação (Status ${response.status}).`);
       }
 
-      // 3. Verifica status HTTP (ex: 400, 401, 500)
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
           localStorage.removeItem('authToken');
         }
-        // Usa a mensagem de erro da API se disponível, senão usa statusText
-        const errorMessage = data.error || data.message || `Erro ${response.status}: ${response.statusText}`;
+        const errorMessage = data.error || data.message || `Erro ${response.status}`;
         throw new Error(errorMessage);
       }
 
       return data as T;
       
     } catch (error: any) {
-      console.error(`[ApiService] Erro na requisição para ${url}:`, error);
+      clearTimeout(timeoutId);
+      console.error(`[ApiService] Erro:`, error);
       throw error;
     }
   }
 
-  // === ROTAS DE AUTENTICAÇÃO ===
+  // === MÉTODOS USANDO AS CONSTANTES CORRETAS ===
 
   async login(credentials: { email: string; password: string }): Promise<LoginResponse> {
-    // Rota backend: /api/auth/login
-    const data = await this.request<LoginResponse>('/api/auth/login', { 
+    const data = await this.request<LoginResponse>(ENDPOINTS.LOGIN, { 
       method: 'POST',
       body: JSON.stringify(credentials),
     });
@@ -76,34 +89,28 @@ class ApiService {
     return data;
   }
 
+  async getDashboard(): Promise<DashboardResponse> {
+    return this.request<DashboardResponse>(ENDPOINTS.DASHBOARD, { 
+      method: 'GET',
+    });
+  }
+
   async recoverPassword(email: string): Promise<{ message: string }> {
-      return this.request<{ message: string }>('/api/auth/recuperar-senha', {
+      return this.request<{ message: string }>(ENDPOINTS.RECOVERY, {
           method: 'POST',
           body: JSON.stringify({ email })
       });
   }
 
   async changePassword(newPassword: string): Promise<{ message: string }> {
-    return this.request<{ message: string }>('/api/auth/trocar-senha', {
+    return this.request<{ message: string }>(ENDPOINTS.CHANGE_PASSWORD, {
       method: 'POST',
       body: JSON.stringify({ newPassword }),
     });
   }
 
-  // === ROTAS DO CLIENTE ===
-
-  async getDashboard(): Promise<DashboardResponse> {
-    // Rota backend: /api/dashboard
-    return this.request<DashboardResponse>('/api/dashboard', { 
-      method: 'GET',
-    });
-  }
-
-  async performLoginAction(
-    loginId: number, 
-    action: 'limpar-mac' | 'desconectar' | 'diagnostico'
-  ): Promise<any> {
-    return this.request<any>(`/api/logins/${loginId}/${action}`, {
+  async performLoginAction(loginId: number, action: string): Promise<any> {
+    return this.request<any>(ENDPOINTS.LOGIN_ACTION(loginId, action), { 
       method: 'POST',
     });
   }
@@ -113,8 +120,6 @@ class ApiService {
       method: 'POST',
     });
   }
-
-  // === TASKS & AI MODULE ===
 
   async getTasks(): Promise<Task[]> {
     return this.request<Task[]>('/api/tasks', { method: 'GET' });

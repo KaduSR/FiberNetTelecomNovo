@@ -479,7 +479,7 @@ const ClientArea: React.FC = () => {
                 {/* Header */}
                 <header className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-10">
                     <div>
-                        <h1 className="text-3xl font-bold text-white">Olá, {dashboardData?.clientes[0]?.razao.split(' ')[0]}!</h1>
+                        <h1 className="text-3xl font-bold text-white">Olá, {dashboardData?.clientes[0]?.nome?.split(' ')[0]}!</h1>
                         <p className="text-gray-400">Bem-vindo(a) à sua central de controle unificada.</p>
                     </div>
                     <Button onClick={handleLogout} variant="secondary" className="!py-2 !px-4 text-sm gap-2">
@@ -513,7 +513,7 @@ const ClientArea: React.FC = () => {
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="bg-neutral-900 p-6 rounded-xl border border-white/5 md:col-span-2">
                                             <div className="flex items-center gap-3 mb-4 text-fiber-orange"><User size={20} /> <h3 className="text-white font-bold">Clientes Vinculados ({dashboardData.clientes.length})</h3></div>
-                                            {dashboardData.clientes.map(c => <p key={c.id} className="text-sm text-gray-400">{c.razao} - <span className="text-xs">{c.endereco}</span></p>)}
+                                            {dashboardData.clientes.map(c => <p key={c.id} className="text-sm text-gray-400">{c.nome} - <span className="text-xs">{c.endereco}</span></p>)}
                                         </div>
                                         <div className="bg-neutral-900 p-6 rounded-xl border border-white/5">
                                             <div className="flex items-center gap-3 mb-4 text-fiber-orange"><FileSignature size={20} /> <h3 className="text-white font-bold">Contratos Ativos</h3></div>

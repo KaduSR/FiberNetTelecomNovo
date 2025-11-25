@@ -1,10 +1,11 @@
+
 export interface Cliente {
   id: number;
-  razao: string;
-  cnpj_cpf: string;
-  fone: string;
-  email: string;
+  nome: string;
   endereco?: string;
+  cnpj_cpf?: string;
+  fone?: string;
+  email?: string;
   numero?: string;
 }
 
@@ -25,10 +26,10 @@ export interface Fatura {
   data_emissao: string;
   data_vencimento: string;
   valor: string;
-  status: 'A' | 'B' | 'C'; // Aberto, Baixado, Cancelado
+  status: 'A' | 'B' | 'C'; 
   linha_digitavel: string;
   pix_txid: string;
-  boleto: string; // Link PDF
+  boleto: string;
 }
 
 export interface Login {
@@ -41,14 +42,14 @@ export interface Login {
   id_contrato: number;
   upload_atual?: string;
   download_atual?: string;
-  // NOVOS CAMPOS
+  // NOVOS CAMPOS DE IP
   ip_privado?: string;
   ip_publico?: string;
 }
 
 export interface ConsumoPoint {
-  data?: string;     
-  mes_ano?: string;  
+  data?: string;     // Para diário (ex: "2023-10-25")
+  mes_ano?: string;  // Para mensal (ex: "2023-10")
   download_bytes: number;
   upload_bytes: number;
 }
@@ -56,8 +57,8 @@ export interface ConsumoPoint {
 export interface Consumo {
   total_download_bytes: number;
   total_upload_bytes: number;
-  // NOVOS CAMPOS FORMATADOS
-  total_download: string;
+  // NOVOS CAMPOS FORMATADOS (Strings prontas do backend)
+  total_download: string; 
   total_upload: string;
   history: {
     daily: ConsumoPoint[];
@@ -103,4 +104,9 @@ export interface DashboardResponse {
 
 export interface LoginResponse {
   token: string;
+  user?: {
+      id: number;
+      nome: string;
+      email: string;
+  }
 }

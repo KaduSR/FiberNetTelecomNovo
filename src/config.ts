@@ -1,25 +1,17 @@
 
-// Centralized configuration for the application
-// You can override this using the VITE_API_BASE_URL environment variable in .env or Vercel settings
-
-// Safely determine API Base URL
-const getApiBaseUrl = () => {
-  // Use relative path '/api-proxy' to leverage the Proxy configured in vite.config.ts (Dev) and vercel.json (Prod).
-  // This avoids CORS issues by making the browser think it's calling the same domain.
-  console.log(`[Config] API Base URL active: /api-proxy (Proxy to Backend)`);
+export const getApiBaseUrl = () => {
+  // Mantemos o proxy para evitar CORS e usar a configuração do vercel.json
   return '/api-proxy';
 };
 
 export const API_BASE_URL = getApiBaseUrl();
 
-// Specific Endpoints (Helpers)
-// ... código anterior ...
-
+// CORREÇÃO: Adicionando os prefixos /api e /auth que faltavam
 export const ENDPOINTS = {
-  LOGIN: `/api/auth/login`,          // Adicionado /api/auth
-  DASHBOARD: `/api/dashboard`,       // Adicionado /api
-  CHANGE_PASSWORD: `/api/trocar-senha`,
-  RECOVERY: `/api/recuperar-senha`, 
+  LOGIN: `/api/auth/login`,
+  DASHBOARD: `/api/dashboard`,
+  CHANGE_PASSWORD: `/api/auth/trocar-senha`,
+  RECOVERY: `/api/auth/recuperar-senha`, 
   INVOICES: `/api/faturas`,
   SERVICE_STATUS: `/api/status`,
   SPEEDTEST_RUN: `/api/speedtest`,

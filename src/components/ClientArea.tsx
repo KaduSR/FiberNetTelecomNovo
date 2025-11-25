@@ -4,12 +4,11 @@ import {
   User, Lock, FileText, Download, Copy, CheckCircle, AlertCircle, Loader2, 
   QrCode, X, LogOut, Wifi, Activity, 
   Clock, Settings, Eye, EyeOff, Mail, ArrowUp, ArrowDown, LayoutDashboard, Ban,
-  FileSignature, BarChart3, ScrollText, Zap, Power, Server, Link2, ThumbsUp, Printer, Trash2, ArrowLeft, MessageCircle,
-  Sparkles, Plus, ListTodo, Brain, Globe
+  FileSignature, BarChart3, ScrollText, Zap, Power, Server, Link2, ThumbsUp, Printer, Trash2, ArrowLeft, MessageCircle, Globe
 } from 'lucide-react';
 import Button from './Button';
-import { DashboardResponse, Consumo, Fatura, Task } from '../types/api';
-import { apiService } from '../services/apiService';
+import { DashboardResponse, Consumo, Fatura } from '../src/types/api';
+import { apiService } from '../src/services/apiService';
 import { CONTACT_INFO } from '../constants';
 
 // === HELPERS ===
@@ -138,12 +137,6 @@ const ClientArea: React.FC = () => {
     const [actionStatus, setActionStatus] = useState<{ [key: string]: { status: 'idle' | 'loading' | 'success' | 'error', message?: string } }>({});
     const [diagResult, setDiagResult] = useState<{ download: string, upload: string } | null>(null);
 
-    // Tasks & AI State
-    const [tasks, setTasks] = useState<Task[]>([]);
-    const [isTasksLoading, setIsTasksLoading] = useState(false);
-    const [taskValues, setTaskValues] = useState({ title: '', description: '' });
-    const [taskAnalysisLoading, setTaskAnalysisLoading] = useState<string | null>(null); // ID of task being analyzed
-
     // Login View States
     const [loginView, setLoginView] = useState<'login' | 'forgot'>('login');
     const [rememberMe, setRememberMe] = useState(false);
@@ -158,56 +151,12 @@ const ClientArea: React.FC = () => {
         try {
             const data = await apiService.getDashboard();
             setDashboardData(data);
+            // IMPORTANTE: Marca como autenticado após carregar dados com sucesso
+            // Isso evita o loop de logout/login na recarga da página
+            setIsAuthenticated(true);
         } catch (error) {
             console.error("Erro ao carregar dashboard:", error);
             handleLogout();
-        }
-    };
-
-    const fetchTasks = async () => {
-        setIsTasksLoading(true);
-        try {
-            const data = await apiService.getTasks();
-            setTasks(data);
-        } catch (error) {
-            console.error("Erro ao carregar tarefas:", error);
-        } finally {
-            setIsTasksLoading(false);
-        }
-    };
-
-    const handleCreateTask = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!taskValues.title || !taskValues.description) return;
-        
-        setIsTasksLoading(true);
-        try {
-            const newTask = await apiService.createTask(taskValues);
-            setTasks(prev => [newTask, ...prev]);
-            setTaskValues({ title: '', description: '' });
-        } catch (error) {
-            console.error("Erro ao criar tarefa:", error);
-            alert("Erro ao criar tarefa. Tente novamente.");
-        } finally {
-            setIsTasksLoading(false);
-        }
-    };
-
-    const handleAnalyzeTask = async (taskId: string) => {
-        setTaskAnalysisLoading(taskId);
-        try {
-            const result = await apiService.analyzeTask(taskId);
-            // Atualiza a tarefa local com o resultado da análise
-            setTasks(prev => prev.map(t => 
-                t.id === taskId 
-                ? { ...t, analysis: result.analysis || JSON.stringify(result) } 
-                : t
-            ));
-        } catch (error) {
-            console.error("Erro ao analisar tarefa:", error);
-            alert("Erro ao analisar tarefa com IA.");
-        } finally {
-            setTaskAnalysisLoading(null);
         }
     };
 
@@ -244,7 +193,14 @@ const ClientArea: React.FC = () => {
 
         } catch (error: any) {
             console.error("Login Error:", error);
-            setLoginError(error.message || 'Ocorreu um erro desconhecido.');
+            
+            let msg = error.message || 'Ocorreu um erro desconhecido.';
+            if (msg.includes('Failed to fetch') || msg.includes('Network Error')) {
+                 msg = 'Falha de conexão. Verifique sua internet ou tente novamente.';
+            }
+            
+            setLoginError(msg);
+            
             localStorage.removeItem('authToken');
             setIsAuthenticated(false);
         } finally {
@@ -335,13 +291,6 @@ const ClientArea: React.FC = () => {
         }
     }, []);
 
-    // Load tasks when tab is active
-    useEffect(() => {
-        if (activeTab === 'tasks' && isAuthenticated) {
-            fetchTasks();
-        }
-    }, [activeTab, isAuthenticated]);
-
     // === OTHER HANDLERS ===
     const handleCopy = (text: string, id: string) => {
         navigator.clipboard.writeText(text);
@@ -381,7 +330,6 @@ const ClientArea: React.FC = () => {
       { id: 'connections', label: 'Conexões', icon: Wifi },
       { id: 'consumption', label: 'Extrato', icon: BarChart3 },
       { id: 'contracts', label: 'Contratos', icon: FileSignature },
-      { id: 'tasks', label: 'Tarefas Inteligentes', icon: Brain }, // New Tab
       { id: 'notes', label: 'Notas Fiscais', icon: ScrollText },
       { id: 'settings', label: 'Configurações', icon: Settings },
     ];
@@ -534,7 +482,7 @@ const ClientArea: React.FC = () => {
                 {/* Header */}
                 <header className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-10">
                     <div>
-                        <h1 className="text-3xl font-bold text-white">Olá, {dashboardData?.clientes[0]?.razao.split(' ')[0]}!</h1>
+                        <h1 className="text-3xl font-bold text-white">Olá, {dashboardData?.clientes[0]?.nome?.split(' ')[0]}!</h1>
                         <p className="text-gray-400">Bem-vindo(a) à sua central de controle unificada.</p>
                     </div>
                     <Button onClick={handleLogout} variant="secondary" className="!py-2 !px-4 text-sm gap-2">
@@ -568,7 +516,7 @@ const ClientArea: React.FC = () => {
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="bg-neutral-900 p-6 rounded-xl border border-white/5 md:col-span-2">
                                             <div className="flex items-center gap-3 mb-4 text-fiber-orange"><User size={20} /> <h3 className="text-white font-bold">Clientes Vinculados ({dashboardData.clientes.length})</h3></div>
-                                            {dashboardData.clientes.map(c => <p key={c.id} className="text-sm text-gray-400">{c.razao} - <span className="text-xs">{c.endereco}</span></p>)}
+                                            {dashboardData.clientes.map(c => <p key={c.id} className="text-sm text-gray-400">{c.nome} - <span className="text-xs">{c.endereco}</span></p>)}
                                         </div>
                                         <div className="bg-neutral-900 p-6 rounded-xl border border-white/5">
                                             <div className="flex items-center gap-3 mb-4 text-fiber-orange"><FileSignature size={20} /> <h3 className="text-white font-bold">Contratos Ativos</h3></div>
@@ -581,83 +529,10 @@ const ClientArea: React.FC = () => {
                                         <div className="bg-neutral-900 p-6 rounded-xl border border-white/5 md:col-span-2">
                                             <div className="flex items-center gap-3 mb-4 text-fiber-orange"><BarChart3 size={20} /> <h3 className="text-white font-bold">Consumo Total (Mês Atual)</h3></div>
                                             <div className="flex flex-col sm:flex-row gap-8">
-                                                <div className="flex items-center gap-3"><ArrowDown className="text-fiber-blue" /><p><span className="text-gray-400 text-sm">Download</span><br/><span className="text-white font-bold text-lg">{dashboardData.consumo.total_download}</span></p></div>
-                                                <div className="flex items-center gap-3"><ArrowUp className="text-fiber-orange" /><p><span className="text-gray-400 text-sm">Upload</span><br/><span className="text-white font-bold text-lg">{dashboardData.consumo.total_upload}</span></p></div>
+                                                <div className="flex items-center gap-3"><ArrowDown className="text-fiber-blue" /><p><span className="text-gray-400 text-sm">Download</span><br/><span className="text-white font-bold text-lg">{dashboardData.consumo.total_download || formatBytes(dashboardData.consumo.total_download_bytes)}</span></p></div>
+                                                <div className="flex items-center gap-3"><ArrowUp className="text-fiber-orange" /><p><span className="text-gray-400 text-sm">Upload</span><br/><span className="text-white font-bold text-lg">{dashboardData.consumo.total_upload || formatBytes(dashboardData.consumo.total_upload_bytes)}</span></p></div>
                                             </div>
                                         </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* TASKS TAB (NEW) */}
-                            {activeTab === 'tasks' && (
-                                <div className="animate-fadeIn">
-                                    <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
-                                        <Brain className="text-fiber-orange"/> Tarefas Inteligentes
-                                    </h2>
-                                    <p className="text-gray-400 mb-8">Gerencie suas tarefas e use a IA para analisá-las.</p>
-
-                                    {/* Create Task Form */}
-                                    <div className="bg-neutral-900 border border-white/10 rounded-xl p-6 mb-8">
-                                        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Plus size={18} /> Nova Tarefa</h3>
-                                        <form onSubmit={handleCreateTask} className="space-y-4">
-                                            <input 
-                                                placeholder="Título da tarefa" 
-                                                value={taskValues.title}
-                                                onChange={(e) => setTaskValues({...taskValues, title: e.target.value})}
-                                                className="w-full bg-fiber-dark border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:ring-1 focus:ring-fiber-orange"
-                                                required
-                                            />
-                                            <textarea 
-                                                placeholder="Descrição detalhada..." 
-                                                value={taskValues.description}
-                                                onChange={(e) => setTaskValues({...taskValues, description: e.target.value})}
-                                                className="w-full bg-fiber-dark border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:ring-1 focus:ring-fiber-orange h-24"
-                                                required
-                                            />
-                                            <div className="flex justify-end">
-                                                <Button type="submit" disabled={isTasksLoading}>
-                                                    {isTasksLoading ? <Loader2 className="animate-spin" /> : 'Criar Tarefa'}
-                                                </Button>
-                                            </div>
-                                        </form>
-                                    </div>
-
-                                    {/* Task List */}
-                                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><ListTodo size={18} /> Minhas Tarefas</h3>
-                                    <div className="space-y-4">
-                                        {tasks.length === 0 && !isTasksLoading ? (
-                                            <p className="text-gray-500 text-center py-8">Nenhuma tarefa encontrada.</p>
-                                        ) : (
-                                            tasks.map(task => (
-                                                <div key={task.id} className="bg-neutral-900 border border-white/10 rounded-xl p-6 transition-all hover:border-fiber-orange/30">
-                                                    <div className="flex justify-between items-start mb-2">
-                                                        <h4 className="text-xl font-bold text-white">{task.title}</h4>
-                                                        <button 
-                                                            onClick={() => handleAnalyzeTask(task.id)} 
-                                                            disabled={!!taskAnalysisLoading}
-                                                            className="flex items-center gap-2 px-3 py-1.5 bg-fiber-blue/10 text-fiber-blue hover:bg-fiber-blue/20 rounded-lg text-xs font-bold transition-colors disabled:opacity-50"
-                                                        >
-                                                            {taskAnalysisLoading === task.id ? <Loader2 size={14} className="animate-spin"/> : <Sparkles size={14} />}
-                                                            Analisar com IA
-                                                        </button>
-                                                    </div>
-                                                    <p className="text-gray-400 text-sm mb-4">{task.description}</p>
-                                                    
-                                                    {task.analysis && (
-                                                        <div className="bg-fiber-blue/5 border border-fiber-blue/20 rounded-lg p-4 mt-4 animate-fadeIn">
-                                                            <div className="flex items-center gap-2 text-fiber-blue text-xs font-bold uppercase tracking-wider mb-2">
-                                                                <Sparkles size={12} /> Análise da IA
-                                                            </div>
-                                                            <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-line">
-                                                                {task.analysis}
-                                                            </p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))
-                                        )}
-                                        {isTasksLoading && tasks.length === 0 && <div className="text-center py-8"><Loader2 className="animate-spin mx-auto text-fiber-orange" /></div>}
                                     </div>
                                 </div>
                             )}
@@ -717,8 +592,17 @@ const ClientArea: React.FC = () => {
                                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-6">
                                                     <div className="flex items-center gap-2 text-gray-400"><Server size={14}/> <strong>ONT:</strong> <span className="text-white">{login.sinal_ultimo_atendimento || 'N/A'}</span></div>
                                                     <div className="flex items-center gap-2 text-gray-400"><Clock size={14}/> <strong>Uptime:</strong> <span className="text-white">{login.tempo_conectado || 'N/A'}</span></div>
-                                                    <div className="flex items-center gap-2 text-gray-400"><Activity size={14}/> <strong>IP Privado:</strong> <span className="text-white font-mono">{login.ip_privado || '--'}</span></div>
-                                                    <div className="flex items-center gap-2 text-gray-400"><Globe size={14}/> <strong>IP Público:</strong> <span className="text-fiber-blue font-bold font-mono">{login.ip_publico || '--'}</span></div>
+                                                    
+                                                    {/* --- NOVOS DADOS DE IP --- */}
+                                                    <div className="flex items-center gap-2 text-gray-400">
+                                                        <Activity size={14}/> <strong>IP Privado:</strong> 
+                                                        <span className="text-white font-mono text-xs">{login.ip_privado || '--'}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 text-gray-400">
+                                                        <Globe size={14}/> <strong>IP Público:</strong> 
+                                                        <span className="text-fiber-blue font-bold font-mono text-xs">{login.ip_publico || '--'}</span>
+                                                    </div>
+                                                    {/* ------------------------- */}
                                                 </div>
                                                 <div className="flex flex-col sm:flex-row gap-3">
                                                     <Button onClick={() => performLoginAction(login.id, 'limpar-mac')} variant="secondary" className="!text-xs !py-2 !px-4 gap-2" disabled={actionStatus[login.id]?.status === 'loading'}>{actionStatus[login.id]?.status === 'loading' ? <Loader2 size={14} className="animate-spin" /> : <X size={14}/>} Limpar MAC</Button>
