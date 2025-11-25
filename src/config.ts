@@ -1,4 +1,5 @@
 
+
 // Centralized configuration for the application
 // You can override this using the VITE_API_BASE_URL environment variable in .env or Vercel settings
 
@@ -6,10 +7,15 @@
 // We check if import.meta.env exists before accessing it to prevent "Cannot read properties of undefined"
 const getApiBaseUrl = () => {
   const _importMeta = import.meta as any;
+  let url = 'https://api.centralfiber.online/api';
+
   if (typeof _importMeta !== 'undefined' && _importMeta.env && _importMeta.env.VITE_API_BASE_URL) {
-    return _importMeta.env.VITE_API_BASE_URL;
+    url = _importMeta.env.VITE_API_BASE_URL;
   }
-  return 'https://api.centralfiber.online/api';
+  
+  // Debug log to help identify connection issues in console
+  console.log(`[${new Date().toISOString()}] [Config] API Base URL active:`, url);
+  return url;
 };
 
 export const API_BASE_URL = getApiBaseUrl();
