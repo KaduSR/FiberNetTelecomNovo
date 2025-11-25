@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { 
   User, Lock, FileText, Download, Copy, CheckCircle, AlertCircle, Loader2, 
@@ -8,29 +7,37 @@ import {
   FileSignature, BarChart3, ScrollText, Zap, Power, Server, Link2, ThumbsUp, Printer, Trash2, ArrowLeft, MessageCircle
 } from 'lucide-react';
 import Button from './Button';
-import { Invoice, ConsumptionHistory, ConsumptionPoint, DashboardData } from '../types';
-import { ENDPOINTS } from '../src/config';
-import { CONTACT_INFO } from '../constants'; // Import contact info for WhatsApp link
+import { DashboardResponse, Consumo, Fatura } from '../src/types/api';
+import { apiService } from '../src/services/apiService';
+import { CONTACT_INFO } from '../constants';
 
-// === HELPERS & TYPES ===
+// === HELPERS ===
 const formatBytes = (bytes: number | string | undefined, decimals = 2) => {
     const val = Number(bytes);
     if (isNaN(val) || val === 0) return '0 GB';
-    const k = 1024;
-    const dm = decimals < 0 ? 0 : decimals;
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(val) / Math.log(k));
-    const sizeIndex = Math.min(i, sizes.length - 1);
-    return `${parseFloat((val / Math.pow(k, sizeIndex)).toFixed(dm))} ${sizes[sizeIndex]}`;
+    const i = parseInt(Math.floor(Math.log(val) / Math.log(1024)).toString());
+    return Math.round(val / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+};
+
+const bytesToGB = (bytes: number) => {
+    return parseFloat((bytes / (1024 * 1024 * 1024)).toFixed(2));
 };
 
 // === SUB-COMPONENT: CONSUMPTION CHART ===
-const ConsumptionChart: React.FC<{ history?: ConsumptionHistory }> = ({ history }) => {
-    const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'annual'>('daily');
-    const [activePoint, setActivePoint] = useState<ConsumptionPoint | null>(null);
+const ConsumptionChart: React.FC<{ history?: Consumo['history'] }> = ({ history }) => {
+    const [period, setPeriod] = useState<'daily' | 'monthly'>('daily');
+    const [activePoint, setActivePoint] = useState<{ label: string, download: number, upload: number } | null>(null);
 
-    const data = history?.[period] || [];
+    // Map API data to Chart friendly format
+    const rawData = history?.[period] || [];
     
+    const data = rawData.map(item => ({
+        label: period === 'daily' ? (item.data || '') : (item.mes_ano || ''),
+        download: bytesToGB(item.download_bytes),
+        upload: bytesToGB(item.upload_bytes)
+    })).reverse(); 
+
     if(!history || data.length === 0){
         return (
             <div className="h-64 flex items-center justify-center text-gray-500 bg-black/20 rounded-xl mt-6">
@@ -58,11 +65,12 @@ const ConsumptionChart: React.FC<{ history?: ConsumptionHistory }> = ({ history 
             <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
                 <h3 className="text-white font-bold flex items-center gap-2"><Activity size={18} className="text-fiber-orange" /> Histórico de Consumo</h3>
                 <div className="flex bg-white/5 p-1 rounded-full border border-white/10">
-                    {(['daily', 'weekly', 'monthly', 'annual'] as const).map(p => (
-                        <button key={p} onClick={() => setPeriod(p)} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${period === p ? 'bg-fiber-orange text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
-                            {p === 'daily' ? 'Diário' : p === 'weekly' ? 'Semanal' : p === 'monthly' ? 'Mensal' : 'Anual' }
-                        </button>
-                    ))}
+                    <button onClick={() => setPeriod('daily')} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${period === 'daily' ? 'bg-fiber-orange text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
+                        Diário
+                    </button>
+                    <button onClick={() => setPeriod('monthly')} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${period === 'monthly' ? 'bg-fiber-orange text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
+                        Mensal
+                    </button>
                 </div>
             </div>
             <div className="h-64 w-full relative group">
@@ -89,7 +97,10 @@ const ConsumptionChart: React.FC<{ history?: ConsumptionHistory }> = ({ history 
                     </svg>
                 </div>
                 <div className="absolute bottom-0 left-8 right-0 flex justify-between text-[10px] text-gray-400 font-medium px-2">
-                    {data.map((d, i) => <span key={i} className="text-center w-8 truncate">{d.label}</span>)}
+                    {/* Only show first and last label to avoid clutter */}
+                    <span>{data[0]?.label}</span>
+                    <span>{data[Math.floor(data.length / 2)]?.label}</span>
+                    <span>{data[data.length - 1]?.label}</span>
                 </div>
                 {activePoint && (
                     <div className="absolute top-0 left-1/2 transform -translate-x-1/2 bg-neutral-900 border border-white/20 p-3 rounded-lg shadow-2xl z-10 pointer-events-none animate-fadeIn backdrop-blur-md">
@@ -114,7 +125,7 @@ const ClientArea: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [loginError, setLoginError] = useState('');
     const [showLoginPass, setShowLoginPass] = useState(false);
-    const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+    const [dashboardData, setDashboardData] = useState<DashboardResponse | null>(null);
     const [activeTab, setActiveTab] = useState('dashboard');
     const [isPixModalOpen, setPixModalOpen] = useState(false);
     const [activePixCode, setActivePixCode] = useState('');
@@ -129,29 +140,19 @@ const ClientArea: React.FC = () => {
     // Login View States
     const [loginView, setLoginView] = useState<'login' | 'forgot'>('login');
     const [rememberMe, setRememberMe] = useState(false);
-    // Use controlled input for email to prevent sync issues
     const [emailInput, setEmailInput] = useState('');
     
     const [recoveryStatus, setRecoveryStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
     const [recoveryMessage, setRecoveryMessage] = useState('');
 
-
     // === API FUNCTIONS ===
-    
-    // Initial fetch (only used on mount or refresh)
+
     const fetchDashboardData = async () => {
         try {
-            const token = localStorage.getItem('authToken');
-            if (!token) throw new Error('No token found');
-
-            const response = await fetch(ENDPOINTS.DASHBOARD, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (!response.ok) throw new Error('Falha ao carregar dados do painel');
-            const data = await response.json();
+            const data = await apiService.getDashboard();
             setDashboardData(data);
         } catch (error) {
-            console.error(error);
+            console.error("Erro ao carregar dashboard:", error);
             handleLogout();
         }
     };
@@ -163,66 +164,26 @@ const ClientArea: React.FC = () => {
         
         const formData = new FormData(e.currentTarget);
         const password = formData.get('password') as string;
-        // Use state value for email to guarantee we use what the user sees
         const email = emailInput;
 
         try {
-            console.log("Conectando a:", ENDPOINTS.LOGIN);
+            console.log("Iniciando login...");
+            const loginResponse = await apiService.login({ email, password });
             
-            // 1. Perform Login
-            const response = await fetch(ENDPOINTS.LOGIN, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify({ email, password })
-            });
-
-            // Defensive JSON parsing
-            let data;
-            try {
-                data = await response.json();
-            } catch (jsonError) {
-                console.error("Erro ao processar JSON:", jsonError);
-                throw new Error("O servidor retornou uma resposta inválida. Tente novamente mais tarde.");
+            if (!loginResponse.token) {
+                 throw new Error('Token de acesso não fornecido pelo servidor.');
             }
 
-            if (!response.ok) {
-                throw new Error(data.error || data.message || `Login falhou (${response.status}). Verifique suas credenciais.`);
-            }
-            
-            // Validate Token Presence
-            if (!data.token) {
-                 throw new Error('Erro crítico: Token de acesso não fornecido pelo servidor.');
-            }
-
-            // 2. Validate Token by fetching Dashboard immediately
-            // This prevents "Login -> Success -> Dashboard Fail -> Logout" loop (Silent Failure)
             console.log("Token recebido, validando sessão...");
-            const dashResponse = await fetch(ENDPOINTS.DASHBOARD, {
-                headers: { 'Authorization': `Bearer ${data.token}` }
-            });
+            const dashData = await apiService.getDashboard();
+            setDashboardData(dashData);
 
-            if (!dashResponse.ok) {
-                 if (dashResponse.status === 401) throw new Error('Sessão inválida ou expirada imediatamente.');
-                 throw new Error('Falha ao carregar dados do usuário. Tente novamente.');
-            }
-
-            const dashData = await dashResponse.json();
-
-            // 3. Commit Session (Only if dashboard fetch succeeded)
-            localStorage.setItem('authToken', data.token);
-            
-            // Handle "Remember Me"
             if (rememberMe) {
                 localStorage.setItem('fiber_saved_email', email);
             } else {
                 localStorage.removeItem('fiber_saved_email');
             }
 
-            // 4. Update State
-            setDashboardData(dashData);
             setIsAuthenticated(true);
             setActiveTab('dashboard');
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -230,15 +191,14 @@ const ClientArea: React.FC = () => {
         } catch (error: any) {
             console.error("Login Error:", error);
             
-            let msg = error.message || 'Ocorreu um erro ao tentar fazer login.';
-            
-            // Specific check for Network/Fetch errors
-            if (msg === 'Failed to fetch' || msg.includes('NetworkError') || msg.includes('Network request failed')) {
-                msg = 'Erro de Conexão: Não foi possível conectar ao servidor. Verifique sua internet.';
+            let msg = error.message || 'Ocorreu um erro desconhecido.';
+            if (msg.includes('Failed to fetch') || msg.includes('Network Error')) {
+                 msg = 'Falha de conexão. Verifique sua internet ou tente novamente.';
             }
-
+            
             setLoginError(msg);
-            localStorage.removeItem('authToken'); // Ensure no stale state
+            
+            localStorage.removeItem('authToken');
             setIsAuthenticated(false);
         } finally {
             setIsLoading(false);
@@ -253,23 +213,12 @@ const ClientArea: React.FC = () => {
         const email = formData.get('recoveryEmail') as string;
 
         try {
-            const response = await fetch(ENDPOINTS.RECOVERY, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email })
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Email não encontrado em nossa base.');
-            }
-
+            const data = await apiService.recoverPassword(email);
             setRecoveryStatus('success');
             setRecoveryMessage(data.message || 'Um link de redefinição foi enviado para seu e-mail.');
         } catch (error: any) {
             setRecoveryStatus('error');
-            setRecoveryMessage(error.message);
+            setRecoveryMessage(error.message || 'Falha ao solicitar recuperação.');
         }
     };
 
@@ -287,17 +236,7 @@ const ClientArea: React.FC = () => {
         const newPassword = formData.get('novaSenha') as string;
 
         try {
-            const token = localStorage.getItem('authToken');
-            const response = await fetch(ENDPOINTS.CHANGE_PASSWORD, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ newPassword })
-            });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.error || 'Falha ao trocar senha');
+            const data = await apiService.changePassword(newPassword);
             setPasswordChangeStatus({ type: 'success', message: data.message });
             e.currentTarget.reset();
         } catch (error: any) {
@@ -308,43 +247,41 @@ const ClientArea: React.FC = () => {
     };
 
     const performLoginAction = async (loginId: string | number, action: 'limpar-mac' | 'desconectar' | 'diagnostico') => {
+        const id = Number(loginId);
         setActionStatus(prev => ({ ...prev, [loginId]: { status: 'loading' as const } }));
         setDiagResult(null);
 
         try {
-            const token = localStorage.getItem('authToken');
-            const response = await fetch(ENDPOINTS.LOGIN_ACTION(loginId, action), {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.error || `Falha ao executar ação`);
-
-            if (action === 'diagnostico') {
+            const data = await apiService.performLoginAction(id, action);
+            
+            if (action === 'diagnostico' && data.consumo) {
                 setDiagResult(data.consumo);
             }
-            
-            setActionStatus(prev => ({ ...prev, [loginId]: { status: 'success' as const, message: data.message } }));
+
+            setActionStatus(prev => ({ 
+                ...prev, 
+                [loginId]: { status: 'success' as const, message: data.message } 
+            }));
         } catch (error: any) {
-            setActionStatus(prev => ({ ...prev, [loginId]: { status: 'error' as const, message: error.message } }));
+            setActionStatus(prev => ({ 
+                ...prev, 
+                [loginId]: { status: 'error' as const, message: error.message } 
+            }));
         } finally {
              setTimeout(() => setActionStatus(prev => ({ ...prev, [loginId]: { status: 'idle' as const } })), 3000);
         }
     };
-    
-    // === EFFECTS ===
 
+    // === EFFECTS ===
     useEffect(() => {
-        // Check for saved email
         const saved = localStorage.getItem('fiber_saved_email');
         if (saved) {
-            setEmailInput(saved); // Update state directly
+            setEmailInput(saved);
             setRememberMe(true);
         }
 
         const token = localStorage.getItem('authToken');
         if (token) {
-            // Validate existing session on mount
             fetchDashboardData().finally(() => setIsLoading(false));
         } else {
             setIsLoading(false);
@@ -371,14 +308,15 @@ const ClientArea: React.FC = () => {
     // === RENDER LOGIC ===
     const filteredInvoices = (dashboardData?.faturas || []).filter(invoice => {
         if (invoiceStatusFilter === 'todas') return true;
-        return invoice.status === invoiceStatusFilter;
+        // Mapeamento simples de status
+        const statusMap: Record<string, string> = { 'A': 'aberto', 'B': 'pago', 'C': 'cancelado' };
+        return statusMap[invoice.status]?.toLowerCase() === invoiceStatusFilter;
     });
 
-    const getInvoiceStatusProps = (status: Invoice['status']) => {
+    const getInvoiceStatusProps = (status: Fatura['status']) => {
         switch (status) {
-            case 'pago': return { icon: CheckCircle, color: 'green', label: 'Pago' };
-            case 'vencido': return { icon: AlertCircle, color: 'red', label: 'Vencido' };
-            case 'cancelado': return { icon: Ban, color: 'gray', label: 'Cancelado' };
+            case 'B': return { icon: CheckCircle, color: 'green', label: 'Pago' };
+            case 'C': return { icon: Ban, color: 'gray', label: 'Cancelado' };
             default: return { icon: Clock, color: 'blue', label: 'Em Aberto' };
         }
     };
@@ -541,7 +479,7 @@ const ClientArea: React.FC = () => {
                 {/* Header */}
                 <header className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-10">
                     <div>
-                        <h1 className="text-3xl font-bold text-white">Olá, {dashboardData?.clientes[0]?.nome.split(' ')[0]}!</h1>
+                        <h1 className="text-3xl font-bold text-white">Olá, {dashboardData?.clientes[0]?.razao.split(' ')[0]}!</h1>
                         <p className="text-gray-400">Bem-vindo(a) à sua central de controle unificada.</p>
                     </div>
                     <Button onClick={handleLogout} variant="secondary" className="!py-2 !px-4 text-sm gap-2">
@@ -575,7 +513,7 @@ const ClientArea: React.FC = () => {
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="bg-neutral-900 p-6 rounded-xl border border-white/5 md:col-span-2">
                                             <div className="flex items-center gap-3 mb-4 text-fiber-orange"><User size={20} /> <h3 className="text-white font-bold">Clientes Vinculados ({dashboardData.clientes.length})</h3></div>
-                                            {dashboardData.clientes.map(c => <p key={c.id} className="text-sm text-gray-400">{c.nome} - <span className="text-xs">{c.endereco}</span></p>)}
+                                            {dashboardData.clientes.map(c => <p key={c.id} className="text-sm text-gray-400">{c.razao} - <span className="text-xs">{c.endereco}</span></p>)}
                                         </div>
                                         <div className="bg-neutral-900 p-6 rounded-xl border border-white/5">
                                             <div className="flex items-center gap-3 mb-4 text-fiber-orange"><FileSignature size={20} /> <h3 className="text-white font-bold">Contratos Ativos</h3></div>
@@ -616,14 +554,14 @@ const ClientArea: React.FC = () => {
                                                         <div className="flex items-center gap-2 mb-2">
                                                             <Icon size={16} className={`text-fiber-${color}`} />
                                                             <span className={`text-sm font-bold text-fiber-${color}`}>{label}</span>
-                                                            <span className="text-gray-500 text-xs">| Venc.: {invoice.vencimento}</span>
+                                                            <span className="text-gray-500 text-xs">| Venc.: {invoice.data_vencimento}</span>
                                                         </div>
                                                         <p className="text-white font-semibold">R$ {invoice.valor}</p>
                                                     </div>
                                                     <div className="flex items-center gap-2 flex-wrap">
                                                         {invoice.linha_digitavel && <Button onClick={() => handleCopy(invoice.linha_digitavel!, String(invoice.id))} variant="secondary" className="!text-xs !py-1.5 !px-3 gap-1.5"><Copy size={12} /> {copiedBarcodeId === String(invoice.id) ? 'Copiado!' : 'Código'}</Button>}
-                                                        {invoice.pix_code && <Button onClick={() => handleOpenPixModal(invoice.pix_code!)} className="!bg-fiber-green/10 !text-fiber-green !text-xs !py-1.5 !px-3 gap-1.5"><QrCode size={12} /> Pagar PIX</Button>}
-                                                        {invoice.link_pdf && <Button onClick={() => window.open(invoice.link_pdf!, '_blank')} variant="outline" className="!text-xs !py-1.5 !px-3 gap-1.5"><Download size={12} /> PDF</Button>}
+                                                        {invoice.pix_txid && <Button onClick={() => handleOpenPixModal(invoice.pix_txid!)} className="!bg-fiber-green/10 !text-fiber-green !text-xs !py-1.5 !px-3 gap-1.5"><QrCode size={12} /> Pagar PIX</Button>}
+                                                        {invoice.boleto && <Button onClick={() => window.open(invoice.boleto!, '_blank')} variant="outline" className="!text-xs !py-1.5 !px-3 gap-1.5"><Download size={12} /> PDF</Button>}
                                                     </div>
                                                 </div>
                                             );
@@ -643,14 +581,14 @@ const ClientArea: React.FC = () => {
                                             <div key={login.id} className="bg-neutral-900 border border-white/10 rounded-xl p-6">
                                                 <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 mb-4">
                                                     <h3 className="text-lg font-bold text-white">{login.login}</h3>
-                                                    <div className={`flex items-center gap-2 font-bold text-sm ${login.status === 'online' ? 'text-fiber-green' : 'text-gray-500'}`}>
-                                                        <div className={`w-2.5 h-2.5 rounded-full ${login.status === 'online' ? 'bg-fiber-green animate-pulse' : 'bg-gray-500'}`}></div>
-                                                        {login.status === 'online' ? 'Online' : 'Offline'}
+                                                    <div className={`flex items-center gap-2 font-bold text-sm ${login.online === 'S' ? 'text-fiber-green' : 'text-gray-500'}`}>
+                                                        <div className={`w-2.5 h-2.5 rounded-full ${login.online === 'S' ? 'bg-fiber-green animate-pulse' : 'bg-gray-500'}`}></div>
+                                                        {login.online === 'S' ? 'Online' : 'Offline'}
                                                     </div>
                                                 </div>
                                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-6">
-                                                    <div className="flex items-center gap-2 text-gray-400"><Server size={14}/> <strong>ONT:</strong> <span className="text-white">{login.sinal_ont || 'N/A'}</span></div>
-                                                    <div className="flex items-center gap-2 text-gray-400"><Clock size={14}/> <strong>Uptime:</strong> <span className="text-white">{login.uptime || 'N/A'}</span></div>
+                                                    <div className="flex items-center gap-2 text-gray-400"><Server size={14}/> <strong>ONT:</strong> <span className="text-white">{login.sinal_ultimo_atendimento || 'N/A'}</span></div>
+                                                    <div className="flex items-center gap-2 text-gray-400"><Clock size={14}/> <strong>Uptime:</strong> <span className="text-white">{login.tempo_conectado || 'N/A'}</span></div>
                                                 </div>
                                                 <div className="flex flex-col sm:flex-row gap-3">
                                                     <Button onClick={() => performLoginAction(login.id, 'limpar-mac')} variant="secondary" className="!text-xs !py-2 !px-4 gap-2" disabled={actionStatus[login.id]?.status === 'loading'}>{actionStatus[login.id]?.status === 'loading' ? <Loader2 size={14} className="animate-spin" /> : <X size={14}/>} Limpar MAC</Button>
@@ -678,9 +616,7 @@ const ClientArea: React.FC = () => {
                             {/* CONTRACTS TAB */}
                             {activeTab === 'contracts' && dashboardData && (
                                 <div className="space-y-8">
-                                    {/* Contracts Section */}
                                     <div className="bg-white text-gray-800 rounded-lg overflow-hidden shadow-lg font-sans">
-                                        {/* Header */}
                                         <div className="bg-nubank-primary p-6 flex justify-between items-center text-white">
                                             <div className="flex items-center gap-4">
                                                 <FileText size={40} className="opacity-80" />
@@ -691,35 +627,25 @@ const ClientArea: React.FC = () => {
                                             </div>
                                             <div className="text-right">
                                                 <div className="text-3xl font-bold">{dashboardData.contratos.filter(c => c.status === 'A').length}</div>
-                                                <div className="text-xs text-purple-200 uppercase tracking-wider">contratos ativos listados</div>
+                                                <div className="text-xs text-purple-200 uppercase tracking-wider">contratos ativos</div>
                                             </div>
                                         </div>
 
-                                        {/* List Header */}
-                                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 border-b border-gray-200 bg-gray-50 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border-b border-gray-200 bg-gray-50 text-xs font-bold text-gray-500 uppercase tracking-wider">
                                             <div className="text-center md:text-left">Status</div>
-                                            <div className="md:col-span-2">Contrato</div>
-                                            <div>Pago até</div>
-                                            <div>Data do Contrato</div>
+                                            <div className="md:col-span-2">Plano</div>
                                             <div className="text-center">Ações</div>
                                         </div>
 
-                                        {/* List Items */}
                                         {dashboardData.contratos.map((contrato) => (
-                                            <div key={contrato.id} className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 border-b border-gray-100 items-center hover:bg-gray-50 transition-colors">
+                                            <div key={contrato.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border-b border-gray-100 items-center hover:bg-gray-50 transition-colors">
                                                 <div className="flex justify-center md:justify-start">
                                                     <div className={`w-8 h-8 rounded flex items-center justify-center ${contrato.status === 'A' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
                                                         <ThumbsUp size={16} fill="currentColor" />
                                                     </div>
                                                 </div>
                                                 <div className="md:col-span-2 font-medium text-gray-700">
-                                                    {contrato.plano}
-                                                </div>
-                                                <div className="text-gray-500 text-sm">
-                                                    {contrato.pago_ate || '-'}
-                                                </div>
-                                                <div className="text-gray-500 text-sm">
-                                                    {contrato.data_contrato || '-'}
+                                                    {contrato.descricao_aux_plano_venda || 'Plano Padrão'}
                                                 </div>
                                                 <div className="flex justify-center gap-3 text-gray-400">
                                                     <button 
@@ -730,89 +656,9 @@ const ClientArea: React.FC = () => {
                                                     >
                                                         <Printer size={18} />
                                                     </button>
-                                                    <button className="hover:text-red-500 transition-colors" title="Ação indisponível" disabled>
-                                                        <Trash2 size={18} className="opacity-50 cursor-not-allowed" />
-                                                    </button>
                                                 </div>
                                             </div>
                                         ))}
-                                    </div>
-
-                                    {/* Terms Section */}
-                                    <div className="bg-white text-gray-800 rounded-lg overflow-hidden shadow-lg font-sans">
-                                         {/* Header */}
-                                         <div className="bg-nubank-primary p-6 flex justify-between items-center text-white">
-                                            <div className="flex items-center gap-4">
-                                                <FileText size={40} className="opacity-80" />
-                                                <div>
-                                                    <h2 className="text-2xl font-bold">Termos</h2>
-                                                    <p className="text-purple-200 text-sm">Gerencie seus termos.</p>
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <div className="text-3xl font-bold">0</div>
-                                                <div className="text-xs text-purple-200 uppercase tracking-wider">Termos listados</div>
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="p-12 text-center text-gray-500">
-                                            <p className="text-lg">Olá, você ainda não tem <strong className="text-purple-600">TERMOS</strong> 😳</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* FISCAL NOTES TAB (NEW) */}
-                            {activeTab === 'notes' && dashboardData && (
-                                <div className="space-y-8">
-                                    <div className="bg-white text-gray-800 rounded-lg overflow-hidden shadow-lg font-sans">
-                                        {/* Header */}
-                                        <div className="bg-gray-600 p-6 flex justify-between items-center text-white">
-                                            <div className="flex items-center gap-4">
-                                                <ScrollText size={40} className="opacity-80" />
-                                                <div>
-                                                    <h2 className="text-2xl font-bold">Notas</h2>
-                                                    <p className="text-gray-200 text-sm">Gerencie suas notas.</p>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* List Header */}
-                                        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 p-4 border-b border-gray-200 bg-gray-50 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                            <div>Status</div>
-                                            <div>Documento</div>
-                                            <div>Data de emissão</div>
-                                            <div>Data de saída</div>
-                                            <div>Valor</div>
-                                            <div className="text-center">Ações</div>
-                                        </div>
-
-                                        {/* Content */}
-                                        {dashboardData.notas && dashboardData.notas.length > 0 ? (
-                                            dashboardData.notas.map(nota => (
-                                                <div key={nota.id} className="grid grid-cols-1 md:grid-cols-6 gap-4 p-4 border-b border-gray-100 items-center hover:bg-gray-50 transition-colors text-sm">
-                                                    <div className="font-medium text-green-600">{nota.status}</div>
-                                                    <div className="text-gray-600">{nota.documento}</div>
-                                                    <div className="text-gray-500">{nota.data_emissao}</div>
-                                                    <div className="text-gray-500">{nota.data_saida}</div>
-                                                    <div className="font-bold text-gray-700">R$ {nota.valor}</div>
-                                                    <div className="flex justify-center gap-3 text-gray-400">
-                                                        <button 
-                                                            onClick={() => nota.link_pdf && window.open(nota.link_pdf, '_blank')}
-                                                            className="hover:text-gray-600 transition-colors"
-                                                            title="Baixar PDF"
-                                                            disabled={!nota.link_pdf}
-                                                        >
-                                                            <Printer size={18} />
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ))
-                                        ) : (
-                                            <div className="p-12 text-center text-gray-500">
-                                                <p className="text-lg">Olá, você ainda não tem <strong className="text-gray-700">NOTAS</strong> 😳</p>
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
                             )}
@@ -836,11 +682,6 @@ const ClientArea: React.FC = () => {
                                                 {passwordChangeStatus.message}
                                             </div>
                                         )}
-                                    </div>
-                                    <div className="bg-neutral-900 border border-white/10 rounded-xl p-6 mt-6">
-                                        <h3 className="text-lg font-bold text-white mb-4">Desbloqueio de Confiança</h3>
-                                        <p className="text-sm text-gray-400 mb-4">Se sua conexão foi bloqueada por falta de pagamento, você pode solicitar um desbloqueio temporário de 24h.</p>
-                                        <Button variant="outline">Solicitar Desbloqueio</Button>
                                     </div>
                                 </div>
                             )}

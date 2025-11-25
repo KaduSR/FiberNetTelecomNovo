@@ -1,3 +1,4 @@
+
 export interface Cliente {
   id: number;
   razao: string;
@@ -73,6 +74,15 @@ export interface OntInfo {
   serial_number?: string;
   status?: string;
   sinal_rx?: string;
+}
+
+export interface Task {
+  id: string;
+  title: string;
+  description: string;
+  status?: string;
+  analysis?: string; // Campo para o retorno da IA
+  createdAt?: string;
 }
 
 // Resposta completa do Dashboard

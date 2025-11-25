@@ -1,12 +1,14 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   User, Lock, FileText, Download, Copy, CheckCircle, AlertCircle, Loader2, 
   QrCode, X, LogOut, Wifi, Activity, 
   Clock, Settings, Eye, EyeOff, Mail, ArrowUp, ArrowDown, LayoutDashboard, Ban,
-  FileSignature, BarChart3, ScrollText, Zap, Power, Server, Link2, ThumbsUp, Printer, Trash2, ArrowLeft, MessageCircle
+  FileSignature, BarChart3, ScrollText, Zap, Power, Server, Link2, ThumbsUp, Printer, Trash2, ArrowLeft, MessageCircle,
+  Sparkles, Plus, ListTodo, Brain
 } from 'lucide-react';
 import Button from './Button';
-import { DashboardResponse, Consumo, Fatura } from '../types/api';
+import { DashboardResponse, Consumo, Fatura, Task } from '../types/api';
 import { apiService } from '../services/apiService';
 import { CONTACT_INFO } from '../constants';
 
@@ -136,6 +138,12 @@ const ClientArea: React.FC = () => {
     const [actionStatus, setActionStatus] = useState<{ [key: string]: { status: 'idle' | 'loading' | 'success' | 'error', message?: string } }>({});
     const [diagResult, setDiagResult] = useState<{ download: string, upload: string } | null>(null);
 
+    // Tasks & AI State
+    const [tasks, setTasks] = useState<Task[]>([]);
+    const [isTasksLoading, setIsTasksLoading] = useState(false);
+    const [taskValues, setTaskValues] = useState({ title: '', description: '' });
+    const [taskAnalysisLoading, setTaskAnalysisLoading] = useState<string | null>(null); // ID of task being analyzed
+
     // Login View States
     const [loginView, setLoginView] = useState<'login' | 'forgot'>('login');
     const [rememberMe, setRememberMe] = useState(false);
@@ -156,6 +164,53 @@ const ClientArea: React.FC = () => {
         }
     };
 
+    const fetchTasks = async () => {
+        setIsTasksLoading(true);
+        try {
+            const data = await apiService.getTasks();
+            setTasks(data);
+        } catch (error) {
+            console.error("Erro ao carregar tarefas:", error);
+        } finally {
+            setIsTasksLoading(false);
+        }
+    };
+
+    const handleCreateTask = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!taskValues.title || !taskValues.description) return;
+        
+        setIsTasksLoading(true);
+        try {
+            const newTask = await apiService.createTask(taskValues);
+            setTasks(prev => [newTask, ...prev]);
+            setTaskValues({ title: '', description: '' });
+        } catch (error) {
+            console.error("Erro ao criar tarefa:", error);
+            alert("Erro ao criar tarefa. Tente novamente.");
+        } finally {
+            setIsTasksLoading(false);
+        }
+    };
+
+    const handleAnalyzeTask = async (taskId: string) => {
+        setTaskAnalysisLoading(taskId);
+        try {
+            const result = await apiService.analyzeTask(taskId);
+            // Atualiza a tarefa local com o resultado da análise
+            setTasks(prev => prev.map(t => 
+                t.id === taskId 
+                ? { ...t, analysis: result.analysis || JSON.stringify(result) } 
+                : t
+            ));
+        } catch (error) {
+            console.error("Erro ao analisar tarefa:", error);
+            alert("Erro ao analisar tarefa com IA.");
+        } finally {
+            setTaskAnalysisLoading(null);
+        }
+    };
+
     const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setIsLoading(true);
@@ -163,25 +218,20 @@ const ClientArea: React.FC = () => {
         
         const formData = new FormData(e.currentTarget);
         const password = formData.get('password') as string;
-        // Use state value for email to guarantee we use what the user sees
         const email = emailInput;
 
         try {
-            console.log("Conectando...");
+            console.log("Iniciando login...");
             const loginResponse = await apiService.login({ email, password });
             
             if (!loginResponse.token) {
-                 throw new Error('Erro crítico: Token de acesso não fornecido pelo servidor.');
+                 throw new Error('Token de acesso não fornecido pelo servidor.');
             }
 
-            // Validar Token Imediatamente
             console.log("Token recebido, validando sessão...");
-            // Usamos apiService.getDashboard diretamente para poder capturar o erro aqui
-            // ao invés de usar a função wrapper fetchDashboardData que faria logout
             const dashData = await apiService.getDashboard();
             setDashboardData(dashData);
 
-            // Se chegou aqui, o login E o dashboard funcionaram
             if (rememberMe) {
                 localStorage.setItem('fiber_saved_email', email);
             } else {
@@ -194,27 +244,8 @@ const ClientArea: React.FC = () => {
 
         } catch (error: any) {
             console.error("Login Error:", error);
-            
-            let msg = error.message || 'Ocorreu um erro ao tentar fazer login.';
-            const lowerMsg = msg.toLowerCase();
-
-            // Mensagens amigáveis para erros comuns
-            if (
-                lowerMsg.includes('fetch') || 
-                lowerMsg.includes('network') || 
-                lowerMsg.includes('connect') ||
-                lowerMsg.includes('conexão') ||
-                !window.navigator.onLine
-            ) {
-                msg = 'Sistema Indisponível: Não foi possível conectar ao servidor. Verifique sua internet ou tente novamente mais tarde.';
-            } else if (lowerMsg.includes('token') || lowerMsg.includes('json')) {
-                msg = 'Erro de Sessão: O servidor retornou uma resposta inválida. Contate o suporte.';
-            } else if (lowerMsg.includes('401') || lowerMsg.includes('403')) {
-                msg = 'Credenciais inválidas. Verifique seu e-mail e senha.';
-            }
-
-            setLoginError(msg);
-            localStorage.removeItem('authToken'); // Garante que não sobrou lixo
+            setLoginError(error.message || 'Ocorreu um erro desconhecido.');
+            localStorage.removeItem('authToken');
             setIsAuthenticated(false);
         } finally {
             setIsLoading(false);
@@ -304,6 +335,13 @@ const ClientArea: React.FC = () => {
         }
     }, []);
 
+    // Load tasks when tab is active
+    useEffect(() => {
+        if (activeTab === 'tasks' && isAuthenticated) {
+            fetchTasks();
+        }
+    }, [activeTab, isAuthenticated]);
+
     // === OTHER HANDLERS ===
     const handleCopy = (text: string, id: string) => {
         navigator.clipboard.writeText(text);
@@ -343,6 +381,7 @@ const ClientArea: React.FC = () => {
       { id: 'connections', label: 'Conexões', icon: Wifi },
       { id: 'consumption', label: 'Extrato', icon: BarChart3 },
       { id: 'contracts', label: 'Contratos', icon: FileSignature },
+      { id: 'tasks', label: 'Tarefas Inteligentes', icon: Brain }, // New Tab
       { id: 'notes', label: 'Notas Fiscais', icon: ScrollText },
       { id: 'settings', label: 'Configurações', icon: Settings },
     ];
@@ -546,6 +585,79 @@ const ClientArea: React.FC = () => {
                                                 <div className="flex items-center gap-3"><ArrowUp className="text-fiber-orange" /><p><span className="text-gray-400 text-sm">Upload</span><br/><span className="text-white font-bold text-lg">{formatBytes(dashboardData.consumo.total_upload_bytes)}</span></p></div>
                                             </div>
                                         </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* TASKS TAB (NEW) */}
+                            {activeTab === 'tasks' && (
+                                <div className="animate-fadeIn">
+                                    <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
+                                        <Brain className="text-fiber-orange"/> Tarefas Inteligentes
+                                    </h2>
+                                    <p className="text-gray-400 mb-8">Gerencie suas tarefas e use a IA para analisá-las.</p>
+
+                                    {/* Create Task Form */}
+                                    <div className="bg-neutral-900 border border-white/10 rounded-xl p-6 mb-8">
+                                        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Plus size={18} /> Nova Tarefa</h3>
+                                        <form onSubmit={handleCreateTask} className="space-y-4">
+                                            <input 
+                                                placeholder="Título da tarefa" 
+                                                value={taskValues.title}
+                                                onChange={(e) => setTaskValues({...taskValues, title: e.target.value})}
+                                                className="w-full bg-fiber-dark border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:ring-1 focus:ring-fiber-orange"
+                                                required
+                                            />
+                                            <textarea 
+                                                placeholder="Descrição detalhada..." 
+                                                value={taskValues.description}
+                                                onChange={(e) => setTaskValues({...taskValues, description: e.target.value})}
+                                                className="w-full bg-fiber-dark border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:ring-1 focus:ring-fiber-orange h-24"
+                                                required
+                                            />
+                                            <div className="flex justify-end">
+                                                <Button type="submit" disabled={isTasksLoading}>
+                                                    {isTasksLoading ? <Loader2 className="animate-spin" /> : 'Criar Tarefa'}
+                                                </Button>
+                                            </div>
+                                        </form>
+                                    </div>
+
+                                    {/* Task List */}
+                                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><ListTodo size={18} /> Minhas Tarefas</h3>
+                                    <div className="space-y-4">
+                                        {tasks.length === 0 && !isTasksLoading ? (
+                                            <p className="text-gray-500 text-center py-8">Nenhuma tarefa encontrada.</p>
+                                        ) : (
+                                            tasks.map(task => (
+                                                <div key={task.id} className="bg-neutral-900 border border-white/10 rounded-xl p-6 transition-all hover:border-fiber-orange/30">
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <h4 className="text-xl font-bold text-white">{task.title}</h4>
+                                                        <button 
+                                                            onClick={() => handleAnalyzeTask(task.id)} 
+                                                            disabled={!!taskAnalysisLoading}
+                                                            className="flex items-center gap-2 px-3 py-1.5 bg-fiber-blue/10 text-fiber-blue hover:bg-fiber-blue/20 rounded-lg text-xs font-bold transition-colors disabled:opacity-50"
+                                                        >
+                                                            {taskAnalysisLoading === task.id ? <Loader2 size={14} className="animate-spin"/> : <Sparkles size={14} />}
+                                                            Analisar com IA
+                                                        </button>
+                                                    </div>
+                                                    <p className="text-gray-400 text-sm mb-4">{task.description}</p>
+                                                    
+                                                    {task.analysis && (
+                                                        <div className="bg-fiber-blue/5 border border-fiber-blue/20 rounded-lg p-4 mt-4 animate-fadeIn">
+                                                            <div className="flex items-center gap-2 text-fiber-blue text-xs font-bold uppercase tracking-wider mb-2">
+                                                                <Sparkles size={12} /> Análise da IA
+                                                            </div>
+                                                            <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-line">
+                                                                {task.analysis}
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))
+                                        )}
+                                        {isTasksLoading && tasks.length === 0 && <div className="text-center py-8"><Loader2 className="animate-spin mx-auto text-fiber-orange" /></div>}
                                     </div>
                                 </div>
                             )}

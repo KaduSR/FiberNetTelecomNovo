@@ -3,6 +3,10 @@
   "version": 2,
   "rewrites": [
     {
+      "source": "/api-proxy/:match*",
+      "destination": "https://api.centralfiber.online/:match*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

@@ -1,4 +1,4 @@
-import { DashboardResponse, LoginResponse } from '../types/api';
+import { DashboardResponse, LoginResponse, Task } from '../types/api';
 import { API_BASE_URL } from '../config';
 
 class ApiService {
@@ -16,57 +16,71 @@ class ApiService {
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    // Remove barra inicial duplicada se houver e garante formatação correta
+    // Garante que não haja barras duplicadas
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    const url = `${API_BASE_URL}${cleanEndpoint}`;
+    // Remove barra final da Base URL se houver para evitar duplicidade
+    const cleanBaseUrl = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+    const url = `${cleanBaseUrl}${cleanEndpoint}`;
     
-    console.log(`[ApiService] Requesting: ${url}`);
+    // Debug em desenvolvimento - Verificação segura de ambiente
+    try {
+        if (import.meta?.env?.DEV) {
+            console.log(`[ApiService] Requesting: ${url}`);
+        }
+    } catch (e) {
+        // Ignora erro de acesso ao env se não estiver disponível
+    }
 
     try {
       const response = await fetch(url, {
         ...options,
-        mode: 'cors', // Explicitly state CORS requirement
+        // mode: 'cors', // Removido para evitar conflitos com Proxy (same-origin)
+        cache: 'no-store', // Importante: Evita cache de disco/memória do navegador em respostas JSON
         headers: {
           ...this.getHeaders(),
           ...options.headers,
         },
       });
 
-      // Defensive JSON parsing: Check content type before parsing
-      let data;
-      const contentType = response.headers.get("content-type");
+      // 1. Obtém o texto bruto primeiro para debug em caso de erro de JSON
+      const text = await response.text();
       
-      if (contentType && contentType.indexOf("application/json") !== -1) {
-        data = await response.json();
-      } else {
-        // If response is not JSON (e.g. 502/504 HTML page), handle gracefully
-        if (!response.ok) {
-           // Try to get text if possible to log it
-           const text = await response.text().catch(() => 'No body');
-           console.error(`[ApiService] Non-JSON error response: ${text.substring(0, 100)}`);
-           throw new Error(`Erro do Servidor (${response.status})`);
-        }
-        // If success but not JSON, return empty object or null (depending on T)
-        data = {} as T; 
+      let data: any;
+      try {
+          // 2. Tenta fazer o parse do JSON
+          data = text ? JSON.parse(text) : {};
+      } catch (e) {
+          // 3. Se falhar, é provável que seja HTML (erro 404/500 do servidor web ou proxy)
+          console.error(`[ApiService] Falha ao processar JSON. Status: ${response.status}. Resposta recebida (início): ${text.substring(0, 200)}`);
+          
+          if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+              // Verifica erro 404 especificamente
+              if (response.status === 404) {
+                 throw new Error('Endpoint não encontrado (404). Verifique se a URL da API está correta.');
+              }
+              throw new Error(`A API retornou HTML em vez de JSON (Status ${response.status}). Possível erro de servidor ou rota inexistente.`);
+          }
+          throw new Error('Resposta inválida do servidor (Não é JSON).');
       }
 
+      // 4. Verifica status HTTP (ex: 400, 401, 500)
       if (!response.ok) {
-        // Se o token for inválido, limpa o storage
         if (response.status === 401 || response.status === 403) {
           localStorage.removeItem('authToken');
         }
-        throw new Error(data.error || data.message || `Erro na requisição: ${response.status}`);
+        // Usa a mensagem de erro da API se disponível, senão usa statusText
+        const errorMessage = data.error || data.message || `Erro ${response.status}: ${response.statusText}`;
+        throw new Error(errorMessage);
       }
 
-      return data;
-    } catch (error: any) {
-      console.error(`[ApiService] Error on ${url}:`, error);
+      return data as T;
       
-      // If it's a fetch error (Network/CORS), rethrow with a specific message if needed, 
-      // or just let ClientArea handle 'Failed to fetch'
+    } catch (error: any) {
+      console.error(`[ApiService] Erro na requisição para ${url}:`, error);
+      
+      // Tratamento específico para erros de rede (CORS, Offline, DNS)
       if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
-          // Browser generic network error
-          throw new Error('Falha de conexão com o servidor.');
+          throw new Error('Não foi possível conectar ao servidor. Verifique sua conexão com a internet ou se a API está online.');
       }
       
       throw error;
@@ -116,6 +130,27 @@ class ApiService {
 
   async unlockTrust(): Promise<{ message: string }> {
     return this.request<{ message: string }>('/desbloqueio-confianca', {
+      method: 'POST',
+    });
+  }
+
+  // === TASKS & AI MODULE ===
+
+  async getTasks(): Promise<Task[]> {
+    return this.request<Task[]>('/tasks', {
+      method: 'GET'
+    });
+  }
+
+  async createTask(data: { title: string; description: string }): Promise<Task> {
+    return this.request<Task>('/tasks', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async analyzeTask(taskId: string): Promise<any> {
+    return this.request<any>(`/ai/analyze/${taskId}`, {
       method: 'POST',
     });
   }
