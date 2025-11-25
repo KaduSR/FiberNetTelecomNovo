@@ -1,4 +1,3 @@
-
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -9,7 +8,8 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api-proxy': {
-        target: 'https://api.centralfiber.online',
+        // ⚠️ ATENÇÃO: Usando http conforme seu teste bem-sucedido
+        target: 'http://api.centralfiber.online', 
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/api-proxy/, '')

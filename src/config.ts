@@ -13,13 +13,15 @@ const getApiBaseUrl = () => {
 export const API_BASE_URL = getApiBaseUrl();
 
 // Specific Endpoints (Helpers)
+// ... código anterior ...
+
 export const ENDPOINTS = {
-  LOGIN: `/login`,
-  DASHBOARD: `/dashboard`,
-  CHANGE_PASSWORD: `/trocar-senha`,
-  RECOVERY: `/recuperar-senha`, 
-  INVOICES: `/faturas`,
-  SERVICE_STATUS: `/status`,
-  SPEEDTEST_RUN: `/speedtest`,
-  LOGIN_ACTION: (id: string | number, action: string) => `/logins/${id}/${action}`,
+  LOGIN: `/api/auth/login`,          // Adicionado /api/auth
+  DASHBOARD: `/api/dashboard`,       // Adicionado /api
+  CHANGE_PASSWORD: `/api/trocar-senha`,
+  RECOVERY: `/api/recuperar-senha`, 
+  INVOICES: `/api/faturas`,
+  SERVICE_STATUS: `/api/status`,
+  SPEEDTEST_RUN: `/api/speedtest`,
+  LOGIN_ACTION: (id: string | number, action: string) => `/api/logins/${id}/${action}`,
 };

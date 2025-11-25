@@ -22,20 +22,9 @@ class ApiService {
     const cleanBaseUrl = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
     const url = `${cleanBaseUrl}${cleanEndpoint}`;
     
-    // Debug em desenvolvimento - Verificação segura de ambiente
-    try {
-        if (import.meta?.env?.DEV) {
-            console.log(`[ApiService] Requesting: ${url}`);
-        }
-    } catch (e) {
-        // Ignora erro de acesso ao env se não estiver disponível
-    }
-
     try {
       const response = await fetch(url, {
         ...options,
-        // mode: 'cors', // Removido para evitar conflitos com Proxy (same-origin)
-        cache: 'no-store', // Importante: Evita cache de disco/memória do navegador em respostas JSON
         headers: {
           ...this.getHeaders(),
           ...options.headers,
@@ -50,20 +39,11 @@ class ApiService {
           // 2. Tenta fazer o parse do JSON
           data = text ? JSON.parse(text) : {};
       } catch (e) {
-          // 3. Se falhar, é provável que seja HTML (erro 404/500 do servidor web ou proxy)
-          console.error(`[ApiService] Falha ao processar JSON. Status: ${response.status}. Resposta recebida (início): ${text.substring(0, 200)}`);
-          
-          if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
-              // Verifica erro 404 especificamente
-              if (response.status === 404) {
-                 throw new Error('Endpoint não encontrado (404). Verifique se a URL da API está correta.');
-              }
-              throw new Error(`A API retornou HTML em vez de JSON (Status ${response.status}). Possível erro de servidor ou rota inexistente.`);
-          }
-          throw new Error('Resposta inválida do servidor (Não é JSON).');
+          console.error(`[ApiService] Erro JSON. Status: ${response.status}. Resposta: ${text.substring(0, 200)}`);
+          throw new Error(`Erro de comunicação com o servidor (Status ${response.status}). Verifique a conexão.`);
       }
 
-      // 4. Verifica status HTTP (ex: 400, 401, 500)
+      // 3. Verifica status HTTP (ex: 400, 401, 500)
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
           localStorage.removeItem('authToken');
@@ -77,18 +57,15 @@ class ApiService {
       
     } catch (error: any) {
       console.error(`[ApiService] Erro na requisição para ${url}:`, error);
-      
-      // Tratamento específico para erros de rede (CORS, Offline, DNS)
-      if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
-          throw new Error('Não foi possível conectar ao servidor. Verifique sua conexão com a internet ou se a API está online.');
-      }
-      
       throw error;
     }
   }
 
+  // === ROTAS DE AUTENTICAÇÃO ===
+
   async login(credentials: { email: string; password: string }): Promise<LoginResponse> {
-    const data = await this.request<LoginResponse>('/login', {
+    // Rota backend: /api/auth/login
+    const data = await this.request<LoginResponse>('/api/auth/login', { 
       method: 'POST',
       body: JSON.stringify(credentials),
     });
@@ -100,22 +77,25 @@ class ApiService {
   }
 
   async recoverPassword(email: string): Promise<{ message: string }> {
-      return this.request<{ message: string }>('/recuperar-senha', {
+      return this.request<{ message: string }>('/api/auth/recuperar-senha', {
           method: 'POST',
           body: JSON.stringify({ email })
       });
   }
 
-  async getDashboard(): Promise<DashboardResponse> {
-    return this.request<DashboardResponse>('/dashboard', {
-      method: 'GET',
+  async changePassword(newPassword: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>('/api/auth/trocar-senha', {
+      method: 'POST',
+      body: JSON.stringify({ newPassword }),
     });
   }
 
-  async changePassword(newPassword: string): Promise<{ message: string }> {
-    return this.request<{ message: string }>('/trocar-senha', {
-      method: 'POST',
-      body: JSON.stringify({ newPassword }),
+  // === ROTAS DO CLIENTE ===
+
+  async getDashboard(): Promise<DashboardResponse> {
+    // Rota backend: /api/dashboard
+    return this.request<DashboardResponse>('/api/dashboard', { 
+      method: 'GET',
     });
   }
 
@@ -123,13 +103,13 @@ class ApiService {
     loginId: number, 
     action: 'limpar-mac' | 'desconectar' | 'diagnostico'
   ): Promise<any> {
-    return this.request<any>(`/logins/${loginId}/${action}`, {
+    return this.request<any>(`/api/logins/${loginId}/${action}`, {
       method: 'POST',
     });
   }
 
   async unlockTrust(): Promise<{ message: string }> {
-    return this.request<{ message: string }>('/desbloqueio-confianca', {
+    return this.request<{ message: string }>('/api/desbloqueio-confianca', {
       method: 'POST',
     });
   }
@@ -137,20 +117,18 @@ class ApiService {
   // === TASKS & AI MODULE ===
 
   async getTasks(): Promise<Task[]> {
-    return this.request<Task[]>('/tasks', {
-      method: 'GET'
-    });
+    return this.request<Task[]>('/api/tasks', { method: 'GET' });
   }
 
   async createTask(data: { title: string; description: string }): Promise<Task> {
-    return this.request<Task>('/tasks', {
+    return this.request<Task>('/api/tasks', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
   async analyzeTask(taskId: string): Promise<any> {
-    return this.request<any>(`/ai/analyze/${taskId}`, {
+    return this.request<any>(`/api/ai/analyze/${taskId}`, {
       method: 'POST',
     });
   }

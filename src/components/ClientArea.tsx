@@ -5,7 +5,7 @@ import {
   QrCode, X, LogOut, Wifi, Activity, 
   Clock, Settings, Eye, EyeOff, Mail, ArrowUp, ArrowDown, LayoutDashboard, Ban,
   FileSignature, BarChart3, ScrollText, Zap, Power, Server, Link2, ThumbsUp, Printer, Trash2, ArrowLeft, MessageCircle,
-  Sparkles, Plus, ListTodo, Brain
+  Sparkles, Plus, ListTodo, Brain, Globe
 } from 'lucide-react';
 import Button from './Button';
 import { DashboardResponse, Consumo, Fatura, Task } from '../types/api';
@@ -581,8 +581,8 @@ const ClientArea: React.FC = () => {
                                         <div className="bg-neutral-900 p-6 rounded-xl border border-white/5 md:col-span-2">
                                             <div className="flex items-center gap-3 mb-4 text-fiber-orange"><BarChart3 size={20} /> <h3 className="text-white font-bold">Consumo Total (Mês Atual)</h3></div>
                                             <div className="flex flex-col sm:flex-row gap-8">
-                                                <div className="flex items-center gap-3"><ArrowDown className="text-fiber-blue" /><p><span className="text-gray-400 text-sm">Download</span><br/><span className="text-white font-bold text-lg">{formatBytes(dashboardData.consumo.total_download_bytes)}</span></p></div>
-                                                <div className="flex items-center gap-3"><ArrowUp className="text-fiber-orange" /><p><span className="text-gray-400 text-sm">Upload</span><br/><span className="text-white font-bold text-lg">{formatBytes(dashboardData.consumo.total_upload_bytes)}</span></p></div>
+                                                <div className="flex items-center gap-3"><ArrowDown className="text-fiber-blue" /><p><span className="text-gray-400 text-sm">Download</span><br/><span className="text-white font-bold text-lg">{dashboardData.consumo.total_download}</span></p></div>
+                                                <div className="flex items-center gap-3"><ArrowUp className="text-fiber-orange" /><p><span className="text-gray-400 text-sm">Upload</span><br/><span className="text-white font-bold text-lg">{dashboardData.consumo.total_upload}</span></p></div>
                                             </div>
                                         </div>
                                     </div>
@@ -717,6 +717,8 @@ const ClientArea: React.FC = () => {
                                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-6">
                                                     <div className="flex items-center gap-2 text-gray-400"><Server size={14}/> <strong>ONT:</strong> <span className="text-white">{login.sinal_ultimo_atendimento || 'N/A'}</span></div>
                                                     <div className="flex items-center gap-2 text-gray-400"><Clock size={14}/> <strong>Uptime:</strong> <span className="text-white">{login.tempo_conectado || 'N/A'}</span></div>
+                                                    <div className="flex items-center gap-2 text-gray-400"><Activity size={14}/> <strong>IP Privado:</strong> <span className="text-white font-mono">{login.ip_privado || '--'}</span></div>
+                                                    <div className="flex items-center gap-2 text-gray-400"><Globe size={14}/> <strong>IP Público:</strong> <span className="text-fiber-blue font-bold font-mono">{login.ip_publico || '--'}</span></div>
                                                 </div>
                                                 <div className="flex flex-col sm:flex-row gap-3">
                                                     <Button onClick={() => performLoginAction(login.id, 'limpar-mac')} variant="secondary" className="!text-xs !py-2 !px-4 gap-2" disabled={actionStatus[login.id]?.status === 'loading'}>{actionStatus[login.id]?.status === 'loading' ? <Loader2 size={14} className="animate-spin" /> : <X size={14}/>} Limpar MAC</Button>

@@ -1,4 +1,3 @@
-
 export interface Cliente {
   id: number;
   razao: string;
@@ -42,11 +41,14 @@ export interface Login {
   id_contrato: number;
   upload_atual?: string;
   download_atual?: string;
+  // NOVOS CAMPOS
+  ip_privado?: string;
+  ip_publico?: string;
 }
 
 export interface ConsumoPoint {
-  data?: string;     // Para diário
-  mes_ano?: string;  // Para mensal
+  data?: string;     
+  mes_ano?: string;  
   download_bytes: number;
   upload_bytes: number;
 }
@@ -54,6 +56,9 @@ export interface ConsumoPoint {
 export interface Consumo {
   total_download_bytes: number;
   total_upload_bytes: number;
+  // NOVOS CAMPOS FORMATADOS
+  total_download: string;
+  total_upload: string;
   history: {
     daily: ConsumoPoint[];
     monthly: ConsumoPoint[];
@@ -81,11 +86,10 @@ export interface Task {
   title: string;
   description: string;
   status?: string;
-  analysis?: string; // Campo para o retorno da IA
+  analysis?: string; 
   createdAt?: string;
 }
 
-// Resposta completa do Dashboard
 export interface DashboardResponse {
   clientes: Cliente[];
   contratos: Contrato[];
@@ -97,7 +101,6 @@ export interface DashboardResponse {
   consumo: Consumo;
 }
 
-// Resposta de Autenticação
 export interface LoginResponse {
   token: string;
 }
