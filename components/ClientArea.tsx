@@ -4,7 +4,7 @@ import {
   User, Lock, FileText, Download, Copy, CheckCircle, AlertCircle, Loader2, 
   QrCode, X, LogOut, Wifi, Activity, 
   Clock, Settings, Eye, EyeOff, Mail, ArrowUp, ArrowDown, LayoutDashboard, Ban,
-  FileSignature, BarChart3, ScrollText, Zap, Power, Server, Link2, ThumbsUp, Printer, Trash2, ArrowLeft, MessageCircle
+  FileSignature, BarChart3, ScrollText, Zap, Power, Server, Link2, ThumbsUp, Printer, Trash2, ArrowLeft, MessageCircle, Globe
 } from 'lucide-react';
 import Button from './Button';
 import { DashboardResponse, Consumo, Fatura } from '../src/types/api';
@@ -136,6 +136,9 @@ const ClientArea: React.FC = () => {
     const [showNewPass, setShowNewPass] = useState(false);
     const [actionStatus, setActionStatus] = useState<{ [key: string]: { status: 'idle' | 'loading' | 'success' | 'error', message?: string } }>({});
     const [diagResult, setDiagResult] = useState<{ download: string, upload: string } | null>(null);
+    
+    // Novo estado para o IP Público
+    const [meuIpPublico, setMeuIpPublico] = useState<string>('Carregando...');
 
     // Login View States
     const [loginView, setLoginView] = useState<'login' | 'forgot'>('login');
@@ -151,6 +154,9 @@ const ClientArea: React.FC = () => {
         try {
             const data = await apiService.getDashboard();
             setDashboardData(data);
+            // IMPORTANTE: Marca como autenticado após carregar dados com sucesso
+            // Isso evita o loop de logout/login na recarga da página
+            setIsAuthenticated(true);
         } catch (error) {
             console.error("Erro ao carregar dashboard:", error);
             handleLogout();
@@ -273,6 +279,22 @@ const ClientArea: React.FC = () => {
     };
 
     // === EFFECTS ===
+    
+    // Busca IP Público quando autenticado
+    useEffect(() => {
+        if (isAuthenticated) {
+            fetch('https://api.ipify.org?format=json')
+                .then(response => response.json())
+                .then(data => {
+                    setMeuIpPublico(data.ip);
+                })
+                .catch(error => {
+                    console.error('Erro ao buscar IP:', error);
+                    setMeuIpPublico('Indisponível');
+                });
+        }
+    }, [isAuthenticated]);
+
     useEffect(() => {
         const saved = localStorage.getItem('fiber_saved_email');
         if (saved) {
@@ -526,8 +548,8 @@ const ClientArea: React.FC = () => {
                                         <div className="bg-neutral-900 p-6 rounded-xl border border-white/5 md:col-span-2">
                                             <div className="flex items-center gap-3 mb-4 text-fiber-orange"><BarChart3 size={20} /> <h3 className="text-white font-bold">Consumo Total (Mês Atual)</h3></div>
                                             <div className="flex flex-col sm:flex-row gap-8">
-                                                <div className="flex items-center gap-3"><ArrowDown className="text-fiber-blue" /><p><span className="text-gray-400 text-sm">Download</span><br/><span className="text-white font-bold text-lg">{formatBytes(dashboardData.consumo.total_download_bytes)}</span></p></div>
-                                                <div className="flex items-center gap-3"><ArrowUp className="text-fiber-orange" /><p><span className="text-gray-400 text-sm">Upload</span><br/><span className="text-white font-bold text-lg">{formatBytes(dashboardData.consumo.total_upload_bytes)}</span></p></div>
+                                                <div className="flex items-center gap-3"><ArrowDown className="text-fiber-blue" /><p><span className="text-gray-400 text-sm">Download</span><br/><span className="text-white font-bold text-lg">{dashboardData.consumo.total_download || formatBytes(dashboardData.consumo.total_download_bytes)}</span></p></div>
+                                                <div className="flex items-center gap-3"><ArrowUp className="text-fiber-orange" /><p><span className="text-gray-400 text-sm">Upload</span><br/><span className="text-white font-bold text-lg">{dashboardData.consumo.total_upload || formatBytes(dashboardData.consumo.total_upload_bytes)}</span></p></div>
                                             </div>
                                         </div>
                                     </div>
@@ -589,6 +611,17 @@ const ClientArea: React.FC = () => {
                                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-6">
                                                     <div className="flex items-center gap-2 text-gray-400"><Server size={14}/> <strong>ONT:</strong> <span className="text-white">{login.sinal_ultimo_atendimento || 'N/A'}</span></div>
                                                     <div className="flex items-center gap-2 text-gray-400"><Clock size={14}/> <strong>Uptime:</strong> <span className="text-white">{login.tempo_conectado || 'N/A'}</span></div>
+                                                    
+                                                    {/* --- NOVOS DADOS DE IP --- */}
+                                                    <div className="flex items-center gap-2 text-gray-400">
+                                                        <Activity size={14}/> <strong>IP Privado:</strong> 
+                                                        <span className="text-white font-mono text-xs">{login.ip_privado || 'Não atribuído'}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 text-gray-400">
+                                                        <Globe size={14}/> <strong>IP Público:</strong> 
+                                                        <span className="text-fiber-blue font-bold font-mono text-xs">{meuIpPublico}</span>
+                                                    </div>
+                                                    {/* ------------------------- */}
                                                 </div>
                                                 <div className="flex flex-col sm:flex-row gap-3">
                                                     <Button onClick={() => performLoginAction(login.id, 'limpar-mac')} variant="secondary" className="!text-xs !py-2 !px-4 gap-2" disabled={actionStatus[login.id]?.status === 'loading'}>{actionStatus[login.id]?.status === 'loading' ? <Loader2 size={14} className="animate-spin" /> : <X size={14}/>} Limpar MAC</Button>
