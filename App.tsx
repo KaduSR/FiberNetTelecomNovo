@@ -1,8 +1,7 @@
 
-import React, { useState, Suspense } from 'react';
+import React, { useState, Suspense, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
-import PlanCard from './components/PlanCard';
 import Features from './components/Features';
 import Footer from './components/Footer';
 import SupportModal from './components/SupportModal';
@@ -10,8 +9,9 @@ import SpeedTestSection from './components/SpeedTestSection';
 import ClientArea from './components/ClientArea';
 import NewsSection from './components/NewsSection';
 import { PLANS, HISTORY_TEXT } from './constants';
-import { MessageCircle, Loader2, Headphones } from 'lucide-react';
+import { Loader2, Headphones } from 'lucide-react';
 import FiberNetTextLogo from './components/FiberNetTextLogo';
+import PlanCard from './components/PlanCard';
 
 // Lazy load heavier components
 const Ethics = React.lazy(() => import('./components/Ethics'));
@@ -23,6 +23,11 @@ const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState('home');
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
 
+  // === NOVO: Scroll para o topo sempre que a página mudar ===
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentPage]);
+
   const toggleSupportModal = () => setIsSupportModalOpen(!isSupportModalOpen);
 
   const handleNavigate = (page: string) => {
@@ -33,7 +38,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-fiber-dark font-sans text-gray-900 flex flex-col">
       <Navbar 
-        onNavigate={setCurrentPage} 
+        onNavigate={handleNavigate} 
         currentPage={currentPage} 
         onOpenSupport={() => setIsSupportModalOpen(true)}
       />
