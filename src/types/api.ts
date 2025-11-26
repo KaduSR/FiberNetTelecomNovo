@@ -1,4 +1,5 @@
 
+
 export interface Cliente {
   id: number;
   nome: string;
@@ -32,7 +33,7 @@ export interface Fatura {
   data_emissao: string;
   data_vencimento: string;
   valor: string;
-  status: 'A' | 'B' | 'C'; 
+  status: 'A' | 'B' | 'C' | 'Aberta' | 'Paga' | 'Vencida' | string; 
   linha_digitavel: string;
   pix_txid: string;
   boleto: string;
@@ -69,6 +70,10 @@ export interface Login {
   contrato_id: number; // CAMPO CRÍTICO PARA O AGRUPAMENTO
   online: 'S' | 'N';
   sinal_ultimo_atendimento: string; // Sinal ONT
+  // Fallback fields for API variations
+  sinal_rx?: string;
+  sinal?: string;
+  
   tempo_conectado: string;
   upload_atual?: string;
   download_atual?: string;

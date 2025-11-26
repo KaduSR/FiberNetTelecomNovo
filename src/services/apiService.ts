@@ -288,9 +288,55 @@ class ApiService {
   }
 
   async getDashboard(): Promise<DashboardResponse> {
-    return this.request<DashboardResponse>(ENDPOINTS.DASHBOARD, { 
+    const rawData = await this.request<any>(ENDPOINTS.DASHBOARD, { 
       method: 'GET',
     });
+
+    // ✅ NORMALIZAÇÃO E FILTROS ROBUSTOS
+    // Isso garante que o front receba dados consistentes mesmo que a API varie
+    const normalized: DashboardResponse = {
+      clientes: rawData.clientes || [],
+      
+      // ✅ FILTRAR APENAS CONTRATOS ATIVOS
+      contratos: (rawData.contratos || []).filter((c: any) => c.status === 'A'),
+      
+      // ✅ NORMALIZAR FATURAS (Apenas abertas, e mapear campos variáveis)
+      faturas: (rawData.faturas || []).map((f: any) => ({
+        ...f,
+        // Garantir campos obrigatórios
+        data_vencimento: f.data_vencimento || f.vencimento || 'Sem data',
+        // Fallback para campos de pagamento
+        pix_txid: f.pix_txid || f.pix_code || f.chave_pix || null,
+        linha_digitavel: f.linha_digitavel || f.codigo_barras || f.digitable_line || null,
+        // Normalizar status
+        status: f.status || 'Desconhecido'
+      })),
+      
+      // ✅ NORMALIZAR LOGINS (Status Online e Sinais)
+      logins: (rawData.logins || []).map((l: any) => ({
+        ...l,
+        // Normaliza status online para 'S' ou 'N' independente de vir true/false/online/offline
+        online: ['S', 'Y', 'true', 'online'].includes(String(l.online).toLowerCase()) || l.status === 'online' ? 'S' : 'N',
+        // Fallbacks para sinal
+        sinal_ultimo_atendimento: l.sinal_ultimo_atendimento || l.sinal_ont || l.sinal || 'N/A',
+        // Fallback para modelo
+        ont_modelo: l.ont_modelo || l.modelo_ont || 'ONU Padrão'
+      })),
+      
+      notas: rawData.notas || [],
+      ordensServico: rawData.ordensServico || [],
+      ontInfo: rawData.ontInfo || [],
+      consumo: rawData.consumo || { 
+        total_download_bytes: 0, 
+        total_upload_bytes: 0, 
+        total_download: '0 GB', 
+        total_upload: '0 GB',
+        history: { daily: [], weekly: [], monthly: [] }
+      },
+      ai_analysis: rawData.ai_analysis
+    };
+
+    return normalized;
   }
 
   async recoverPassword(email: string): Promise<{ message: string }> {

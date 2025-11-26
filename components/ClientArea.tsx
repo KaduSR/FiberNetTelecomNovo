@@ -1,11 +1,12 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   User, Lock, FileText, Download, Copy, CheckCircle, AlertCircle, Loader2, 
   QrCode, X, LogOut, Wifi, Activity, 
   Clock, Settings, Eye, EyeOff, Mail, ArrowUp, ArrowDown, LayoutDashboard, Ban,
   FileSignature, BarChart3, ScrollText, Zap, Power, Server, Link2, ThumbsUp, Printer, Trash2, ArrowLeft, MessageCircle, Globe,
-  MapPin, Router, Bot, Send, Search, ChevronDown, HelpCircle
+  MapPin, Router, Bot, Send, Search, ChevronDown, HelpCircle, AlertTriangle
 } from 'lucide-react';
 import Button from './Button';
 import { DashboardResponse, Consumo, Fatura, ChatMessage, HistoryData } from '../src/types/api';
@@ -15,7 +16,7 @@ import AIInsights from '../src/components/AIInsights';
 import { GoogleGenAI } from "@google/genai";
 
 // MUDANÇA DE CHAVE PARA FORÇAR LIMPEZA DE CACHE
-const DASH_CACHE_KEY = 'fiber_dashboard_cache_v19_search_fix';
+const DASH_CACHE_KEY = 'fiber_dashboard_cache_v21_strict_active';
 
 const CHAT_SUGGESTIONS = [
     { label: "Minha fatura vence quando?", icon: FileText },
@@ -36,6 +37,19 @@ const formatBytes = (bytes: number | string | undefined, decimals = 2) => {
 
 const bytesToGB = (bytes: number) => {
     return parseFloat((bytes / (1024 * 1024 * 1024)).toFixed(2));
+};
+
+// === HELPER: VERIFICA SE FATURA ESTÁ ABERTA (ROBUST CHECK) ===
+const isInvoiceOpen = (status: string) => {
+    if (!status) return false;
+    const s = String(status).toUpperCase();
+    return ['A', 'ABERTA', 'PENDENTE', '1', 'OPEN'].includes(s);
+};
+
+const isInvoicePaid = (status: string) => {
+    if (!status) return false;
+    const s = String(status).toUpperCase();
+    return ['P', 'PAGO', 'PAGA', 'BAIXADO', 'BAIXADA', 'LIQUIDADO'].includes(s);
 };
 
 // === SUB-COMPONENT: CONSUMPTION CHART ===
@@ -252,6 +266,7 @@ const ClientArea: React.FC = () => {
         setIsRefetching(true);
         try {
             const data = await apiService.getDashboard();
+            console.log("Dashboard Data Received:", data); // DEBUGGING LOG
             setDashboardData(data);
             setIsAuthenticated(true);
             localStorage.setItem(DASH_CACHE_KEY, JSON.stringify(data));
@@ -279,6 +294,7 @@ const ClientArea: React.FC = () => {
             if (!loginResponse.token) throw new Error('Token inválido.');
 
             const dashData = await apiService.getDashboard();
+            console.log("Login Dashboard Data:", dashData); // DEBUGGING LOG
             setDashboardData(dashData);
             localStorage.setItem(DASH_CACHE_KEY, JSON.stringify(dashData));
 
@@ -476,7 +492,6 @@ const ClientArea: React.FC = () => {
         return (
             <div className="min-h-screen bg-fiber-dark flex items-center justify-center p-4 animate-fadeIn">
                 <div className="w-full max-w-md bg-fiber-card p-8 rounded-2xl border border-white/10 shadow-2xl">
-                    {/* ... (Login form unchanged) ... */}
                     {loginView === 'login' ? (
                         <>
                             <h2 className="text-3xl font-bold text-white text-center mb-2">Área do Cliente</h2>
@@ -565,73 +580,169 @@ const ClientArea: React.FC = () => {
                                     
                                     <AIInsights data={dashboardData.ai_analysis} />
 
-                                    {dashboardData.contratos.map((contrato) => {
-                                        const loginsDoContrato = dashboardData.logins.filter(l => Number(l.contrato_id) === Number(contrato.id));
-                                        const faturasDoContrato = dashboardData.faturas.filter(f => f.contrato_id ? Number(f.contrato_id) === Number(contrato.id) : true);
-                                        const notasDoContrato = dashboardData.notas?.filter(n => n.contrato_id ? Number(n.contrato_id) === Number(contrato.id) : true) || [];
+                                    {/* ✅ VERIFICAR SE HÁ CONTRATOS ATIVOS */}
+                                    {dashboardData.contratos.length === 0 ? (
+                                        <div className="bg-neutral-900 border border-white/10 rounded-xl p-8 text-center">
+                                            <AlertCircle size={48} className="text-yellow-500 mx-auto mb-4" />
+                                            <p className="text-white font-bold mb-2">Nenhum contrato ativo encontrado</p>
+                                            <p className="text-gray-400 text-sm">Entre em contato com o suporte para mais informações.</p>
+                                        </div>
+                                    ) : (
+                                        dashboardData.contratos.map((contrato) => {
+                                            // ✅ LOGS DE DEBUG
+                                            console.log('🔍 Processando Contrato:', contrato.id, contrato.status);
 
-                                        return (
-                                            <div key={contrato.id} className="bg-neutral-900 border border-white/10 rounded-xl p-6 mb-6 shadow-lg">
-                                                {/* (Contract Rendering Code - Same as before) */}
-                                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-white/5 pb-4">
-                                                    <div>
-                                                        <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                                                            <FileSignature size={20} className="text-fiber-orange" />
-                                                            {contrato.descricao_aux_plano_venda || `Contrato #${contrato.id}`}
-                                                        </h3>
-                                                        <p className="text-gray-400 text-sm mt-1 flex items-center gap-2">
-                                                            <MapPin size={14} className="text-gray-500" /> 
-                                                            {contrato.endereco || 'Endereço Principal'} 
-                                                            {contrato.bairro && ` - ${contrato.bairro}`}
-                                                            {contrato.cidade && `, ${contrato.cidade}`}
-                                                        </p>
-                                                    </div>
-                                                    <span className={`mt-2 md:mt-0 px-3 py-1 rounded-full text-xs font-bold ${contrato.status === 'A' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                                                        {contrato.status === 'A' ? 'Ativo' : 'Inativo'}
-                                                    </span>
-                                                </div>
+                                            // ✅ DOUBLE CHECK: Garantir que só exibe ativos (redundância de segurança)
+                                            if (contrato.status !== 'A') {
+                                                console.warn('⚠️ Contrato não ativo detectado no loop:', contrato.id);
+                                                return null;
+                                            }
 
-                                                <div className="mb-8">
-                                                    <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                                        <Router size={14} /> Conexões e Equipamentos
-                                                    </h4>
+                                            // Filtra logins
+                                            const loginsDoContrato = dashboardData.logins.filter(l => 
+                                                Number(l.contrato_id) === Number(contrato.id)
+                                            );
+                                            
+                                            // Filtra faturas (Apenas Abertas)
+                                            const faturasDoContrato = dashboardData.faturas.filter(f => 
+                                                (f.contrato_id ? Number(f.contrato_id) === Number(contrato.id) : true) && 
+                                                isInvoiceOpen(f.status)
+                                            );
+
+                                            const notasDoContrato = dashboardData.notas?.filter(n => 
+                                                n.contrato_id ? Number(n.contrato_id) === Number(contrato.id) : true
+                                            ) || [];
+
+                                            return (
+                                                <div key={contrato.id} className="bg-neutral-900 border border-white/10 rounded-xl p-6 mb-6 shadow-lg">
                                                     
-                                                    {loginsDoContrato.length > 0 ? (
-                                                        <div className="grid grid-cols-1 gap-4">
-                                                            {loginsDoContrato.map(login => (
-                                                                <div key={login.id} className="bg-black/40 border border-white/5 rounded-lg p-4 flex flex-col md:flex-row justify-between items-center gap-4">
-                                                                    <div className="flex items-center gap-4">
-                                                                         <div className={`w-3 h-3 rounded-full ${login.online === 'S' ? 'bg-fiber-green animate-pulse' : 'bg-gray-500'}`}></div>
-                                                                         <div>
-                                                                             <p className="font-bold text-white text-sm">{login.login}</p>
-                                                                             <p className="text-xs text-gray-500 font-mono mt-0.5">IP Privado: {login.ip_privado || '--'}</p>
-                                                                         </div>
-                                                                    </div>
-                                                                    
-                                                                    <div className="flex items-center gap-6 text-xs text-gray-400">
-                                                                        <div className="flex items-center gap-2" title="Modelo da ONU">
-                                                                            <Router size={14}/> {login.ont_modelo || 'ONU Padrão'}
-                                                                        </div>
-                                                                        <div className="flex items-center gap-2" title="Sinal Óptico">
-                                                                            <Activity size={14}/> 
-                                                                            <span className={parseFloat(login.sinal_ultimo_atendimento) < -27 ? 'text-red-400' : 'text-fiber-green'}>
-                                                                                {login.sinal_ultimo_atendimento || '- dBm'}
-                                                                            </span>
-                                                                        </div>
-                                                                         <div className="flex items-center gap-2" title="Tempo Conectado">
-                                                                            <Clock size={14}/> {login.tempo_conectado || 'Recente'}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            ))}
+                                                    {/* CABEÇALHO DO CONTRATO */}
+                                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-white/5 pb-4">
+                                                        <div>
+                                                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                                                <FileSignature size={20} className="text-fiber-orange" />
+                                                                {contrato.descricao_aux_plano_venda || `Contrato #${contrato.id}`}
+                                                            </h3>
+                                                            <p className="text-gray-400 text-sm mt-1 flex items-center gap-2">
+                                                                <MapPin size={14} className="text-gray-500" /> 
+                                                                {contrato.endereco || 'Endereço não informado'} 
+                                                                {contrato.bairro && ` - ${contrato.bairro}`}
+                                                                {contrato.cidade && `, ${contrato.cidade}`}
+                                                            </p>
                                                         </div>
-                                                    ) : (
-                                                        <p className="text-gray-500 text-sm italic px-4">Nenhuma conexão ativa para este contrato.</p>
-                                                    )}
+                                                        <span className="mt-2 md:mt-0 px-3 py-1 rounded-full text-xs font-bold bg-green-500/20 text-green-400">
+                                                            ✓ ATIVO
+                                                        </span>
+                                                    </div>
+
+                                                    {/* CONEXÕES (ONT) */}
+                                                    <div className="mb-8">
+                                                        <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                                            <Router size={14} /> Conexões e Equipamentos
+                                                        </h4>
+                                                        
+                                                        {loginsDoContrato.length > 0 ? (
+                                                            <div className="grid grid-cols-1 gap-4">
+                                                                {loginsDoContrato.map(login => (
+                                                                    <div key={login.id} className="bg-black/40 border border-white/5 rounded-lg p-4 flex flex-col md:flex-row justify-between items-center gap-4">
+                                                                        <div className="flex items-center gap-4">
+                                                                             <div className={`w-3 h-3 rounded-full ${login.online === 'S' ? 'bg-fiber-green animate-pulse' : 'bg-gray-500'}`} title={login.online === 'S' ? 'Online' : 'Offline'}></div>
+                                                                             <div>
+                                                                                 <p className="font-bold text-white text-sm">{login.login}</p>
+                                                                                 <p className="text-xs text-gray-500 font-mono mt-0.5">IP: {login.ip_privado || 'N/A'}</p>
+                                                                             </div>
+                                                                        </div>
+                                                                        
+                                                                        <div className="flex items-center gap-6 text-xs text-gray-400">
+                                                                            <div className="flex items-center gap-2" title="Modelo da ONU">
+                                                                                <Router size={14}/> {login.ont_modelo}
+                                                                            </div>
+                                                                            <div className="flex items-center gap-2" title="Sinal Óptico">
+                                                                                <Activity size={14}/> 
+                                                                                <span className={parseFloat(login.sinal_ultimo_atendimento) < -27 ? 'text-red-400' : 'text-fiber-green'}>
+                                                                                    {login.sinal_ultimo_atendimento}
+                                                                                </span>
+                                                                            </div>
+                                                                             <div className="flex items-center gap-2" title="Tempo Conectado">
+                                                                                <Clock size={14}/> {login.tempo_conectado || 'Recente'}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        ) : (
+                                                            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 flex items-start gap-3">
+                                                                <AlertTriangle size={18} className="text-yellow-500 flex-shrink-0 mt-0.5" />
+                                                                <div>
+                                                                    <p className="text-yellow-400 font-bold text-sm">Nenhuma conexão ativa</p>
+                                                                    <p className="text-gray-400 text-xs mt-1">Não há logins vinculados a este contrato.</p>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* FINANCEIRO */}
+                                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                                        <div>
+                                                            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                                                <FileText size={14} /> Faturas Pendentes
+                                                            </h4>
+                                                            <div className="space-y-3">
+                                                                {faturasDoContrato.length > 0 ? (
+                                                                    faturasDoContrato.map(fatura => (
+                                                                        <div key={fatura.id} className="flex justify-between items-center bg-white/5 p-3 rounded-lg border-l-2 border-fiber-orange hover:bg-white/10 transition-colors">
+                                                                            <div>
+                                                                                <p className="text-white font-bold text-sm">R$ {fatura.valor}</p>
+                                                                                <p className="text-[10px] text-gray-400">Venc: {fatura.data_vencimento}</p>
+                                                                            </div>
+                                                                            <div className="flex gap-2">
+                                                                                {fatura.pix_txid && <button onClick={() => handleOpenPixModal(fatura.pix_txid!)} className="text-[10px] bg-fiber-green/20 text-fiber-green px-2 py-1 rounded hover:bg-fiber-green/30 transition font-bold flex items-center gap-1"><QrCode size={10}/> PIX</button>}
+                                                                                {fatura.linha_digitavel && <button onClick={() => handleCopy(fatura.linha_digitavel!, String(fatura.id))} className="text-[10px] bg-white/10 text-white px-2 py-1 rounded hover:bg-white/20 transition flex items-center gap-1">
+                                                                                    {copiedBarcodeId === String(fatura.id) ? <><CheckCircle size={10}/> Copiado</> : <><Copy size={10}/> Código</>}
+                                                                                </button>}
+                                                                                {!fatura.pix_txid && !fatura.linha_digitavel && <span className="text-[10px] text-gray-500 italic">Sem pagamento online</span>}
+                                                                            </div>
+                                                                        </div>
+                                                                    ))
+                                                                ) : (
+                                                                    <p className="text-gray-500 text-sm italic flex items-center gap-2"><CheckCircle size={14} className="text-green-500"/> Nenhuma fatura pendente.</p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Notas Fiscais */}
+                                                        <div>
+                                                            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                                                <ScrollText size={14} /> Últimas Notas Fiscais
+                                                            </h4>
+                                                            <div className="space-y-2 max-h-40 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 pr-2">
+                                                                {notasDoContrato.length > 0 ? (
+                                                                    notasDoContrato.slice(0,3).map(nota => (
+                                                                        <div key={nota.id} className="flex justify-between items-center p-2 hover:bg-white/5 rounded transition-colors border-b border-white/5 last:border-0">
+                                                                            <div>
+                                                                                <p className="text-xs text-white">NF #{nota.numero_nota}</p>
+                                                                                <p className="text-[10px] text-gray-500">{nota.data_emissao}</p>
+                                                                            </div>
+                                                                            <div className="flex items-center gap-3">
+                                                                                <span className="text-xs font-mono text-gray-300">R$ {nota.valor}</span>
+                                                                                {nota.link_pdf && (
+                                                                                    <a href={nota.link_pdf} target="_blank" rel="noopener noreferrer" className="text-fiber-blue hover:text-white transition-colors" title="Baixar PDF">
+                                                                                        <Download size={14} />
+                                                                                    </a>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    ))
+                                                                ) : (
+                                                                    <p className="text-gray-500 text-sm italic">Nenhuma nota disponível.</p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        );
-                                    })}
+                                            );
+                                        }).filter(Boolean) // Remove nulls (contratos filtrados)
+                                    )}
                                 </div>
                             )}
 
@@ -648,7 +759,7 @@ const ClientArea: React.FC = () => {
                                     
                                     <div className="flex-grow bg-neutral-900 border border-white/10 rounded-xl overflow-hidden flex flex-col">
                                         <div ref={chatContainerRef} className="flex-grow p-4 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-fiber-orange/20">
-                                            {/* ÁREA DE SUGESTÕES INICIAIS (QUANDO O CHAT ESTÁ VAZIO OU APENAS COM A SAUDAÇÃO) */}
+                                            {/* ÁREA DE SUGESTÕES INICIAIS */}
                                             {chatMessages.length <= 1 && !isChatTyping && (
                                                 <div className="mb-6 bg-white/5 p-4 rounded-xl border border-white/10">
                                                     <p className="text-sm font-bold text-white mb-3 flex items-center gap-2">
@@ -679,8 +790,6 @@ const ClientArea: React.FC = () => {
                                                             : 'bg-white/10 text-gray-200 rounded-bl-none'
                                                     }`}>
                                                         <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                                                        
-                                                        {/* RENDER SEARCH SOURCES */}
                                                         {msg.sources && msg.sources.length > 0 && (
                                                             <div className="mt-3 pt-3 border-t border-white/10">
                                                                 <p className="text-[10px] text-gray-400 font-bold uppercase mb-2 flex items-center gap-1">
@@ -701,14 +810,12 @@ const ClientArea: React.FC = () => {
                                                                 </div>
                                                             </div>
                                                         )}
-
                                                         <span className="text-[10px] opacity-50 mt-1 block text-right">
                                                             {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                         </span>
                                                     </div>
                                                 </div>
                                             ))}
-                                            
 
                                             {isChatTyping && (
                                                 <div className="flex justify-start">
@@ -744,9 +851,18 @@ const ClientArea: React.FC = () => {
                                         ))}
                                     </div>
                                     <div className="space-y-3">
-                                        {(dashboardData?.faturas || []).filter(inv => invoiceStatusFilter === 'todas' ? true : (inv.status === 'A' ? 'aberto' : 'pago') === invoiceStatusFilter).map(invoice => (
+                                        {(dashboardData?.faturas || []).filter(inv => {
+                                            if (invoiceStatusFilter === 'todas') return true;
+                                            if (invoiceStatusFilter === 'aberto') return isInvoiceOpen(inv.status);
+                                            if (invoiceStatusFilter === 'pago') return isInvoicePaid(inv.status);
+                                            return true;
+                                        }).map(invoice => (
                                             <div key={invoice.id} className="bg-neutral-900 border border-white/10 rounded-xl p-4 flex justify-between items-center">
-                                                 <div><p className="font-bold text-white">R$ {invoice.valor}</p><p className="text-xs text-gray-500">{invoice.data_vencimento}</p></div>
+                                                 <div>
+                                                     <p className="font-bold text-white">R$ {invoice.valor}</p>
+                                                     <p className="text-xs text-gray-500">{invoice.data_vencimento}</p>
+                                                     <span className={`text-[10px] uppercase font-bold ${isInvoiceOpen(invoice.status) ? 'text-red-400' : 'text-green-500'}`}>{invoice.status}</span>
+                                                 </div>
                                                  <div className="flex gap-2">{invoice.linha_digitavel && <Button variant="secondary" onClick={() => handleCopy(invoice.linha_digitavel!, String(invoice.id))} className="!py-1 !px-3 !text-xs">Copiar</Button>}</div>
                                             </div>
                                         ))}
@@ -780,7 +896,6 @@ const ClientArea: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    {/* PASSA O HISTÓRICO CORRETO BASEADO NA SELEÇÃO */}
                                     <ConsumptionChart 
                                         history={
                                             selectedLoginConsumo === 'total' 
