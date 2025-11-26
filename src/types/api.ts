@@ -154,4 +154,5 @@ export interface ChatMessage {
     sender: 'user' | 'bot';
     text: string;
     timestamp: Date;
+    sources?: { title: string; url: string }[]; // Added for Search Grounding
 }

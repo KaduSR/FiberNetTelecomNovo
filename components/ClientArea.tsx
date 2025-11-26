@@ -5,7 +5,7 @@ import {
   QrCode, X, LogOut, Wifi, Activity, 
   Clock, Settings, Eye, EyeOff, Mail, ArrowUp, ArrowDown, LayoutDashboard, Ban,
   FileSignature, BarChart3, ScrollText, Zap, Power, Server, Link2, ThumbsUp, Printer, Trash2, ArrowLeft, MessageCircle, Globe,
-  MapPin, Router, Bot, Send, ChevronDown
+  MapPin, Router, Bot, Send, Search, ChevronDown, HelpCircle
 } from 'lucide-react';
 import Button from './Button';
 import { DashboardResponse, Consumo, Fatura, ChatMessage, HistoryData } from '../src/types/api';
@@ -15,16 +15,15 @@ import AIInsights from '../src/components/AIInsights';
 import { GoogleGenAI } from "@google/genai";
 
 // MUDANÇA DE CHAVE PARA FORÇAR LIMPEZA DE CACHE
-const DASH_CACHE_KEY = 'fiber_dashboard_cache_v16_consumo_login';
+const DASH_CACHE_KEY = 'fiber_dashboard_cache_v19_search_fix';
 
 const CHAT_SUGGESTIONS = [
-    { label: "Quais são minhas faturas em aberto?", icon: FileText },
-    { label: "Minha conexão está lenta", icon: Activity },
+    { label: "Minha fatura vence quando?", icon: FileText },
+    { label: "O WhatsApp caiu?", icon: Globe },
+    { label: "Instagram com problemas?", icon: Activity },
+    { label: "Minha conexão está lenta", icon: Wifi },
     { label: "Quero a 2ª via do boleto", icon: QrCode },
-    { label: "Reiniciar conexão", icon: RefreshCw },
 ];
-
-import { RefreshCw } from 'lucide-react';
 
 // === HELPERS ===
 const formatBytes = (bytes: number | string | undefined, decimals = 2) => {
@@ -75,8 +74,6 @@ const ConsumptionChart: React.FC<{ history?: HistoryData }> = ({ history }) => {
         if (data.length < 2) return '';
         let d = `M ${getX(0)} ${getY(data[0][key])}`;
         for (let i = 1; i < data.length; i++) {
-             // Curva suave (Bézier) simples ou linha reta
-             // Para simplificar e manter performance em SVG puro, usamos linha reta por enquanto ou curva simples
              d += ` L ${getX(i)} ${getY(data[i][key])}`;
         }
         return d;
@@ -369,18 +366,40 @@ const ClientArea: React.FC = () => {
                     Seu nome é Fiber.IA.
                     Você deve ser educado, prestativo e focar em suporte técnico de internet e questões financeiras básicas.
                     A empresa oferece planos de fibra óptica.
+                    
+                    IMPORTANTE: Se o usuário perguntar se um aplicativo ou serviço (como WhatsApp, Instagram, Facebook, Bancos, etc) caiu ou está fora do ar, VOCÊ DEVE usar a ferramenta de busca do Google para verificar sites como DownDetector, G1, TechTudo ou notícias recentes.
+                    Responda com base no que encontrar na busca. Se encontrar relatos de queda, informe ao usuário e forneça as fontes.
+                    
+                    Se o usuário relatar lentidão, sugira reiniciar o modem e testar via cabo.
+                    Se perguntar sobre faturas, oriente a baixar na aba Faturas.
+
                     Não invente dados de clientes.
-                    Se não souber responder, sugira contato via WhatsApp ${CONTACT_INFO.whatsapp}.`
+                    Se não souber responder, sugira contato via WhatsApp ${CONTACT_INFO.whatsapp}.`,
+                    tools: [{ googleSearch: {} }],
                 }
             });
 
             const botText = response.text || "Desculpe, não consegui processar sua resposta no momento.";
             
+            // Extract Search Grounding Sources
+            let sources: { title: string; url: string }[] = [];
+            if (response.candidates?.[0]?.groundingMetadata?.groundingChunks) {
+                sources = response.candidates[0].groundingMetadata.groundingChunks
+                    .map((chunk: any) => {
+                        if (chunk.web?.uri && chunk.web?.title) {
+                            return { title: chunk.web.title, url: chunk.web.uri };
+                        }
+                        return null;
+                    })
+                    .filter((s: any) => s !== null);
+            }
+
             const botMsg: ChatMessage = { 
                 id: (Date.now() + 1).toString(), 
                 sender: 'bot', 
                 text: botText, 
-                timestamp: new Date() 
+                timestamp: new Date(),
+                sources: sources
             };
             setChatMessages(prev => [...prev, botMsg]);
 
@@ -389,7 +408,7 @@ const ClientArea: React.FC = () => {
             const errorMsg: ChatMessage = { 
                 id: (Date.now() + 1).toString(), 
                 sender: 'bot', 
-                text: "Desculpe, estou enfrentando instabilidade técnica. Por favor, tente novamente mais tarde.", 
+                text: "Desculpe, estou enfrentando instabilidade técnica. Por favor, tente novamente mais tarde ou contate o suporte humano.", 
                 timestamp: new Date() 
             };
             setChatMessages(prev => [...prev, errorMsg]);
@@ -629,14 +648,60 @@ const ClientArea: React.FC = () => {
                                     
                                     <div className="flex-grow bg-neutral-900 border border-white/10 rounded-xl overflow-hidden flex flex-col">
                                         <div ref={chatContainerRef} className="flex-grow p-4 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-fiber-orange/20">
+                                            {/* ÁREA DE SUGESTÕES INICIAIS (QUANDO O CHAT ESTÁ VAZIO OU APENAS COM A SAUDAÇÃO) */}
+                                            {chatMessages.length <= 1 && !isChatTyping && (
+                                                <div className="mb-6 bg-white/5 p-4 rounded-xl border border-white/10">
+                                                    <p className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                                                        <HelpCircle size={16} className="text-fiber-orange"/> Sugestões de Dúvidas
+                                                    </p>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                                        {CHAT_SUGGESTIONS.map((suggestion, index) => (
+                                                            <button 
+                                                                key={index}
+                                                                onClick={() => handleSuggestionClick(suggestion.label)}
+                                                                className="flex items-center gap-3 p-3 bg-neutral-800 hover:bg-neutral-700 border border-white/5 hover:border-fiber-orange/50 rounded-xl text-left transition-all group"
+                                                            >
+                                                                <div className="p-2 bg-fiber-orange/10 rounded-lg group-hover:bg-fiber-orange group-hover:text-white text-fiber-orange transition-colors">
+                                                                    <suggestion.icon size={18} />
+                                                                </div>
+                                                                <span className="text-xs font-bold text-gray-300 group-hover:text-white">{suggestion.label}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
                                             {chatMessages.map((msg) => (
                                                 <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                                    <div className={`max-w-[80%] rounded-2xl p-4 ${
+                                                    <div className={`max-w-[85%] rounded-2xl p-4 ${
                                                         msg.sender === 'user' 
                                                             ? 'bg-fiber-orange text-white rounded-br-none' 
                                                             : 'bg-white/10 text-gray-200 rounded-bl-none'
                                                     }`}>
-                                                        <p className="text-sm">{msg.text}</p>
+                                                        <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                                                        
+                                                        {/* RENDER SEARCH SOURCES */}
+                                                        {msg.sources && msg.sources.length > 0 && (
+                                                            <div className="mt-3 pt-3 border-t border-white/10">
+                                                                <p className="text-[10px] text-gray-400 font-bold uppercase mb-2 flex items-center gap-1">
+                                                                    <Search size={10} /> Fontes Pesquisadas:
+                                                                </p>
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    {msg.sources.map((source, idx) => (
+                                                                        <a 
+                                                                            key={idx} 
+                                                                            href={source.url} 
+                                                                            target="_blank" 
+                                                                            rel="noopener noreferrer"
+                                                                            className="text-[10px] bg-white/5 hover:bg-white/10 border border-white/10 px-2 py-1 rounded-full text-fiber-blue truncate max-w-[200px] flex items-center gap-1 transition-colors"
+                                                                        >
+                                                                            <Link2 size={8} /> {source.title}
+                                                                        </a>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
                                                         <span className="text-[10px] opacity-50 mt-1 block text-right">
                                                             {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                         </span>
@@ -644,22 +709,6 @@ const ClientArea: React.FC = () => {
                                                 </div>
                                             ))}
                                             
-                                            {chatMessages.length === 1 && !isChatTyping && (
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6 animate-fadeIn">
-                                                    {CHAT_SUGGESTIONS.map((suggestion, index) => (
-                                                        <button 
-                                                            key={index}
-                                                            onClick={() => handleSuggestionClick(suggestion.label)}
-                                                            className="flex items-center gap-3 p-3 bg-neutral-800 hover:bg-neutral-700 border border-white/5 hover:border-fiber-orange/50 rounded-xl text-left transition-all group"
-                                                        >
-                                                            <div className="p-2 bg-fiber-orange/10 rounded-lg group-hover:bg-fiber-orange group-hover:text-white text-fiber-orange transition-colors">
-                                                                <suggestion.icon size={18} />
-                                                            </div>
-                                                            <span className="text-sm text-gray-300 group-hover:text-white">{suggestion.label}</span>
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            )}
 
                                             {isChatTyping && (
                                                 <div className="flex justify-start">

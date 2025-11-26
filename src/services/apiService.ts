@@ -14,11 +14,15 @@ const generateHistory = (multiplier: number): HistoryData => {
         upload_bytes: Math.random() * 2 * 1024 * 1024 * 1024 * multiplier
       };
     }),
-    weekly: Array.from({length: 12}, (_, i) => ({
-      semana: `Sem ${i + 1}`,
-      download_bytes: Math.random() * 35 * 1024 * 1024 * 1024 * multiplier,
-      upload_bytes: Math.random() * 15 * 1024 * 1024 * 1024 * multiplier
-    })),
+    weekly: Array.from({length: 12}, (_, i) => {
+      // Create simple labels like "Sem 1", "Sem 2" relative to current
+      // In a real app, this would be date ranges
+      return {
+        semana: `Semana ${i + 1}`,
+        download_bytes: Math.random() * 35 * 1024 * 1024 * 1024 * multiplier,
+        upload_bytes: Math.random() * 15 * 1024 * 1024 * 1024 * multiplier
+      };
+    }),
     monthly: [
       { mes_ano: "09/2024", download_bytes: 380 * 1024 * 1024 * 1024 * multiplier, upload_bytes: 180 * 1024 * 1024 * 1024 * multiplier },
       { mes_ano: "10/2024", download_bytes: 420 * 1024 * 1024 * 1024 * multiplier, upload_bytes: 200 * 1024 * 1024 * 1024 * multiplier },
