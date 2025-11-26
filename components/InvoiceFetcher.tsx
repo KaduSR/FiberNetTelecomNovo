@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Search, FileText, Download, Copy, CheckCircle, AlertCircle, CreditCard, Loader2, QrCode, X } from 'lucide-react';
 import Button from './Button';

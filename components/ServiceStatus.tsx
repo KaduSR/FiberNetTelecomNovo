@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Activity, AlertTriangle, Smartphone, DollarSign, Gamepad2, Tv, ShieldCheck, RefreshCw, Server, Wifi, CheckCircle2, ArrowLeft, Zap } from 'lucide-react';
 import { ENDPOINTS } from '../src/config';

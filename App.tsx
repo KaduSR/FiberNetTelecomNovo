@@ -10,7 +10,7 @@ import SpeedTestSection from './components/SpeedTestSection';
 import ClientArea from './components/ClientArea';
 import NewsSection from './components/NewsSection';
 import { PLANS, HISTORY_TEXT } from './constants';
-import { MessageCircle, Loader2 } from 'lucide-react';
+import { MessageCircle, Loader2, Headphones } from 'lucide-react';
 import FiberNetTextLogo from './components/FiberNetTextLogo';
 
 // Lazy load heavier components
@@ -175,16 +175,21 @@ const App: React.FC = () => {
         onNavigate={handleNavigate}
       />
 
-      {/* Floating WhatsApp Button */}
-      <a 
-        href="https://wa.me/552424581861" 
-        target="_blank"
-        rel="noreferrer"
-        className="fixed bottom-6 right-6 z-50 bg-fiber-green text-white p-4 rounded-full shadow-2xl hover:scale-110 transition-transform animate-bounce"
-        aria-label="Falar no WhatsApp"
+      {/* Floating Support Button */}
+      <button 
+        onClick={() => setIsSupportModalOpen(true)}
+        className="fixed bottom-6 right-6 z-50 bg-fiber-orange text-white p-4 rounded-full shadow-[0_0_20px_rgba(255,107,0,0.5)] hover:scale-110 hover:shadow-[0_0_30px_rgba(255,107,0,0.8)] transition-all duration-300 group"
+        aria-label="Abrir Central de Suporte"
+        title="Central de Suporte"
       >
-        <MessageCircle size={32} fill="white" />
-      </a>
+        <Headphones size={32} />
+        {/* Tooltip on Hover */}
+        <span className="absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-fiber-card text-white text-xs font-bold py-2 px-3 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10 flex items-center">
+            Falar com Suporte
+            {/* Seta do Tooltip */}
+            <span className="absolute -right-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-fiber-card border-t border-r border-white/10 transform rotate-45"></span>
+        </span>
+      </button>
     </div>
   );
 };

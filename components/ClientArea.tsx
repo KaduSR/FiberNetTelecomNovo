@@ -11,6 +11,8 @@ import { DashboardResponse, Consumo, Fatura } from '../src/types/api';
 import { apiService } from '../src/services/apiService';
 import { CONTACT_INFO } from '../constants';
 
+const DASH_CACHE_KEY = 'fiber_dashboard_cache';
+
 // === HELPERS ===
 const formatBytes = (bytes: number | string | undefined, decimals = 2) => {
     const val = Number(bytes);
@@ -29,7 +31,6 @@ const ConsumptionChart: React.FC<{ history?: Consumo['history'] }> = ({ history 
     const [period, setPeriod] = useState<'daily' | 'monthly'>('daily');
     const [activePoint, setActivePoint] = useState<{ label: string, download: number, upload: number } | null>(null);
 
-    // Map API data to Chart friendly format
     const rawData = history?.[period] || [];
     
     const data = rawData.map(item => ({
@@ -97,7 +98,6 @@ const ConsumptionChart: React.FC<{ history?: Consumo['history'] }> = ({ history 
                     </svg>
                 </div>
                 <div className="absolute bottom-0 left-8 right-0 flex justify-between text-[10px] text-gray-400 font-medium px-2">
-                    {/* Only show first and last label to avoid clutter */}
                     <span>{data[0]?.label}</span>
                     <span>{data[Math.floor(data.length / 2)]?.label}</span>
                     <span>{data[data.length - 1]?.label}</span>
@@ -120,12 +120,39 @@ const ConsumptionChart: React.FC<{ history?: Consumo['history'] }> = ({ history 
 
 // === MAIN COMPONENT ===
 const ClientArea: React.FC = () => {
-    // === STATE MANAGEMENT ===
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
+    // === STATE MANAGEMENT OTIMIZADO ===
+    
+    // 1. Inicialização Preguiçosa do Dashboard Data (Carrega do cache ANTES do render)
+    const [dashboardData, setDashboardData] = useState<DashboardResponse | null>(() => {
+        try {
+            const cached = localStorage.getItem(DASH_CACHE_KEY);
+            return cached ? JSON.parse(cached) : null;
+        } catch (e) {
+            console.warn('Dashboard cache parse error', e);
+            return null;
+        }
+    });
+
+    // 2. Verifica autenticação baseada no token e dados existentes
+    const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+        const token = localStorage.getItem('authToken');
+        // Se tem token, assumimos autenticado (se tiver dados em cache, melhor ainda)
+        return !!token;
+    });
+
+    // 3. Loading é falso se já temos dados do cache
+    const [isLoading, setIsLoading] = useState<boolean>(() => {
+        const token = localStorage.getItem('authToken');
+        const cached = localStorage.getItem(DASH_CACHE_KEY);
+        
+        if (!token) return false; // Não está logado, não carrega
+        if (cached) return false; // Tem cache, carrega instantâneo (loading false)
+        return true; // Tem token mas não tem cache, precisa carregar
+    });
+
+    const [isRefetching, setIsRefetching] = useState(false);
     const [loginError, setLoginError] = useState('');
     const [showLoginPass, setShowLoginPass] = useState(false);
-    const [dashboardData, setDashboardData] = useState<DashboardResponse | null>(null);
     const [activeTab, setActiveTab] = useState('dashboard');
     const [isPixModalOpen, setPixModalOpen] = useState(false);
     const [activePixCode, setActivePixCode] = useState('');
@@ -136,30 +163,33 @@ const ClientArea: React.FC = () => {
     const [showNewPass, setShowNewPass] = useState(false);
     const [actionStatus, setActionStatus] = useState<{ [key: string]: { status: 'idle' | 'loading' | 'success' | 'error', message?: string } }>({});
     const [diagResult, setDiagResult] = useState<{ download: string, upload: string } | null>(null);
-    
-    // Novo estado para o IP Público
     const [meuIpPublico, setMeuIpPublico] = useState<string>('Carregando...');
 
     // Login View States
     const [loginView, setLoginView] = useState<'login' | 'forgot'>('login');
     const [rememberMe, setRememberMe] = useState(false);
     const [emailInput, setEmailInput] = useState('');
-    
     const [recoveryStatus, setRecoveryStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
     const [recoveryMessage, setRecoveryMessage] = useState('');
 
     // === API FUNCTIONS ===
 
     const fetchDashboardData = async () => {
+        setIsRefetching(true);
         try {
             const data = await apiService.getDashboard();
             setDashboardData(data);
-            // IMPORTANTE: Marca como autenticado após carregar dados com sucesso
-            // Isso evita o loop de logout/login na recarga da página
             setIsAuthenticated(true);
+            localStorage.setItem(DASH_CACHE_KEY, JSON.stringify(data));
         } catch (error) {
-            console.error("Erro ao carregar dashboard:", error);
-            handleLogout();
+            console.error("Erro ao atualizar dashboard:", error);
+            // Se falhar e não tivermos dados em cache, aí sim deslogamos
+            if (!dashboardData) {
+                handleLogout();
+            }
+        } finally {
+            setIsRefetching(false);
+            setIsLoading(false);
         }
     };
 
@@ -183,6 +213,9 @@ const ClientArea: React.FC = () => {
             console.log("Token recebido, validando sessão...");
             const dashData = await apiService.getDashboard();
             setDashboardData(dashData);
+            
+            // Salva Cache
+            localStorage.setItem(DASH_CACHE_KEY, JSON.stringify(dashData));
 
             if (rememberMe) {
                 localStorage.setItem('fiber_saved_email', email);
@@ -196,14 +229,11 @@ const ClientArea: React.FC = () => {
 
         } catch (error: any) {
             console.error("Login Error:", error);
-            
             let msg = error.message || 'Ocorreu um erro desconhecido.';
             if (msg.includes('Failed to fetch') || msg.includes('Network Error')) {
                  msg = 'Falha de conexão. Verifique sua internet ou tente novamente.';
             }
-            
             setLoginError(msg);
-            
             localStorage.removeItem('authToken');
             setIsAuthenticated(false);
         } finally {
@@ -259,11 +289,9 @@ const ClientArea: React.FC = () => {
 
         try {
             const data = await apiService.performLoginAction(id, action);
-            
             if (action === 'diagnostico' && data.consumo) {
                 setDiagResult(data.consumo);
             }
-
             setActionStatus(prev => ({ 
                 ...prev, 
                 [loginId]: { status: 'success' as const, message: data.message } 
@@ -279,38 +307,41 @@ const ClientArea: React.FC = () => {
     };
 
     // === EFFECTS ===
-    
-    // Busca IP Público quando autenticado
     useEffect(() => {
-        if (isAuthenticated) {
-            fetch('https://api.ipify.org?format=json')
-                .then(response => response.json())
-                .then(data => {
-                    setMeuIpPublico(data.ip);
-                })
-                .catch(error => {
-                    console.error('Erro ao buscar IP:', error);
-                    setMeuIpPublico('Indisponível');
-                });
-        }
-    }, [isAuthenticated]);
-
-    useEffect(() => {
+        // Init saved email
         const saved = localStorage.getItem('fiber_saved_email');
         if (saved) {
             setEmailInput(saved);
             setRememberMe(true);
         }
 
-        const token = localStorage.getItem('authToken');
-        if (token) {
-            fetchDashboardData().finally(() => setIsLoading(false));
-        } else {
-            setIsLoading(false);
+        // Se estiver autenticado (tem token), atualiza os dados em background
+        // mas a UI já mostrou o cache instantaneamente
+        if (isAuthenticated) {
+            fetch('https://api.ipify.org?format=json')
+                .then(r => r.json())
+                .then(d => setMeuIpPublico(d.ip))
+                .catch(() => setMeuIpPublico('Indisponível'));
+                
+            fetchDashboardData();
         }
     }, []);
 
-    // === OTHER HANDLERS ===
+    // === RENDER LOGIC ===
+    const filteredInvoices = (dashboardData?.faturas || []).filter(invoice => {
+        if (invoiceStatusFilter === 'todas') return true;
+        const statusMap: Record<string, string> = { 'A': 'aberto', 'B': 'pago', 'C': 'cancelado' };
+        return statusMap[invoice.status]?.toLowerCase() === invoiceStatusFilter;
+    });
+
+    const getInvoiceStatusProps = (status: Fatura['status']) => {
+        switch (status) {
+            case 'B': return { icon: CheckCircle, color: 'green', label: 'Pago' };
+            case 'C': return { icon: Ban, color: 'gray', label: 'Cancelado' };
+            default: return { icon: Clock, color: 'blue', label: 'Em Aberto' };
+        }
+    };
+
     const handleCopy = (text: string, id: string) => {
         navigator.clipboard.writeText(text);
         setCopiedBarcodeId(id);
@@ -325,22 +356,6 @@ const ClientArea: React.FC = () => {
         navigator.clipboard.writeText(activePixCode);
         setIsPixCopied(true);
         setTimeout(() => setIsPixCopied(false), 2000);
-    };
-
-    // === RENDER LOGIC ===
-    const filteredInvoices = (dashboardData?.faturas || []).filter(invoice => {
-        if (invoiceStatusFilter === 'todas') return true;
-        // Mapeamento simples de status
-        const statusMap: Record<string, string> = { 'A': 'aberto', 'B': 'pago', 'C': 'cancelado' };
-        return statusMap[invoice.status]?.toLowerCase() === invoiceStatusFilter;
-    });
-
-    const getInvoiceStatusProps = (status: Fatura['status']) => {
-        switch (status) {
-            case 'B': return { icon: CheckCircle, color: 'green', label: 'Pago' };
-            case 'C': return { icon: Ban, color: 'gray', label: 'Cancelado' };
-            default: return { icon: Clock, color: 'blue', label: 'Em Aberto' };
-        }
     };
 
     const TABS = [
@@ -501,7 +516,10 @@ const ClientArea: React.FC = () => {
                 {/* Header */}
                 <header className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-10">
                     <div>
-                        <h1 className="text-3xl font-bold text-white">Olá, {dashboardData?.clientes[0]?.nome?.split(' ')[0]}!</h1>
+                        <h1 className="text-3xl font-bold text-white flex items-center gap-2">
+                            Olá, {dashboardData?.clientes[0]?.nome?.split(' ')[0]}!
+                            {isRefetching && <Loader2 size={16} className="text-fiber-orange animate-spin" />}
+                        </h1>
                         <p className="text-gray-400">Bem-vindo(a) à sua central de controle unificada.</p>
                     </div>
                     <Button onClick={handleLogout} variant="secondary" className="!py-2 !px-4 text-sm gap-2">
@@ -615,7 +633,7 @@ const ClientArea: React.FC = () => {
                                                     {/* --- NOVOS DADOS DE IP --- */}
                                                     <div className="flex items-center gap-2 text-gray-400">
                                                         <Activity size={14}/> <strong>IP Privado:</strong> 
-                                                        <span className="text-white font-mono text-xs">{login.ip_privado || 'Não atribuído'}</span>
+                                                        <span className="text-white font-mono text-xs">{login.ip_privado || '--'}</span>
                                                     </div>
                                                     <div className="flex items-center gap-2 text-gray-400">
                                                         <Globe size={14}/> <strong>IP Público:</strong> 

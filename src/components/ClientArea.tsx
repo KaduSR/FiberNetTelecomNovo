@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   User, Lock, FileText, Download, Copy, CheckCircle, AlertCircle, Loader2, 
@@ -7,9 +6,11 @@ import {
   FileSignature, BarChart3, ScrollText, Zap, Power, Server, Link2, ThumbsUp, Printer, Trash2, ArrowLeft, MessageCircle, Globe
 } from 'lucide-react';
 import Button from './Button';
-import { DashboardResponse, Consumo, Fatura } from '../src/types/api';
-import { apiService } from '../src/services/apiService';
+import { DashboardResponse, Consumo, Fatura } from '../types/api';
+import { apiService } from '../services/apiService';
 import { CONTACT_INFO } from '../constants';
+
+const DASH_CACHE_KEY = 'fiber_dashboard_cache';
 
 // === HELPERS ===
 const formatBytes = (bytes: number | string | undefined, decimals = 2) => {
@@ -121,11 +122,38 @@ const ConsumptionChart: React.FC<{ history?: Consumo['history'] }> = ({ history 
 // === MAIN COMPONENT ===
 const ClientArea: React.FC = () => {
     // === STATE MANAGEMENT ===
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
+    
+    // 1. Inicialização Preguiçosa do Dashboard Data (Carrega do cache ANTES do render)
+    const [dashboardData, setDashboardData] = useState<DashboardResponse | null>(() => {
+        try {
+            const cached = localStorage.getItem(DASH_CACHE_KEY);
+            return cached ? JSON.parse(cached) : null;
+        } catch (e) {
+            console.warn('Dashboard cache parse error', e);
+            return null;
+        }
+    });
+
+    // 2. Verifica autenticação baseada no token e dados existentes
+    const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+        const token = localStorage.getItem('authToken');
+        // Se tem token, assumimos autenticado (se tiver dados em cache, melhor ainda)
+        return !!token;
+    });
+
+    // 3. Loading é falso se já temos dados do cache
+    const [isLoading, setIsLoading] = useState<boolean>(() => {
+        const token = localStorage.getItem('authToken');
+        const cached = localStorage.getItem(DASH_CACHE_KEY);
+        
+        if (!token) return false; // Não está logado, não carrega
+        if (cached) return false; // Tem cache, carrega instantâneo (loading false)
+        return true; // Tem token mas não tem cache, precisa carregar
+    });
+
+    const [isRefetching, setIsRefetching] = useState(false);
     const [loginError, setLoginError] = useState('');
     const [showLoginPass, setShowLoginPass] = useState(false);
-    const [dashboardData, setDashboardData] = useState<DashboardResponse | null>(null);
     const [activeTab, setActiveTab] = useState('dashboard');
     const [isPixModalOpen, setPixModalOpen] = useState(false);
     const [activePixCode, setActivePixCode] = useState('');
@@ -136,6 +164,7 @@ const ClientArea: React.FC = () => {
     const [showNewPass, setShowNewPass] = useState(false);
     const [actionStatus, setActionStatus] = useState<{ [key: string]: { status: 'idle' | 'loading' | 'success' | 'error', message?: string } }>({});
     const [diagResult, setDiagResult] = useState<{ download: string, upload: string } | null>(null);
+    const [meuIpPublico, setMeuIpPublico] = useState<string>('Carregando...');
 
     // Login View States
     const [loginView, setLoginView] = useState<'login' | 'forgot'>('login');
@@ -148,15 +177,21 @@ const ClientArea: React.FC = () => {
     // === API FUNCTIONS ===
 
     const fetchDashboardData = async () => {
+        setIsRefetching(true);
         try {
             const data = await apiService.getDashboard();
             setDashboardData(data);
-            // IMPORTANTE: Marca como autenticado após carregar dados com sucesso
-            // Isso evita o loop de logout/login na recarga da página
             setIsAuthenticated(true);
+            localStorage.setItem(DASH_CACHE_KEY, JSON.stringify(data));
         } catch (error) {
-            console.error("Erro ao carregar dashboard:", error);
-            handleLogout();
+            console.error("Erro ao atualizar dashboard:", error);
+            // Se falhar e não tivermos dados em cache, aí sim deslogamos
+            if (!dashboardData) {
+                handleLogout();
+            }
+        } finally {
+            setIsRefetching(false);
+            setIsLoading(false);
         }
     };
 
@@ -180,6 +215,9 @@ const ClientArea: React.FC = () => {
             console.log("Token recebido, validando sessão...");
             const dashData = await apiService.getDashboard();
             setDashboardData(dashData);
+            
+            // Salva Cache
+            localStorage.setItem(DASH_CACHE_KEY, JSON.stringify(dashData));
 
             if (rememberMe) {
                 localStorage.setItem('fiber_saved_email', email);
@@ -277,17 +315,22 @@ const ClientArea: React.FC = () => {
 
     // === EFFECTS ===
     useEffect(() => {
+        // Init saved email
         const saved = localStorage.getItem('fiber_saved_email');
         if (saved) {
             setEmailInput(saved);
             setRememberMe(true);
         }
 
-        const token = localStorage.getItem('authToken');
-        if (token) {
-            fetchDashboardData().finally(() => setIsLoading(false));
-        } else {
-            setIsLoading(false);
+        // Se estiver autenticado (tem token), atualiza os dados em background
+        // mas a UI já mostrou o cache instantaneamente
+        if (isAuthenticated) {
+            fetch('https://api.ipify.org?format=json')
+                .then(r => r.json())
+                .then(d => setMeuIpPublico(d.ip))
+                .catch(() => setMeuIpPublico('Indisponível'));
+                
+            fetchDashboardData();
         }
     }, []);
 
@@ -482,7 +525,10 @@ const ClientArea: React.FC = () => {
                 {/* Header */}
                 <header className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-10">
                     <div>
-                        <h1 className="text-3xl font-bold text-white">Olá, {dashboardData?.clientes[0]?.nome?.split(' ')[0]}!</h1>
+                        <h1 className="text-3xl font-bold text-white flex items-center gap-2">
+                            Olá, {dashboardData?.clientes[0]?.nome?.split(' ')[0]}!
+                            {isRefetching && <Loader2 size={16} className="text-fiber-orange animate-spin" />}
+                        </h1>
                         <p className="text-gray-400">Bem-vindo(a) à sua central de controle unificada.</p>
                     </div>
                     <Button onClick={handleLogout} variant="secondary" className="!py-2 !px-4 text-sm gap-2">
@@ -600,7 +646,7 @@ const ClientArea: React.FC = () => {
                                                     </div>
                                                     <div className="flex items-center gap-2 text-gray-400">
                                                         <Globe size={14}/> <strong>IP Público:</strong> 
-                                                        <span className="text-fiber-blue font-bold font-mono text-xs">{login.ip_publico || '--'}</span>
+                                                        <span className="text-fiber-blue font-bold font-mono text-xs">{meuIpPublico}</span>
                                                     </div>
                                                     {/* ------------------------- */}
                                                 </div>
