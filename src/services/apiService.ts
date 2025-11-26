@@ -15,8 +15,6 @@ const generateHistory = (multiplier: number): HistoryData => {
       };
     }),
     weekly: Array.from({length: 12}, (_, i) => {
-      // Create simple labels like "Sem 1", "Sem 2" relative to current
-      // In a real app, this would be date ranges
       return {
         semana: `Semana ${i + 1}`,
         download_bytes: Math.random() * 35 * 1024 * 1024 * 1024 * multiplier,
@@ -32,147 +30,6 @@ const generateHistory = (multiplier: number): HistoryData => {
       { mes_ano: "02/2025", download_bytes: 500 * 1024 * 1024 * 1024 * multiplier, upload_bytes: 250 * 1024 * 1024 * 1024 * multiplier }
     ]
   };
-};
-
-// === DADOS MOCKADOS PARA AMBIENTE DE DESENVOLVIMENTO ===
-const MOCK_DASHBOARD: DashboardResponse = {
-  clientes: [
-    {
-      id: 999,
-      nome: "Desenvolvedor Fiber.Net",
-      endereco: "Endereço Principal - Matriz",
-      cnpj_cpf: "000.000.000-00",
-      email: "dev@fibernet.com",
-      fone: "(24) 99999-9999"
-    }
-  ],
-  contratos: [
-    // CONTRATO 1 - RESIDENCIAL
-    {
-      id: 1001,
-      id_cliente: 999,
-      login: "dev.casa",
-      status: "A",
-      desbloqueio_confianca: "N",
-      descricao_aux_plano_venda: "PLANO FIBRA 500 MEGA",
-      endereco: "Rua das Laranjeiras, 100",
-      bairro: "Centro",
-      cidade: "Rio das Flores",
-      pdf_link: "#"
-    },
-    // CONTRATO 2 - COMERCIAL (PARA PROVAR O AGRUPAMENTO)
-    {
-      id: 1002,
-      id_cliente: 999,
-      login: "dev.loja",
-      status: "A",
-      desbloqueio_confianca: "N",
-      descricao_aux_plano_venda: "PLANO EMPRESARIAL 1GB",
-      endereco: "Av. do Comércio, 500",
-      bairro: "Industrial",
-      cidade: "Valença",
-      pdf_link: "#"
-    }
-  ],
-  logins: [
-    // Login vinculado ao Contrato 1
-    {
-      id: 500,
-      login: "dev.casa",
-      id_cliente: 999,
-      contrato_id: 1001,
-      online: "S",
-      sinal_ultimo_atendimento: "-18.50 dBm",
-      tempo_conectado: "15d 4h 20m",
-      ip_privado: "100.64.10.5",
-      ont_modelo: "Huawei HG8145V5",
-      history: generateHistory(1) // Normal usage
-    },
-    // Login vinculado ao Contrato 2
-    {
-      id: 501,
-      login: "dev.loja",
-      id_cliente: 999,
-      contrato_id: 1002,
-      online: "S",
-      sinal_ultimo_atendimento: "-22.10 dBm",
-      tempo_conectado: "2d 10h 05m",
-      ip_privado: "100.64.20.10",
-      ont_modelo: "ZTE F670L",
-      history: generateHistory(2.5) // Heavy usage
-    }
-  ],
-  faturas: [
-    // Fatura do Contrato 1
-    {
-      id: 501,
-      id_cliente: 999,
-      contrato_id: 1001,
-      documento: "FAT-RES-01",
-      data_emissao: "2025-02-01",
-      data_vencimento: "2025-02-10",
-      valor: "99,90",
-      status: "A", // Aberto
-      linha_digitavel: "84670000001 4 99900099999 9 99999999999 9 99999999999 9",
-      pix_txid: "pix-residencia-mock",
-      boleto: "#"
-    },
-    // Fatura do Contrato 2
-    {
-      id: 502,
-      id_cliente: 999,
-      contrato_id: 1002,
-      documento: "FAT-COM-01",
-      data_emissao: "2025-02-05",
-      data_vencimento: "2025-02-15",
-      valor: "250,00",
-      status: "A", // Aberto
-      linha_digitavel: "84670000002 5 88800088888 8 88888888888 8 88888888888 8",
-      pix_txid: "pix-comercial-mock",
-      boleto: "#"
-    }
-  ],
-  notas: [
-    {
-        id: 700,
-        contrato_id: 1001,
-        numero_nota: "2025001",
-        data_emissao: "10/02/2025",
-        valor: "99,90",
-        link_pdf: "#"
-    }
-  ],
-  ordensServico: [],
-  ontInfo: [],
-  consumo: {
-    total_download_bytes: 536870912000, // 500 GB
-    total_upload_bytes: 268435456000,   // 250 GB
-    total_download: "500 GB",
-    total_upload: "250 GB",
-    history: generateHistory(3.5) // Combined usage
-  },
-  ai_analysis: {
-    summary: "Sua saúde financeira está estável, mas requer atenção a curto prazo. Identificamos uma fatura próxima do vencimento e alto consumo de upload em horário comercial.",
-    insights: [
-      {
-        type: 'risk',
-        title: "Atenção: Vencimento Próximo",
-        message: "A fatura de R$ 99,90 vence em 5 dias. Evite bloqueios e multas.",
-        action: "Pagar Agora",
-        actionUrl: "#"
-      },
-      {
-        type: 'positive',
-        title: "Excelente Pagador",
-        message: "Você pagou suas últimas 6 faturas em dia! Isso melhora seu score interno."
-      },
-      {
-        type: 'neutral',
-        title: "Dica de Conexão",
-        message: "Seu consumo de upload aumentou 20% esta semana. Ótimo para backups em nuvem!"
-      }
-    ]
-  }
 };
 
 const DEV_TOKEN = "DEV_TOKEN_MOCK_123456";
@@ -192,24 +49,6 @@ class ApiService {
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    // === MOCK INTERCEPTOR ===
-    const token = localStorage.getItem('authToken');
-    if (token === DEV_TOKEN) {
-        console.log(`[DEV MODE] Mocking request to: ${endpoint}`);
-        // Simula delay de rede
-        await new Promise(resolve => setTimeout(resolve, 400));
-        
-        // Retornos Mockados baseados na rota
-        if (endpoint.includes('dashboard')) return MOCK_DASHBOARD as unknown as T;
-        if (endpoint.includes('logins')) return { message: "Comando executado com sucesso (DEV MODE)" } as unknown as T;
-        if (endpoint.includes('trocar-senha')) return { message: "Senha alterada com sucesso (DEV MODE)" } as unknown as T;
-        if (endpoint.includes('recuperar-senha')) return { message: "E-mail de recuperação enviado (DEV MODE)" } as unknown as T;
-        if (endpoint.includes('status')) return { status: 'operational' } as unknown as T;
-        
-        return {} as T;
-    }
-    // ========================
-
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     const cleanBaseUrl = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
     const url = `${cleanBaseUrl}${cleanEndpoint}`;
@@ -264,18 +103,6 @@ class ApiService {
   // === MÉTODOS ===
 
   async login(credentials: { email: string; password: string }): Promise<LoginResponse> {
-    // === DEV BACKDOOR ===
-    if (credentials.email === 'dev@fibernet.com' && credentials.password === 'dev') {
-        console.log("[ApiService] Login DEV realizado com sucesso.");
-        const mockResponse = { 
-            token: DEV_TOKEN,
-            user: { id: 999, nome: "Dev User", email: "dev@fibernet.com" }
-        };
-        localStorage.setItem('authToken', DEV_TOKEN);
-        return mockResponse;
-    }
-    // ====================
-
     const data = await this.request<LoginResponse>(ENDPOINTS.LOGIN, { 
       method: 'POST',
       body: JSON.stringify(credentials),
@@ -292,38 +119,74 @@ class ApiService {
       method: 'GET',
     });
 
-    // ✅ NORMALIZAÇÃO E FILTROS ROBUSTOS
-    // Isso garante que o front receba dados consistentes mesmo que a API varie
+    // ✅ MAPEAMENTO CORRETO DOS DADOS DA API
     const normalized: DashboardResponse = {
       clientes: rawData.clientes || [],
       
       // ✅ FILTRAR APENAS CONTRATOS ATIVOS
-      contratos: (rawData.contratos || []).filter((c: any) => c.status === 'A'),
+      contratos: (rawData.contratos || [])
+        .filter((c: any) => c.status === 'A')
+        .map((c: any) => ({
+          ...c,
+          // Adicionar campos do cliente para contexto
+          endereco: rawData.clientes[0]?.endereco || '',
+          bairro: '', 
+          cidade: '', 
+        })),
       
-      // ✅ NORMALIZAR FATURAS (Apenas abertas, e mapear campos variáveis)
-      faturas: (rawData.faturas || []).map((f: any) => ({
-        ...f,
-        // Garantir campos obrigatórios
-        data_vencimento: f.data_vencimento || f.vencimento || 'Sem data',
-        // Fallback para campos de pagamento
-        pix_txid: f.pix_txid || f.pix_code || f.chave_pix || null,
-        linha_digitavel: f.linha_digitavel || f.codigo_barras || f.digitable_line || null,
-        // Normalizar status
-        status: f.status || 'Desconhecido'
-      })),
+      // ✅ NORMALIZAR FATURAS (APENAS EM ABERTO)
+      faturas: (rawData.faturas || [])
+        .filter((f: any) => f.status !== 'pago' && f.status !== 'P') 
+        .map((f: any) => ({
+          ...f,
+          contrato_id: rawData.contratos[0]?.id, // Vincular ao primeiro contrato ativo como fallback
+          data_vencimento: f.vencimento || f.data_vencimento,
+          status: f.status === 'pago' ? 'C' : 'A', // Normalizar: 'A' = Aberto
+          pix_code: f.pix_code || null,
+          pix_qrcode: f.pix_qrcode || null,
+          pix_txid: null, // Será buscado dinamicamente
+        })),
       
-      // ✅ NORMALIZAR LOGINS (Status Online e Sinais)
-      logins: (rawData.logins || []).map((l: any) => ({
-        ...l,
-        // Normaliza status online para 'S' ou 'N' independente de vir true/false/online/offline
-        online: ['S', 'Y', 'true', 'online'].includes(String(l.online).toLowerCase()) || l.status === 'online' ? 'S' : 'N',
-        // Fallbacks para sinal
-        sinal_ultimo_atendimento: l.sinal_ultimo_atendimento || l.sinal_ont || l.sinal || 'N/A',
-        // Fallback para modelo
-        ont_modelo: l.ont_modelo || l.modelo_ont || 'ONU Padrão'
-      })),
+      // ✅ NORMALIZAR LOGINS COM DADOS DA ONT
+      logins: (rawData.logins || []).map((l: any) => {
+        // Buscar dados da ONT correspondente
+        const ont = (rawData.ontInfo || []).find((o: any) => 
+          Number(o.id_login) === Number(l.id)
+        );
+
+        // Converter uptime de segundos para formato legível se for numérico
+        let tempo_conectado = l.uptime || 'Recente';
+        if (!isNaN(Number(l.uptime))) {
+            const uptimeSeconds = parseInt(l.uptime || '0');
+            const days = Math.floor(uptimeSeconds / 86400);
+            const hours = Math.floor((uptimeSeconds % 86400) / 3600);
+            const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+            tempo_conectado = `${days}d ${hours}h ${minutes}m`;
+        }
+
+        return {
+          ...l,
+          contrato_id: l.contrato_id || rawData.contratos[0]?.id,
+          online: l.status === 'online' || l.online === 'S' ? 'S' : 'N',
+          sinal_ultimo_atendimento: ont?.sinal_rx || l.sinal_ont || 'N/A',
+          tempo_conectado,
+          ont_modelo: ont?.onu_tipo || l.modelo_ont || 'Não informado',
+          ont_sinal_rx: ont?.sinal_rx,
+          ont_sinal_tx: ont?.sinal_tx,
+          ont_temperatura: ont?.temperatura,
+          ont_mac: ont?.mac,
+          ip_publico: l.ip_publico || 'Não disponível'
+        };
+      }),
       
-      notas: rawData.notas || [],
+      // ✅ FILTRAR NOTAS INVÁLIDAS
+      notas: (rawData.notas || [])
+        .filter((n: any) => n.id !== 'ai-insights' && !n.summary)
+        .map((n: any) => ({
+          ...n,
+          contrato_id: rawData.contratos[0]?.id
+        })),
+      
       ordensServico: rawData.ordensServico || [],
       ontInfo: rawData.ontInfo || [],
       consumo: rawData.consumo || { 
@@ -337,6 +200,22 @@ class ApiService {
     };
 
     return normalized;
+  }
+
+  // ✅ NOVO: Buscar PIX de uma fatura específica
+  async getPixCode(faturaId: string | number): Promise<string> {
+    try {
+      const response = await this.request<any>(ENDPOINTS.GET_PIX, {
+        method: 'POST',
+        body: JSON.stringify({ id_areceber: String(faturaId) })
+      });
+
+      // Extrair QR Code do retorno da API
+      return response?.pix?.qrCode?.qrcode || '';
+    } catch (error) {
+      console.error(`[ApiService] Erro ao buscar PIX da fatura ${faturaId}:`, error);
+      throw error;
+    }
   }
 
   async recoverPassword(email: string): Promise<{ message: string }> {
@@ -361,23 +240,6 @@ class ApiService {
 
   async unlockTrust(): Promise<{ message: string }> {
     return this.request<{ message: string }>('/api/desbloqueio-confianca', {
-      method: 'POST',
-    });
-  }
-
-  async getTasks(): Promise<Task[]> {
-    return this.request<Task[]>('/api/tasks', { method: 'GET' });
-  }
-
-  async createTask(data: { title: string; description: string }): Promise<Task> {
-    return this.request<Task>('/api/tasks', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async analyzeTask(taskId: string): Promise<any> {
-    return this.request<any>(`/api/ai/analyze/${taskId}`, {
       method: 'POST',
     });
   }

@@ -1,5 +1,4 @@
 
-
 export interface Cliente {
   id: number;
   nome: string;
@@ -13,12 +12,11 @@ export interface Cliente {
 export interface Contrato {
   id: number;
   id_cliente: number;
-  login: string; // Geralmente o usuário PPPoE principal
+  login: string; 
   status: string; // 'A', 'S', 'C'
   desbloqueio_confianca: 'S' | 'N';
-  descricao_aux_plano_venda?: string; // Nome do Plano
+  descricao_aux_plano_venda?: string; 
   pdf_link?: string; 
-  // Novos campos para agrupamento visual
   endereco?: string;
   numero?: string;
   bairro?: string;
@@ -28,24 +26,29 @@ export interface Contrato {
 export interface Fatura {
   id: number;
   id_cliente: number;
-  contrato_id?: number; // CAMPO CRÍTICO PARA O AGRUPAMENTO
+  contrato_id?: number;
   documento: string;
-  data_emissao: string;
-  data_vencimento: string;
+  data_emissao?: string;
+  data_vencimento: string; 
+  vencimento?: string; 
   valor: string;
-  status: 'A' | 'B' | 'C' | 'Aberta' | 'Paga' | 'Vencida' | string; 
+  status: string; // "pago" | "aberto" | "A" | "B" | "C"
   linha_digitavel: string;
-  pix_txid: string;
-  boleto: string;
+  pix_txid?: string;
+  pix_code?: string;
+  pix_qrcode?: string; // QR Code completo (CopyPaste)
+  boleto?: string;
   descricao?: string;
 }
 
 export interface NotaFiscal {
-    id: number;
-    contrato_id?: number; // CAMPO CRÍTICO PARA O AGRUPAMENTO
-    numero_nota: string;
-    data_emissao: string;
-    valor: string;
+    id: number | string;
+    contrato_id?: number;
+    numero_nota?: string;
+    summary?: string; 
+    insights?: any[]; 
+    data_emissao?: string;
+    valor?: string;
     link_pdf?: string;
 }
 
@@ -67,21 +70,26 @@ export interface Login {
   id: number;
   login: string;
   id_cliente: number;
-  contrato_id: number; // CAMPO CRÍTICO PARA O AGRUPAMENTO
+  contrato_id: number;
   online: 'S' | 'N';
-  sinal_ultimo_atendimento: string; // Sinal ONT
-  // Fallback fields for API variations
-  sinal_rx?: string;
-  sinal?: string;
+  status?: string; 
+  uptime?: string; // tempo em segundos ou string formatada
+  sinal_ultimo_atendimento: string;
   
+  // ONT Details
+  ont_modelo?: string;
+  ont_sinal_rx?: string;
+  ont_sinal_tx?: string;
+  ont_temperatura?: string;
+  ont_mac?: string;
+
   tempo_conectado: string;
   upload_atual?: string;
   download_atual?: string;
-  // Campos de IP e Equipamento
   ip_privado?: string;
   ip_publico?: string;
-  ont_modelo?: string;
-  history?: HistoryData; // Histórico específico deste login
+  
+  history?: HistoryData; 
 }
 
 export interface Consumo {
@@ -106,6 +114,11 @@ export interface OntInfo {
   serial_number?: string;
   status?: string;
   sinal_rx?: string;
+  sinal_tx?: string;
+  temperatura?: string;
+  mac?: string;
+  onu_tipo?: string;
+  id_login?: number | string;
 }
 
 export interface Task {
@@ -117,7 +130,6 @@ export interface Task {
   createdAt?: string;
 }
 
-// === NOVAS INTERFACES DE AI ===
 export interface AiInsight {
   type: 'risk' | 'positive' | 'neutral';
   title: string;
@@ -130,7 +142,6 @@ export interface AiAnalysis {
   summary: string;
   insights: AiInsight[];
 }
-// =============================
 
 export interface DashboardResponse {
   clientes: Cliente[];
@@ -141,7 +152,7 @@ export interface DashboardResponse {
   ordensServico: OrdemServico[];
   ontInfo: OntInfo[];
   consumo: Consumo;
-  ai_analysis?: AiAnalysis; // Campo opcional para insights
+  ai_analysis?: AiAnalysis; 
 }
 
 export interface LoginResponse {
@@ -153,11 +164,10 @@ export interface LoginResponse {
   }
 }
 
-// Tipo para mensagens do Chat IA
 export interface ChatMessage {
     id: string;
     sender: 'user' | 'bot';
     text: string;
     timestamp: Date;
-    sources?: { title: string; url: string }[]; // Added for Search Grounding
+    sources?: { title: string; url: string }[];
 }

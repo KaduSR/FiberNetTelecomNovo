@@ -6,7 +6,6 @@ export const getApiBaseUrl = () => {
 
 export const API_BASE_URL = getApiBaseUrl();
 
-// CORREÇÃO: Adicionando os prefixos /api e /auth que faltavam
 export const ENDPOINTS = {
   LOGIN: `/api/auth/login`,
   DASHBOARD: `/api/dashboard`,
@@ -15,5 +14,6 @@ export const ENDPOINTS = {
   INVOICES: `/api/faturas`,
   SERVICE_STATUS: `/api/status`,
   SPEEDTEST_RUN: `/api/speedtest`,
+  GET_PIX: `/get_pix`, // Endpoint para buscar PIX dinamicamente
   LOGIN_ACTION: (id: string | number, action: string) => `/api/logins/${id}/${action}`,
 };

@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   User, Lock, FileText, Download, Copy, CheckCircle, AlertCircle, Loader2, 
@@ -16,7 +14,7 @@ import AIInsights from '../src/components/AIInsights';
 import { GoogleGenAI } from "@google/genai";
 
 // MUDANÇA DE CHAVE PARA FORÇAR LIMPEZA DE CACHE
-const DASH_CACHE_KEY = 'fiber_dashboard_cache_v21_strict_active';
+const DASH_CACHE_KEY = 'fiber_dashboard_cache_v31_env_fix';
 
 const CHAT_SUGGESTIONS = [
     { label: "Minha fatura vence quando?", icon: FileText },
@@ -37,19 +35,6 @@ const formatBytes = (bytes: number | string | undefined, decimals = 2) => {
 
 const bytesToGB = (bytes: number) => {
     return parseFloat((bytes / (1024 * 1024 * 1024)).toFixed(2));
-};
-
-// === HELPER: VERIFICA SE FATURA ESTÁ ABERTA (ROBUST CHECK) ===
-const isInvoiceOpen = (status: string) => {
-    if (!status) return false;
-    const s = String(status).toUpperCase();
-    return ['A', 'ABERTA', 'PENDENTE', '1', 'OPEN'].includes(s);
-};
-
-const isInvoicePaid = (status: string) => {
-    if (!status) return false;
-    const s = String(status).toUpperCase();
-    return ['P', 'PAGO', 'PAGA', 'BAIXADO', 'BAIXADA', 'LIQUIDADO'].includes(s);
 };
 
 // === SUB-COMPONENT: CONSUMPTION CHART ===
@@ -73,10 +58,7 @@ const ConsumptionChart: React.FC<{ history?: HistoryData }> = ({ history }) => {
         );
     }
     
-    // Calcula o máximo para escala
     const maxVal = Math.max(...data.map(d => Math.max(d.download, d.upload)), 1);
-    
-    // Configurações do Gráfico SVG
     const width = 100;
     const height = 50; 
     const padding = 5;
@@ -112,14 +94,6 @@ const ConsumptionChart: React.FC<{ history?: HistoryData }> = ({ history }) => {
                 </div>
             </div>
             <div className="h-64 w-full relative group">
-                {/* Linhas de grade horizontais */}
-                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
-                    <div className="border-t border-white/5 w-full h-0"></div>
-                    <div className="border-t border-white/5 w-full h-0"></div>
-                    <div className="border-t border-white/5 w-full h-0"></div>
-                    <div className="border-t border-white/5 w-full h-0"></div>
-                </div>
-
                 <div className="absolute left-0 top-0 bottom-6 flex flex-col justify-between text-[10px] text-gray-600 font-mono pointer-events-none z-0">
                     <span>{Math.round(maxVal)} GB</span><span>{Math.round(maxVal / 2)} GB</span><span>0 GB</span>
                 </div>
@@ -137,7 +111,6 @@ const ConsumptionChart: React.FC<{ history?: HistoryData }> = ({ history }) => {
                         <path d={getAreaPath('upload')} fill="url(#gradUpload)" className="transition-all duration-500" />
                         <path d={getPath('upload')} fill="none" stroke="#FF6B00" strokeWidth="0.5" strokeLinecap="round" strokeLinejoin="round" className="transition-all duration-500 drop-shadow-lg" />
                         
-                        {/* Pontos Interativos (reduzidos se houver muitos dados) */}
                         {data.map((d, i) => (
                             <g key={i} className="group/point">
                                 <rect x={getX(i) - (data.length > 20 ? 0.5 : 1)} y="0" width={data.length > 20 ? 1 : 2} height={height} fill="transparent" className="cursor-pointer" onMouseEnter={() => setActivePoint(d)} onMouseLeave={() => setActivePoint(null)} />
@@ -152,7 +125,6 @@ const ConsumptionChart: React.FC<{ history?: HistoryData }> = ({ history }) => {
                     </svg>
                 </div>
 
-                {/* Eixo X Labels (Amostragem para não poluir) */}
                 <div className="absolute bottom-0 left-8 right-0 flex justify-between text-[10px] text-gray-500 font-medium px-2">
                     <span>{data[0]?.label}</span>
                     {data.length > 5 && <span>{data[Math.floor(data.length / 4)]?.label}</span>}
@@ -232,23 +204,19 @@ const ClientArea: React.FC = () => {
     const [showNewPass, setShowNewPass] = useState(false);
     const [actionStatus, setActionStatus] = useState<{ [key: string]: { status: 'idle' | 'loading' | 'success' | 'error', message?: string } }>({});
     const [diagResult, setDiagResult] = useState<{ download: string, upload: string } | null>(null);
-    
-    // Novo state para filtro de consumo
     const [selectedLoginConsumo, setSelectedLoginConsumo] = useState<number | 'total'>('total');
-
     const [loginView, setLoginView] = useState<'login' | 'forgot'>('login');
     const [rememberMe, setRememberMe] = useState(false);
     const [emailInput, setEmailInput] = useState('');
     const [recoveryStatus, setRecoveryStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
     const [recoveryMessage, setRecoveryMessage] = useState('');
+    const [loadingPix, setLoadingPix] = useState<{[key: string]: boolean}>({});
 
-    // Chat AI State
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
         { id: '1', sender: 'bot', text: 'Olá! Sou a IA da Fiber.Net. Como posso ajudar você hoje?', timestamp: new Date() }
     ]);
     const [chatInput, setChatInput] = useState('');
     const [isChatTyping, setIsChatTyping] = useState(false);
-    
     const chatContainerRef = useRef<HTMLDivElement>(null);
 
     // Efeito para rolar para o topo ao mudar de aba
@@ -256,8 +224,6 @@ const ClientArea: React.FC = () => {
         window.scrollTo(0, 0); 
         const timer = setTimeout(() => {
             window.scrollTo(0, 0);
-            document.body.scrollTop = 0;
-            document.documentElement.scrollTop = 0;
         }, 10);
         return () => clearTimeout(timer);
     }, [activeTab]);
@@ -266,7 +232,6 @@ const ClientArea: React.FC = () => {
         setIsRefetching(true);
         try {
             const data = await apiService.getDashboard();
-            console.log("Dashboard Data Received:", data); // DEBUGGING LOG
             setDashboardData(data);
             setIsAuthenticated(true);
             localStorage.setItem(DASH_CACHE_KEY, JSON.stringify(data));
@@ -294,7 +259,6 @@ const ClientArea: React.FC = () => {
             if (!loginResponse.token) throw new Error('Token inválido.');
 
             const dashData = await apiService.getDashboard();
-            console.log("Login Dashboard Data:", dashData); // DEBUGGING LOG
             setDashboardData(dashData);
             localStorage.setItem(DASH_CACHE_KEY, JSON.stringify(dashData));
 
@@ -373,7 +337,14 @@ const ClientArea: React.FC = () => {
         setIsChatTyping(true);
 
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const apiKey = process.env.API_KEY;
+            
+            if (!apiKey) {
+                // Mensagem amigável caso a chave não esteja configurada no ambiente
+                throw new Error("API Key não configurada. Por favor, entre em contato com o suporte.");
+            }
+
+            const ai = new GoogleGenAI({ apiKey });
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
                 contents: text,
@@ -397,7 +368,6 @@ const ClientArea: React.FC = () => {
 
             const botText = response.text || "Desculpe, não consegui processar sua resposta no momento.";
             
-            // Extract Search Grounding Sources
             let sources: { title: string; url: string }[] = [];
             if (response.candidates?.[0]?.groundingMetadata?.groundingChunks) {
                 sources = response.candidates[0].groundingMetadata.groundingChunks
@@ -419,12 +389,16 @@ const ClientArea: React.FC = () => {
             };
             setChatMessages(prev => [...prev, botMsg]);
 
-        } catch (error) {
+        } catch (error: any) {
             console.error("Gemini AI Error:", error);
+            const errorText = error.message?.includes("API Key") 
+                ? "O serviço de IA está temporariamente indisponível. Por favor, tente novamente mais tarde." 
+                : "Desculpe, estou enfrentando instabilidade técnica. Por favor, tente novamente mais tarde ou contate o suporte humano.";
+                
             const errorMsg: ChatMessage = { 
                 id: (Date.now() + 1).toString(), 
                 sender: 'bot', 
-                text: "Desculpe, estou enfrentando instabilidade técnica. Por favor, tente novamente mais tarde ou contate o suporte humano.", 
+                text: errorText, 
                 timestamp: new Date() 
             };
             setChatMessages(prev => [...prev, errorMsg]);
@@ -472,6 +446,37 @@ const ClientArea: React.FC = () => {
         navigator.clipboard.writeText(activePixCode);
         setIsPixCopied(true);
         setTimeout(() => setIsPixCopied(false), 2000);
+    };
+
+    // Nova função para buscar PIX dinamicamente
+    const fetchPixCode = async (faturaId: number) => {
+        if (loadingPix[faturaId]) return;
+      
+        setLoadingPix(prev => ({ ...prev, [faturaId]: true }));
+      
+        try {
+          const pixCode = await apiService.getPixCode(faturaId);
+          
+          if (pixCode) {
+            // Atualizar estado local para manter consistência
+            setDashboardData(prev => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    faturas: prev.faturas.map(f => Number(f.id) === Number(faturaId) ? { ...f, pix_qrcode: pixCode } : f)
+                };
+            });
+            setActivePixCode(pixCode);
+            setPixModalOpen(true);
+          } else {
+             alert('Código PIX não disponível para esta fatura no momento.');
+          }
+        } catch (error) {
+          console.error('Erro ao buscar PIX:', error);
+          alert('Erro ao buscar o código PIX. Tente novamente ou use o código de barras.');
+        } finally {
+          setLoadingPix(prev => ({ ...prev, [faturaId]: false }));
+        }
     };
 
     const TABS = [
@@ -557,7 +562,6 @@ const ClientArea: React.FC = () => {
                                     <div className="flex items-center gap-3">
                                         <tab.icon size={18} /> {tab.label}
                                     </div>
-                                    {/* Exibe Badge se existir (Ex: NOVO na IA) */}
                                     {tab.badge && (
                                         <span className="bg-white text-fiber-orange text-[10px] font-bold px-1.5 py-0.5 rounded">
                                             {tab.badge}
@@ -589,26 +593,19 @@ const ClientArea: React.FC = () => {
                                         </div>
                                     ) : (
                                         dashboardData.contratos.map((contrato) => {
-                                            // ✅ LOGS DE DEBUG
-                                            console.log('🔍 Processando Contrato:', contrato.id, contrato.status);
-
-                                            // ✅ DOUBLE CHECK: Garantir que só exibe ativos (redundância de segurança)
                                             if (contrato.status !== 'A') {
-                                                console.warn('⚠️ Contrato não ativo detectado no loop:', contrato.id);
+                                                console.warn('⚠️ Contrato não ativo detectado:', contrato.id);
                                                 return null;
                                             }
 
-                                            // Filtra logins
                                             const loginsDoContrato = dashboardData.logins.filter(l => 
                                                 Number(l.contrato_id) === Number(contrato.id)
                                             );
                                             
-                                            // Filtra faturas (Apenas Abertas)
                                             const faturasDoContrato = dashboardData.faturas.filter(f => 
-                                                (f.contrato_id ? Number(f.contrato_id) === Number(contrato.id) : true) && 
-                                                isInvoiceOpen(f.status)
-                                            );
-
+                                                f.contrato_id ? Number(f.contrato_id) === Number(contrato.id) : true
+                                            ).filter(f => f.status === 'A'); 
+                                            
                                             const notasDoContrato = dashboardData.notas?.filter(n => 
                                                 n.contrato_id ? Number(n.contrato_id) === Number(contrato.id) : true
                                             ) || [];
@@ -625,7 +622,7 @@ const ClientArea: React.FC = () => {
                                                             </h3>
                                                             <p className="text-gray-400 text-sm mt-1 flex items-center gap-2">
                                                                 <MapPin size={14} className="text-gray-500" /> 
-                                                                {contrato.endereco || 'Endereço não informado'} 
+                                                                {contrato.endereco || 'Endereço não informado'}
                                                                 {contrato.bairro && ` - ${contrato.bairro}`}
                                                                 {contrato.cidade && `, ${contrato.cidade}`}
                                                             </p>
@@ -655,12 +652,20 @@ const ClientArea: React.FC = () => {
                                                                         
                                                                         <div className="flex items-center gap-6 text-xs text-gray-400">
                                                                             <div className="flex items-center gap-2" title="Modelo da ONU">
-                                                                                <Router size={14}/> {login.ont_modelo}
+                                                                                <Router size={14}/> {login.ont_modelo || 'N/A'}
                                                                             </div>
-                                                                            <div className="flex items-center gap-2" title="Sinal Óptico">
+                                                                            <div className="flex items-center gap-2" title="Sinal Óptico (RX)">
                                                                                 <Activity size={14}/> 
-                                                                                <span className={parseFloat(login.sinal_ultimo_atendimento) < -27 ? 'text-red-400' : 'text-fiber-green'}>
-                                                                                    {login.sinal_ultimo_atendimento}
+                                                                                <span className={`font-mono ${
+                                                                                !login.sinal_ultimo_atendimento || login.sinal_ultimo_atendimento === 'N/A' 
+                                                                                    ? 'text-gray-500' 
+                                                                                    : parseFloat(login.sinal_ultimo_atendimento) < -27 
+                                                                                    ? 'text-red-400' 
+                                                                                    : parseFloat(login.sinal_ultimo_atendimento) < -25
+                                                                                        ? 'text-yellow-400'
+                                                                                        : 'text-fiber-green'
+                                                                                }`}>
+                                                                                {login.sinal_ultimo_atendimento || 'N/A'} 
                                                                                 </span>
                                                                             </div>
                                                                              <div className="flex items-center gap-2" title="Tempo Conectado">
@@ -681,7 +686,7 @@ const ClientArea: React.FC = () => {
                                                         )}
                                                     </div>
 
-                                                    {/* FINANCEIRO */}
+                                                    {/* FATURAS PENDENTES */}
                                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                                         <div>
                                                             <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
@@ -689,28 +694,61 @@ const ClientArea: React.FC = () => {
                                                             </h4>
                                                             <div className="space-y-3">
                                                                 {faturasDoContrato.length > 0 ? (
-                                                                    faturasDoContrato.map(fatura => (
-                                                                        <div key={fatura.id} className="flex justify-between items-center bg-white/5 p-3 rounded-lg border-l-2 border-fiber-orange hover:bg-white/10 transition-colors">
-                                                                            <div>
-                                                                                <p className="text-white font-bold text-sm">R$ {fatura.valor}</p>
-                                                                                <p className="text-[10px] text-gray-400">Venc: {fatura.data_vencimento}</p>
+                                                                    faturasDoContrato.map(fatura => {
+                                                                        const isLoadingPixForThis = loadingPix[fatura.id] || false;
+                                                                        return (
+                                                                            <div key={fatura.id} className="flex justify-between items-center bg-white/5 p-3 rounded-lg border-l-2 border-fiber-orange hover:bg-white/10 transition-colors">
+                                                                                <div>
+                                                                                    <p className="text-white font-bold text-sm">R$ {fatura.valor}</p>
+                                                                                    <p className="text-[10px] text-gray-400">
+                                                                                        Venc: {fatura.data_vencimento}
+                                                                                    </p>
+                                                                                </div>
+                                                                                <div className="flex gap-2">
+                                                                                    <button 
+                                                                                        onClick={() => {
+                                                                                            if (fatura.pix_qrcode) {
+                                                                                                handleOpenPixModal(fatura.pix_qrcode);
+                                                                                            } else {
+                                                                                                fetchPixCode(Number(fatura.id));
+                                                                                            }
+                                                                                        }}
+                                                                                        disabled={isLoadingPixForThis}
+                                                                                        className="text-[10px] bg-fiber-green/20 text-fiber-green px-2 py-1 rounded hover:bg-fiber-green/30 transition font-bold flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                                    >
+                                                                                        {isLoadingPixForThis ? (
+                                                                                            <><Loader2 size={10} className="animate-spin"/> ...</>
+                                                                                        ) : (
+                                                                                            <><QrCode size={10}/> PIX</>
+                                                                                        )}
+                                                                                    </button>
+                                                                                    
+                                                                                    {fatura.linha_digitavel && (
+                                                                                        <button 
+                                                                                            onClick={() => handleCopy(fatura.linha_digitavel!, String(fatura.id))} 
+                                                                                            className="text-[10px] bg-white/10 text-white px-2 py-1 rounded hover:bg-white/20 transition flex items-center gap-1"
+                                                                                        >
+                                                                                            {copiedBarcodeId === String(fatura.id) ? (
+                                                                                                <><CheckCircle size={10}/> Copiado</>
+                                                                                            ) : (
+                                                                                                <><Copy size={10}/> Código</>
+                                                                                            )}
+                                                                                        </button>
+                                                                                    )}
+                                                                                </div>
                                                                             </div>
-                                                                            <div className="flex gap-2">
-                                                                                {fatura.pix_txid && <button onClick={() => handleOpenPixModal(fatura.pix_txid!)} className="text-[10px] bg-fiber-green/20 text-fiber-green px-2 py-1 rounded hover:bg-fiber-green/30 transition font-bold flex items-center gap-1"><QrCode size={10}/> PIX</button>}
-                                                                                {fatura.linha_digitavel && <button onClick={() => handleCopy(fatura.linha_digitavel!, String(fatura.id))} className="text-[10px] bg-white/10 text-white px-2 py-1 rounded hover:bg-white/20 transition flex items-center gap-1">
-                                                                                    {copiedBarcodeId === String(fatura.id) ? <><CheckCircle size={10}/> Copiado</> : <><Copy size={10}/> Código</>}
-                                                                                </button>}
-                                                                                {!fatura.pix_txid && !fatura.linha_digitavel && <span className="text-[10px] text-gray-500 italic">Sem pagamento online</span>}
-                                                                            </div>
-                                                                        </div>
-                                                                    ))
+                                                                        );
+                                                                    })
                                                                 ) : (
-                                                                    <p className="text-gray-500 text-sm italic flex items-center gap-2"><CheckCircle size={14} className="text-green-500"/> Nenhuma fatura pendente.</p>
+                                                                    <p className="text-gray-500 text-sm italic flex items-center gap-2">
+                                                                        <CheckCircle size={14} className="text-green-500"/> 
+                                                                        Nenhuma fatura pendente
+                                                                    </p>
                                                                 )}
                                                             </div>
                                                         </div>
 
-                                                        {/* Notas Fiscais */}
+                                                        {/* NOTAS FISCAIS */}
                                                         <div>
                                                             <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
                                                                 <ScrollText size={14} /> Últimas Notas Fiscais
@@ -726,7 +764,13 @@ const ClientArea: React.FC = () => {
                                                                             <div className="flex items-center gap-3">
                                                                                 <span className="text-xs font-mono text-gray-300">R$ {nota.valor}</span>
                                                                                 {nota.link_pdf && (
-                                                                                    <a href={nota.link_pdf} target="_blank" rel="noopener noreferrer" className="text-fiber-blue hover:text-white transition-colors" title="Baixar PDF">
+                                                                                    <a 
+                                                                                        href={nota.link_pdf} 
+                                                                                        target="_blank" 
+                                                                                        rel="noopener noreferrer" 
+                                                                                        className="text-fiber-blue hover:text-white transition-colors" 
+                                                                                        title="Baixar PDF"
+                                                                                    >
                                                                                         <Download size={14} />
                                                                                     </a>
                                                                                 )}
@@ -734,14 +778,15 @@ const ClientArea: React.FC = () => {
                                                                         </div>
                                                                     ))
                                                                 ) : (
-                                                                    <p className="text-gray-500 text-sm italic">Nenhuma nota disponível.</p>
+                                                                    <p className="text-gray-500 text-sm italic">Nenhuma nota disponível</p>
                                                                 )}
                                                             </div>
                                                         </div>
                                                     </div>
+
                                                 </div>
                                             );
-                                        }).filter(Boolean) // Remove nulls (contratos filtrados)
+                                        }).filter(Boolean) 
                                     )}
                                 </div>
                             )}
@@ -853,17 +898,20 @@ const ClientArea: React.FC = () => {
                                     <div className="space-y-3">
                                         {(dashboardData?.faturas || []).filter(inv => {
                                             if (invoiceStatusFilter === 'todas') return true;
-                                            if (invoiceStatusFilter === 'aberto') return isInvoiceOpen(inv.status);
-                                            if (invoiceStatusFilter === 'pago') return isInvoicePaid(inv.status);
+                                            if (invoiceStatusFilter === 'aberto') return inv.status === 'A';
+                                            if (invoiceStatusFilter === 'pago') return inv.status !== 'A';
                                             return true;
                                         }).map(invoice => (
                                             <div key={invoice.id} className="bg-neutral-900 border border-white/10 rounded-xl p-4 flex justify-between items-center">
                                                  <div>
                                                      <p className="font-bold text-white">R$ {invoice.valor}</p>
                                                      <p className="text-xs text-gray-500">{invoice.data_vencimento}</p>
-                                                     <span className={`text-[10px] uppercase font-bold ${isInvoiceOpen(invoice.status) ? 'text-red-400' : 'text-green-500'}`}>{invoice.status}</span>
+                                                     <span className={`text-[10px] uppercase font-bold ${invoice.status === 'A' ? 'text-red-400' : 'text-green-500'}`}>{invoice.status === 'A' ? 'Aberto' : 'Pago'}</span>
                                                  </div>
-                                                 <div className="flex gap-2">{invoice.linha_digitavel && <Button variant="secondary" onClick={() => handleCopy(invoice.linha_digitavel!, String(invoice.id))} className="!py-1 !px-3 !text-xs">Copiar</Button>}</div>
+                                                 <div className="flex gap-2">
+                                                     {invoice.linha_digitavel && <Button variant="secondary" onClick={() => handleCopy(invoice.linha_digitavel!, String(invoice.id))} className="!py-1 !px-3 !text-xs">Copiar</Button>}
+                                                     <Button variant="outline" className="!py-1 !px-3 !text-xs" onClick={() => fetchPixCode(Number(invoice.id))}>PIX</Button>
+                                                 </div>
                                             </div>
                                         ))}
                                     </div>
@@ -875,7 +923,6 @@ const ClientArea: React.FC = () => {
                                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                                         <h2 className="text-2xl font-bold text-white">Extrato de Uso</h2>
                                         
-                                        {/* SELETOR DE LOGIN */}
                                         <div className="relative">
                                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                                 <Router size={16} className="text-fiber-orange" />
