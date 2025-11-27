@@ -4,7 +4,7 @@ import { NavItem, Plan } from './types';
 export const NAV_ITEMS: NavItem[] = [
   { label: 'Início', href: 'home' },
   { label: 'Serviços', href: '#planos' },
-  { label: 'Teste de Velocidade', href: 'speedtest' }, // Link interno para a nova seção
+  { label: 'Teste de Velocidade', href: 'https://www.speedtest.net/' }, // Link externo para Ookla
   { label: 'Notícias', href: 'news' },
   { label: 'Central de Ajuda', href: 'help' },
   { label: 'Ética', href: 'ethics' },
