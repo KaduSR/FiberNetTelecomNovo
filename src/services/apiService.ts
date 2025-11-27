@@ -1,38 +1,6 @@
 
-import { DashboardResponse, LoginResponse, Task, HistoryData } from '../types/api';
+import { DashboardResponse, LoginResponse } from '../types/api';
 import { API_BASE_URL, ENDPOINTS } from '../config';
-
-// Helper to generate mock history
-const generateHistory = (multiplier: number): HistoryData => {
-  return {
-    daily: Array.from({length: 30}, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - (29 - i));
-      return {
-        data: d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-        download_bytes: Math.random() * 5 * 1024 * 1024 * 1024 * multiplier,
-        upload_bytes: Math.random() * 2 * 1024 * 1024 * 1024 * multiplier
-      };
-    }),
-    weekly: Array.from({length: 12}, (_, i) => {
-      return {
-        semana: `Semana ${i + 1}`,
-        download_bytes: Math.random() * 35 * 1024 * 1024 * 1024 * multiplier,
-        upload_bytes: Math.random() * 15 * 1024 * 1024 * 1024 * multiplier
-      };
-    }),
-    monthly: [
-      { mes_ano: "09/2024", download_bytes: 380 * 1024 * 1024 * 1024 * multiplier, upload_bytes: 180 * 1024 * 1024 * 1024 * multiplier },
-      { mes_ano: "10/2024", download_bytes: 420 * 1024 * 1024 * 1024 * multiplier, upload_bytes: 200 * 1024 * 1024 * 1024 * multiplier },
-      { mes_ano: "11/2024", download_bytes: 400 * 1024 * 1024 * 1024 * multiplier, upload_bytes: 200 * 1024 * 1024 * 1024 * multiplier },
-      { mes_ano: "12/2024", download_bytes: 450 * 1024 * 1024 * 1024 * multiplier, upload_bytes: 220 * 1024 * 1024 * 1024 * multiplier },
-      { mes_ano: "01/2025", download_bytes: 400 * 1024 * 1024 * 1024 * multiplier, upload_bytes: 200 * 1024 * 1024 * 1024 * multiplier },
-      { mes_ano: "02/2025", download_bytes: 500 * 1024 * 1024 * 1024 * multiplier, upload_bytes: 250 * 1024 * 1024 * 1024 * multiplier }
-    ]
-  };
-};
-
-const DEV_TOKEN = "DEV_TOKEN_MOCK_123456";
 
 class ApiService {
   private getHeaders(): HeadersInit {
@@ -49,26 +17,19 @@ class ApiService {
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const cleanBase = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    const cleanBaseUrl = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
-    const url = `${cleanBaseUrl}${cleanEndpoint}`;
+    const url = `${cleanBase}${cleanEndpoint}`;
     
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
-
     try {
-      console.log(`[ApiService] Requesting: ${url}`); 
-
+      console.log(`[Frontend] Requesting: ${url}`);
       const response = await fetch(url, {
         ...options,
-        signal: controller.signal,
         headers: {
           ...this.getHeaders(),
           ...options.headers,
         },
       });
-      
-      clearTimeout(timeoutId);
 
       const text = await response.text();
       let data: any;
@@ -76,10 +37,7 @@ class ApiService {
       try {
           data = text ? JSON.parse(text) : {};
       } catch (e) {
-          console.error(`[ApiService] Erro JSON. Status: ${response.status}.`);
-          if (text.trim().startsWith('<')) {
-             throw new Error(`Erro ${response.status}: Endpoint não encontrado ou erro de servidor.`);
-          }
+          console.error('Erro ao parsear JSON:', text);
           throw new Error(`Erro de comunicação (Status ${response.status}).`);
       }
 
@@ -94,7 +52,6 @@ class ApiService {
       return data as T;
       
     } catch (error: any) {
-      clearTimeout(timeoutId);
       console.error(`[ApiService] Erro:`, error);
       throw error;
     }
@@ -119,99 +76,86 @@ class ApiService {
       method: 'GET',
     });
 
-    // ✅ MAPEAMENTO CORRETO DOS DADOS DA API
+    // Normaliza os dados para garantir que o Frontend não quebre
     const normalized: DashboardResponse = {
       clientes: rawData.clientes || [],
       
-      // ✅ FILTRAR APENAS CONTRATOS ATIVOS
-      contratos: (rawData.contratos || [])
-        .filter((c: any) => c.status === 'A')
-        .map((c: any) => ({
+      contratos: (rawData.contratos || []).map((c: any) => ({
           ...c,
-          // Adicionar campos do cliente para contexto
-          endereco: rawData.clientes[0]?.endereco || '',
-          bairro: '', 
-          cidade: '', 
-        })),
+          // Garante campos mínimos e mapeia plano se necessário
+          plano: c.plano || c.descricao_aux_plano_venda || 'Plano Fiber',
+          endereco: c.endereco || rawData.clientes[0]?.endereco || '',
+      })),
       
-      // ✅ NORMALIZAR FATURAS (APENAS EM ABERTO)
-      faturas: (rawData.faturas || [])
-        .filter((f: any) => f.status !== 'pago' && f.status !== 'P') 
-        .map((f: any) => ({
-          ...f,
-          contrato_id: rawData.contratos[0]?.id, // Vincular ao primeiro contrato ativo como fallback
-          data_vencimento: f.vencimento || f.data_vencimento,
-          status: f.status === 'pago' ? 'C' : 'A', // Normalizar: 'A' = Aberto
-          pix_code: f.pix_code || null,
-          pix_qrcode: f.pix_qrcode || null,
-          pix_txid: null, // Será buscado dinamicamente
-        })),
-      
-      // ✅ NORMALIZAR LOGINS COM DADOS DA ONT
-      logins: (rawData.logins || []).map((l: any) => {
-        // Buscar dados da ONT correspondente
-        const ont = (rawData.ontInfo || []).find((o: any) => 
-          Number(o.id_login) === Number(l.id)
-        );
+      // IMPORTANTE: Removemos o .filter() para mostrar TODAS as faturas (Pagas e Abertas)
+      faturas: (rawData.faturas || []).map((f: any) => {
+          // Normaliza status: 'pago', 'C' ou 'P' vira 'C' (Concluído/Pago), outros 'A' (Aberto)
+          const statusRaw = f.status ? String(f.status).toLowerCase() : '';
+          const statusNormalizado = (statusRaw === 'pago' || statusRaw === 'c' || statusRaw === 'p') ? 'C' : 'A';
 
-        // Converter uptime de segundos para formato legível se for numérico
-        let tempo_conectado = l.uptime || 'Recente';
-        if (!isNaN(Number(l.uptime))) {
-            const uptimeSeconds = parseInt(l.uptime || '0');
-            const days = Math.floor(uptimeSeconds / 86400);
-            const hours = Math.floor((uptimeSeconds % 86400) / 3600);
-            const minutes = Math.floor((uptimeSeconds % 3600) / 60);
-            tempo_conectado = `${days}d ${hours}h ${minutes}m`;
-        }
-
-        return {
-          ...l,
-          contrato_id: l.contrato_id || rawData.contratos[0]?.id,
-          online: l.status === 'online' || l.online === 'S' ? 'S' : 'N',
-          sinal_ultimo_atendimento: ont?.sinal_rx || l.sinal_ont || 'N/A',
-          tempo_conectado,
-          ont_modelo: ont?.onu_tipo || l.modelo_ont || 'Não informado',
-          ont_sinal_rx: ont?.sinal_rx,
-          ont_sinal_tx: ont?.sinal_tx,
-          ont_temperatura: ont?.temperatura,
-          ont_mac: ont?.mac,
-          ip_publico: l.ip_publico || 'Não disponível'
-        };
+          return {
+            ...f,
+            contrato_id: rawData.contratos[0]?.id, 
+            data_vencimento: f.vencimento || f.data_vencimento,
+            status: statusNormalizado,
+            pix_code: null, // Será carregado sob demanda pelo botão PIX
+            pix_qrcode: null
+          };
       }),
       
-      // ✅ FILTRAR NOTAS INVÁLIDAS
-      notas: (rawData.notas || [])
-        .filter((n: any) => n.id !== 'ai-insights' && !n.summary)
-        .map((n: any) => ({
-          ...n,
-          contrato_id: rawData.contratos[0]?.id
-        })),
+      logins: (rawData.logins || []).map((l: any) => ({
+          ...l,
+          contrato_id: l.contrato_id || rawData.contratos[0]?.id,
+          online: (l.status === 'online' || l.online === 'S') ? 'S' : 'N',
+          tempo_conectado: l.uptime ? this.formatUptime(l.uptime) : 'Recente',
+          sinal_ultimo_atendimento: l.sinal_ultimo_atendimento || '- dBm',
+          ip_publico: l.ip_publico || 'Automático'
+      })),
       
+      notas: rawData.notas || [],
       ordensServico: rawData.ordensServico || [],
       ontInfo: rawData.ontInfo || [],
+      
       consumo: rawData.consumo || { 
-        total_download_bytes: 0, 
+        total_download: "0 GB",
+        total_upload: "0 GB",
+        total_download_bytes: 0,
         total_upload_bytes: 0, 
-        total_download: '0 GB', 
-        total_upload: '0 GB',
         history: { daily: [], weekly: [], monthly: [] }
       },
-      ai_analysis: rawData.ai_analysis
+      
+      // Pega a análise da IA se existir
+      ai_analysis: rawData.notas?.find((n: any) => n.id === 'ai-insights') || rawData.ai_analysis
     };
 
     return normalized;
   }
 
-  // ✅ NOVO: Buscar PIX de uma fatura específica
-  async getPixCode(faturaId: string | number): Promise<string> {
+  // Método para buscar o PIX usando a nova rota do Backend
+  async getPixCode(faturaId: string | number): Promise<{ qrcode: string, imagem: string }> {
     try {
-      const response = await this.request<any>(ENDPOINTS.GET_PIX, {
-        method: 'POST',
-        body: JSON.stringify({ id_areceber: String(faturaId) })
+      // @ts-ignore
+      const url = typeof ENDPOINTS.GET_PIX === 'function' 
+        ? ENDPOINTS.GET_PIX(faturaId) 
+        : `/faturas/${faturaId}/pix`;
+      
+      const response = await this.request<any>(url, {
+        method: 'GET'
       });
 
-      // Extrair QR Code do retorno da API
-      return response?.pix?.qrCode?.qrcode || '';
+      // O backend retorna { qrcode: "...", imagem: "..." } ou estrutura do IXC
+      if (response.pix && response.pix.qrCode) {
+          return {
+              qrcode: response.pix.qrCode.qrcode,
+              imagem: response.pix.qrCode.imagemQrcode
+          };
+      }
+      
+      return {
+          qrcode: response.qrcode || '',
+          imagem: response.imagem || ''
+      };
+
     } catch (error) {
       console.error(`[ApiService] Erro ao buscar PIX da fatura ${faturaId}:`, error);
       throw error;
@@ -233,15 +177,26 @@ class ApiService {
   }
 
   async performLoginAction(loginId: number, action: string): Promise<any> {
-    return this.request<any>(ENDPOINTS.LOGIN_ACTION(loginId, action), { 
+    // @ts-ignore
+    const url = typeof ENDPOINTS.LOGIN_ACTION === 'function'
+      ? ENDPOINTS.LOGIN_ACTION(loginId, action)
+      : `/logins/${loginId}/${action}`;
+
+    return this.request<any>(url, { 
       method: 'POST',
     });
   }
 
-  async unlockTrust(): Promise<{ message: string }> {
-    return this.request<{ message: string }>('/api/desbloqueio-confianca', {
-      method: 'POST',
-    });
+  // Auxiliar para formatar segundos em dias/horas
+  private formatUptime(seconds: string | number): string {
+      const sec = Number(seconds);
+      if (isNaN(sec)) return String(seconds);
+      
+      const days = Math.floor(sec / 86400);
+      const hours = Math.floor((sec % 86400) / 3600);
+      
+      if (days > 0) return `${days}d ${hours}h`;
+      return `${hours}h ${(Math.floor((sec % 3600) / 60))}m`;
   }
 }
 

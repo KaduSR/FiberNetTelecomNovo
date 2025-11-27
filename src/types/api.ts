@@ -3,7 +3,7 @@ export interface Cliente {
   id: number;
   nome: string;
   endereco?: string;
-  cnpj_cpf?: string;
+  cpn_cnpj?: string;
   fone?: string;
   email?: string;
   numero?: string;
@@ -13,6 +13,7 @@ export interface Contrato {
   id: number;
   id_cliente: number;
   login: string; 
+  plano: string; // Adicionado para compatibilidade
   status: string; // 'A', 'S', 'C'
   desbloqueio_confianca: 'S' | 'N';
   descricao_aux_plano_venda?: string; 
@@ -37,6 +38,7 @@ export interface Fatura {
   pix_txid?: string;
   pix_code?: string;
   pix_qrcode?: string; // QR Code completo (CopyPaste)
+  pix_imagem?: string; // Novo campo para imagem base64
   boleto?: string;
   descricao?: string;
 }

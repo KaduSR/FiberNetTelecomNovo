@@ -1,20 +1,21 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   User, Lock, FileText, Download, Copy, CheckCircle, AlertCircle, Loader2, 
   QrCode, X, LogOut, Wifi, Activity, 
   Clock, Settings, Eye, EyeOff, Mail, ArrowUp, ArrowDown, LayoutDashboard, Ban,
   FileSignature, BarChart3, ScrollText, Zap, Power, Server, Link2, ThumbsUp, Printer, Trash2, ArrowLeft, MessageCircle, Globe,
-  MapPin, Router, Bot, Send, Search, ChevronDown, HelpCircle, AlertTriangle
+  MapPin, Router, Bot, Send, HelpCircle, Search, ChevronDown, AlertTriangle
 } from 'lucide-react';
 import Button from './Button';
-import { DashboardResponse, Consumo, Fatura, ChatMessage, HistoryData } from '../src/types/api';
+import { DashboardResponse, Consumo, Fatura, ChatMessage } from '../src/types/api';
 import { apiService } from '../src/services/apiService';
 import { CONTACT_INFO } from '../constants';
 import AIInsights from '../src/components/AIInsights';
 import { GoogleGenAI } from "@google/genai";
 
-// MUDANÇA DE CHAVE PARA FORÇAR LIMPEZA DE CACHE
-const DASH_CACHE_KEY = 'fiber_dashboard_cache_v31_env_fix';
+// MUDANÇA DE CHAVE PARA FORÇAR LIMPEZA DE CACHE APÓS ATUALIZAÇÃO HTTPS
+const DASH_CACHE_KEY = 'fiber_dashboard_cache_v35_prod_https';
 
 const CHAT_SUGGESTIONS = [
     { label: "Minha fatura vence quando?", icon: FileText },
@@ -38,13 +39,13 @@ const bytesToGB = (bytes: number) => {
 };
 
 // === SUB-COMPONENT: CONSUMPTION CHART ===
-const ConsumptionChart: React.FC<{ history?: HistoryData }> = ({ history }) => {
+const ConsumptionChart: React.FC<{ history?: any }> = ({ history }) => {
     const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
     const [activePoint, setActivePoint] = useState<{ label: string, download: number, upload: number } | null>(null);
 
     const rawData = history?.[period] || [];
     
-    const data = rawData.map(item => ({
+    const data = rawData.map((item: any) => ({
         label: period === 'daily' ? (item.data || '') : period === 'weekly' ? (item.semana || '') : (item.mes_ano || ''),
         download: bytesToGB(item.download_bytes),
         upload: bytesToGB(item.upload_bytes)
@@ -58,7 +59,7 @@ const ConsumptionChart: React.FC<{ history?: HistoryData }> = ({ history }) => {
         );
     }
     
-    const maxVal = Math.max(...data.map(d => Math.max(d.download, d.upload)), 1);
+    const maxVal = Math.max(...data.map((d: any) => Math.max(d.download, d.upload)), 1);
     const width = 100;
     const height = 50; 
     const padding = 5;
@@ -111,7 +112,7 @@ const ConsumptionChart: React.FC<{ history?: HistoryData }> = ({ history }) => {
                         <path d={getAreaPath('upload')} fill="url(#gradUpload)" className="transition-all duration-500" />
                         <path d={getPath('upload')} fill="none" stroke="#FF6B00" strokeWidth="0.5" strokeLinecap="round" strokeLinejoin="round" className="transition-all duration-500 drop-shadow-lg" />
                         
-                        {data.map((d, i) => (
+                        {data.map((d: any, i: number) => (
                             <g key={i} className="group/point">
                                 <rect x={getX(i) - (data.length > 20 ? 0.5 : 1)} y="0" width={data.length > 20 ? 1 : 2} height={height} fill="transparent" className="cursor-pointer" onMouseEnter={() => setActivePoint(d)} onMouseLeave={() => setActivePoint(null)} />
                                 {data.length <= 40 && (
@@ -340,7 +341,6 @@ const ClientArea: React.FC = () => {
             const apiKey = process.env.API_KEY;
             
             if (!apiKey) {
-                // Mensagem amigável caso a chave não esteja configurada no ambiente
                 throw new Error("API Key não configurada. Por favor, entre em contato com o suporte.");
             }
 
@@ -359,7 +359,7 @@ const ClientArea: React.FC = () => {
                     
                     Se o usuário relatar lentidão, sugira reiniciar o modem e testar via cabo.
                     Se perguntar sobre faturas, oriente a baixar na aba Faturas.
-
+                    
                     Não invente dados de clientes.
                     Se não souber responder, sugira contato via WhatsApp ${CONTACT_INFO.whatsapp}.`,
                     tools: [{ googleSearch: {} }],
@@ -418,6 +418,12 @@ const ClientArea: React.FC = () => {
         processMessage(suggestion);
     };
 
+    const handleClearChat = () => {
+        setChatMessages([
+            { id: Date.now().toString(), sender: 'bot', text: 'Olá! Sou a IA da Fiber.Net. Como posso ajudar você hoje?', timestamp: new Date() }
+        ]);
+    };
+
     useEffect(() => {
         const saved = localStorage.getItem('fiber_saved_email');
         if (saved) { setEmailInput(saved); setRememberMe(true); }
@@ -448,14 +454,15 @@ const ClientArea: React.FC = () => {
         setTimeout(() => setIsPixCopied(false), 2000);
     };
 
-    // Nova função para buscar PIX dinamicamente
+    // Nova função para buscar PIX dinamicamente com suporte a objeto
     const fetchPixCode = async (faturaId: number) => {
         if (loadingPix[faturaId]) return;
       
         setLoadingPix(prev => ({ ...prev, [faturaId]: true }));
       
         try {
-          const pixCode = await apiService.getPixCode(faturaId);
+          const response = await apiService.getPixCode(faturaId);
+          const pixCode = response.qrcode; // Agora extraímos do objeto
           
           if (pixCode) {
             // Atualizar estado local para manter consistência
@@ -602,6 +609,7 @@ const ClientArea: React.FC = () => {
                                                 Number(l.contrato_id) === Number(contrato.id)
                                             );
                                             
+                                            // Filtra faturas para o dashboard (apenas abertas)
                                             const faturasDoContrato = dashboardData.faturas.filter(f => 
                                                 f.contrato_id ? Number(f.contrato_id) === Number(contrato.id) : true
                                             ).filter(f => f.status === 'A'); 
@@ -618,7 +626,7 @@ const ClientArea: React.FC = () => {
                                                         <div>
                                                             <h3 className="text-xl font-bold text-white flex items-center gap-2">
                                                                 <FileSignature size={20} className="text-fiber-orange" />
-                                                                {contrato.descricao_aux_plano_venda || `Contrato #${contrato.id}`}
+                                                                {contrato.descricao_aux_plano_venda || contrato.plano || `Contrato #${contrato.id}`}
                                                             </h3>
                                                             <p className="text-gray-400 text-sm mt-1 flex items-center gap-2">
                                                                 <MapPin size={14} className="text-gray-500" /> 
@@ -800,6 +808,9 @@ const ClientArea: React.FC = () => {
                                             </h2>
                                             <p className="text-gray-400 text-sm">Tire dúvidas sobre sua fatura, conexão e mais.</p>
                                         </div>
+                                        <Button variant="secondary" onClick={handleClearChat} className="!py-2 !px-3 text-xs gap-2" title="Limpar conversa">
+                                            <Trash2 size={14} /> Limpar Conversa
+                                        </Button>
                                     </div>
                                     
                                     <div className="flex-grow bg-neutral-900 border border-white/10 rounded-xl overflow-hidden flex flex-col">

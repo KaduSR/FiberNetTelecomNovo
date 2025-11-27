@@ -5,7 +5,6 @@ import path from 'path'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
   define: {
@@ -20,8 +19,7 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api-proxy': {
-        // CORREÇÃO IMPORTANTE: http em vez de https
-        target: 'http://api.centralfiber.online', 
+        target: 'https://api.centralfiber.online', 
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/api-proxy/, '')
