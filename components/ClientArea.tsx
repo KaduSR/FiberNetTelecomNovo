@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   User, Lock, FileText, Download, Copy, CheckCircle, AlertCircle, Loader2, 
   QrCode, X, LogOut, Wifi, Activity, 
   Clock, Settings, Eye, EyeOff, Mail, ArrowUp, ArrowDown, LayoutDashboard, Ban,
   FileSignature, BarChart3, ScrollText, Zap, Power, Server, Link2, ThumbsUp, Printer, Trash2, ArrowLeft, MessageCircle, Globe,
-  MapPin, Router, Bot, Send, HelpCircle, Search, ChevronDown, AlertTriangle
+  MapPin, Router, Bot, Send, Search
 } from 'lucide-react';
 import Button from './Button';
 import { GoogleGenAI } from "@google/genai";
@@ -15,7 +14,7 @@ import { CONTACT_INFO } from '../constants';
 import AIInsights from '../src/components/AIInsights';
 
 // MUDANÇA DE CHAVE PARA FORÇAR LIMPEZA DE CACHE ANTIGO
-const DASH_CACHE_KEY = 'fiber_dashboard_cache_v5_forced';
+const DASH_CACHE_KEY = 'fiber_dashboard_cache_v7_ont_details';
 
 // === HELPERS ===
 const formatBytes = (bytes: number | string | undefined, decimals = 2) => {
@@ -182,7 +181,6 @@ const ClientArea: React.FC = () => {
     const [chatInput, setChatInput] = useState('');
     const [isChatTyping, setIsChatTyping] = useState(false);
     const chatEndRef = useRef<HTMLDivElement>(null);
-    const chatInputRef = useRef<HTMLInputElement>(null);
 
     const CHAT_SUGGESTIONS = [
         { label: "Minha fatura vence quando?", icon: FileText },
@@ -379,13 +377,14 @@ const ClientArea: React.FC = () => {
 
     const handleSuggestionClick = (suggestion: string) => {
         setChatInput(suggestion);
-        setTimeout(() => {
-             if (chatInputRef.current) {
-                chatInputRef.current.focus();
-                chatInputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-        }, 100);
+        if (chatInputRef.current) {
+            chatInputRef.current.focus();
+            chatInputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
     };
+
+    // Ref para o input de chat
+    const chatInputRef = useRef<HTMLInputElement>(null);
 
     const handleClearChat = () => {
         setChatMessages([
@@ -403,7 +402,18 @@ const ClientArea: React.FC = () => {
 
     useEffect(() => {
         if (activeTab === 'ai_support' && chatEndRef.current) {
-            chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+            // Pequeno delay para garantir que a UI atualizou
+            setTimeout(() => {
+                // Scroll container to bottom
+                if (chatEndRef.current) {
+                    chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+                }
+            }, 100);
+        }
+        
+        // Quando mudar para suporte IA, rolar a página para o topo da aba
+        if (activeTab === 'ai_support') {
+            window.scrollTo({ top: 0, behavior: 'auto' });
         }
     }, [chatMessages, activeTab]);
 
@@ -552,7 +562,7 @@ const ClientArea: React.FC = () => {
                     <main className="w-full lg:w-3/4">
                         <div className="bg-fiber-card border border-white/10 rounded-2xl p-6 md:p-8 min-h-[500px] animate-fadeIn">
                             
-                            {/* === DASHBOARD === */}
+                            {/* === DASHBOARD COM AGRUPAMENTO POR CONTRATO (LÓGICA CORRIGIDA) === */}
                             {activeTab === 'dashboard' && dashboardData && (
                                 <div className="space-y-8">
                                     <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
@@ -604,7 +614,7 @@ const ClientArea: React.FC = () => {
                                                         <div className="grid grid-cols-1 gap-4">
                                                             {loginsDoContrato.map(login => (
                                                                 <div key={login.id} className="bg-black/40 border border-white/5 rounded-lg p-4 flex flex-col md:flex-row justify-between items-center gap-4">
-                                                                    <div className="flex items-center gap-4">
+                                                                    <div className="flex items-center gap-4 min-w-[200px]">
                                                                          <div className={`w-3 h-3 rounded-full ${login.online === 'S' ? 'bg-fiber-green animate-pulse' : 'bg-gray-500'}`}></div>
                                                                          <div>
                                                                              <p className="font-bold text-white text-sm">{login.login}</p>
@@ -612,19 +622,39 @@ const ClientArea: React.FC = () => {
                                                                          </div>
                                                                     </div>
                                                                     
-                                                                    <div className="flex items-center gap-6 text-xs text-gray-400">
-                                                                        <div className="flex items-center gap-2" title="Modelo da ONU">
-                                                                            <Router size={14}/> {login.ont_modelo || 'ONU Padrão'}
+                                                                    {/* DETALHES COMPLETOS DA ONT */}
+                                                                    <div className="flex flex-wrap items-center gap-4 md:gap-6 text-xs text-gray-400 mt-2 md:mt-0">
+                                                                        {/* Modelo/Tipo */}
+                                                                        <div className="flex items-center gap-1.5" title="Modelo da ONU">
+                                                                            <Router size={14} className="text-fiber-blue"/> 
+                                                                            <span className="text-white">{login.ont_modelo || 'ONU Padrão'}</span>
                                                                         </div>
-                                                                        <div className="flex items-center gap-2" title="Sinal Óptico">
-                                                                            <Activity size={14}/> 
-                                                                            <span className={parseFloat(login.sinal_ultimo_atendimento) < -27 ? 'text-red-400' : 'text-fiber-green'}>
-                                                                                {login.sinal_ultimo_atendimento || '- dBm'}
+
+                                                                        {/* Sinal RX */}
+                                                                        <div className="flex items-center gap-1.5" title="Sinal de Recepção (RX)">
+                                                                            <ArrowDown size={14} className="text-fiber-orange"/> 
+                                                                            <span className={parseFloat(login.ont_sinal_rx || login.sinal_ultimo_atendimento) < -27 ? 'text-red-400 font-bold' : 'text-fiber-green font-bold'}>
+                                                                                RX: {login.ont_sinal_rx || login.sinal_ultimo_atendimento || '-'}
                                                                             </span>
                                                                         </div>
-                                                                         <div className="flex items-center gap-2" title="Tempo Conectado">
-                                                                            <Clock size={14}/> {login.tempo_conectado || 'Recente'}
-                                                                        </div>
+
+                                                                        {/* Sinal TX */}
+                                                                        {login.ont_sinal_tx && (
+                                                                            <div className="flex items-center gap-1.5" title="Sinal de Transmissão (TX)">
+                                                                                <ArrowUp size={14} className="text-fiber-blue"/> 
+                                                                                <span className="text-gray-300">TX: {login.ont_sinal_tx}</span>
+                                                                            </div>
+                                                                        )}
+
+                                                                        {/* Temperatura */}
+                                                                        {login.ont_temperatura && (
+                                                                            <div className="flex items-center gap-1.5" title="Temperatura da ONU">
+                                                                                <Activity size={14} className={parseFloat(login.ont_temperatura) > 60 ? 'text-red-400' : 'text-gray-400'}/> 
+                                                                                <span className={parseFloat(login.ont_temperatura) > 60 ? 'text-red-400 font-bold' : 'text-gray-300'}>
+                                                                                    {login.ont_temperatura}°C
+                                                                                </span>
+                                                                            </div>
+                                                                        )}
                                                                     </div>
                                                                 </div>
                                                             ))}
@@ -885,17 +915,44 @@ const ClientArea: React.FC = () => {
                                                         {login.online === 'S' ? 'Online' : 'Offline'}
                                                     </div>
                                                 </div>
-                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-6">
-                                                    <div className="flex items-center gap-2 text-gray-400"><Server size={14}/> <strong>ONT:</strong> <span className="text-white">{login.sinal_ultimo_atendimento || 'N/A'}</span></div>
-                                                    <div className="flex items-center gap-2 text-gray-400"><Clock size={14}/> <strong>Uptime:</strong> <span className="text-white">{login.tempo_conectado || 'N/A'}</span></div>
-                                                    
-                                                    {/* --- IP Privado Mantido, IP Público Removido --- */}
-                                                    <div className="flex items-center gap-2 text-gray-400">
-                                                        <Activity size={14}/> <strong>IP Privado:</strong> 
-                                                        <span className="text-white font-mono text-xs">{login.ip_privado || '--'}</span>
+
+                                                {/* Detalhamento de Conexão (Grid Melhorado) */}
+                                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 text-sm mb-6 bg-black/20 p-4 rounded-lg">
+                                                    {/* Modelo */}
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-xs text-gray-500 flex items-center gap-1"><Router size={12}/> Modelo (ONU)</span>
+                                                        <span className="text-white font-medium">{login.ont_modelo || 'Padrão'}</span>
                                                     </div>
-                                                    {/* ------------------------- */}
+
+                                                    {/* RX */}
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-xs text-gray-500 flex items-center gap-1"><ArrowDown size={12}/> Sinal RX</span>
+                                                        <span className={`font-bold ${parseFloat(login.ont_sinal_rx || login.sinal_ultimo_atendimento || '0') < -27 ? 'text-red-400' : 'text-fiber-green'}`}>
+                                                            {login.ont_sinal_rx || login.sinal_ultimo_atendimento || 'N/A'}
+                                                        </span>
+                                                    </div>
+
+                                                    {/* TX */}
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-xs text-gray-500 flex items-center gap-1"><ArrowUp size={12}/> Sinal TX</span>
+                                                        <span className="text-white font-medium">{login.ont_sinal_tx || 'N/A'}</span>
+                                                    </div>
+                                                    
+                                                    {/* Temperatura */}
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-xs text-gray-500 flex items-center gap-1"><Activity size={12}/> Temp.</span>
+                                                        <span className={`font-medium ${parseFloat(login.ont_temperatura || '0') > 65 ? 'text-red-400' : 'text-white'}`}>
+                                                            {login.ont_temperatura ? `${login.ont_temperatura}°C` : 'N/A'}
+                                                        </span>
+                                                    </div>
+
+                                                    {/* Uptime */}
+                                                    <div className="flex flex-col gap-1">
+                                                         <span className="text-xs text-gray-500 flex items-center gap-1"><Clock size={12}/> Uptime</span>
+                                                         <span className="text-white text-xs">{login.tempo_conectado || 'Recente'}</span>
+                                                    </div>
                                                 </div>
+
                                                 <div className="flex flex-col sm:flex-row gap-3">
                                                     <Button onClick={() => performLoginAction(login.id, 'limpar-mac')} variant="secondary" className="!text-xs !py-2 !px-4 gap-2" disabled={actionStatus[login.id]?.status === 'loading'}>{actionStatus[login.id]?.status === 'loading' ? <Loader2 size={14} className="animate-spin" /> : <X size={14}/>} Limpar MAC</Button>
                                                     <Button onClick={() => performLoginAction(login.id, 'desconectar')} variant="secondary" className="!text-xs !py-2 !px-4 gap-2" disabled={actionStatus[login.id]?.status === 'loading'}>{actionStatus[login.id]?.status === 'loading' ? <Loader2 size={14} className="animate-spin" /> : <Power size={14}/>} Desconectar</Button>
