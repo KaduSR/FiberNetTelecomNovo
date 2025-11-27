@@ -8,22 +8,14 @@ import {
   MapPin, Router, Bot, Send, HelpCircle, Search, ChevronDown, AlertTriangle
 } from 'lucide-react';
 import Button from './Button';
+import { GoogleGenAI } from "@google/genai";
 import { DashboardResponse, Consumo, Fatura, ChatMessage } from '../src/types/api';
 import { apiService } from '../src/services/apiService';
 import { CONTACT_INFO } from '../constants';
 import AIInsights from '../src/components/AIInsights';
-import { GoogleGenAI } from "@google/genai";
 
-// MUDANÇA DE CHAVE PARA FORÇAR LIMPEZA DE CACHE APÓS ATUALIZAÇÃO HTTPS
-const DASH_CACHE_KEY = 'fiber_dashboard_cache_v35_prod_https';
-
-const CHAT_SUGGESTIONS = [
-    { label: "Minha fatura vence quando?", icon: FileText },
-    { label: "O WhatsApp caiu?", icon: Globe },
-    { label: "Instagram com problemas?", icon: Activity },
-    { label: "Minha conexão está lenta", icon: Wifi },
-    { label: "Quero a 2ª via do boleto", icon: QrCode },
-];
+// MUDANÇA DE CHAVE PARA FORÇAR LIMPEZA DE CACHE ANTIGO
+const DASH_CACHE_KEY = 'fiber_dashboard_cache_v5_forced';
 
 // === HELPERS ===
 const formatBytes = (bytes: number | string | undefined, decimals = 2) => {
@@ -39,14 +31,14 @@ const bytesToGB = (bytes: number) => {
 };
 
 // === SUB-COMPONENT: CONSUMPTION CHART ===
-const ConsumptionChart: React.FC<{ history?: any }> = ({ history }) => {
-    const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+const ConsumptionChart: React.FC<{ history?: Consumo['history'] }> = ({ history }) => {
+    const [period, setPeriod] = useState<'daily' | 'monthly'>('daily');
     const [activePoint, setActivePoint] = useState<{ label: string, download: number, upload: number } | null>(null);
 
     const rawData = history?.[period] || [];
     
-    const data = rawData.map((item: any) => ({
-        label: period === 'daily' ? (item.data || '') : period === 'weekly' ? (item.semana || '') : (item.mes_ano || ''),
+    const data = rawData.map(item => ({
+        label: period === 'daily' ? (item.data || '') : (item.mes_ano || ''),
         download: bytesToGB(item.download_bytes),
         upload: bytesToGB(item.upload_bytes)
     })).reverse(); 
@@ -59,20 +51,15 @@ const ConsumptionChart: React.FC<{ history?: any }> = ({ history }) => {
         );
     }
     
-    const maxVal = Math.max(...data.map((d: any) => Math.max(d.download, d.upload)), 1);
-    const width = 100;
-    const height = 50; 
-    const padding = 5;
+    const maxVal = Math.max(...data.map(d => Math.max(d.download, d.upload)), 1);
+    const width = 100, height = 100, padding = 10;
     
     const getX = (index: number) => (index / (data.length - 1)) * (width - (padding * 2)) + padding;
     const getY = (value: number) => height - padding - (value / maxVal) * (height - (padding * 2));
 
     const getPath = (key: 'download' | 'upload') => {
-        if (data.length < 2) return '';
         let d = `M ${getX(0)} ${getY(data[0][key])}`;
-        for (let i = 1; i < data.length; i++) {
-             d += ` L ${getX(i)} ${getY(data[i][key])}`;
-        }
+        for (let i = 1; i < data.length; i++) d += ` L ${getX(i)} ${getY(data[i][key])}`;
         return d;
     };
     
@@ -80,84 +67,56 @@ const ConsumptionChart: React.FC<{ history?: any }> = ({ history }) => {
 
     return (
         <div className="bg-black/20 border border-white/5 rounded-2xl p-6 mt-6 relative overflow-hidden">
-            <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+            <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
                 <h3 className="text-white font-bold flex items-center gap-2"><Activity size={18} className="text-fiber-orange" /> Histórico de Consumo</h3>
-                <div className="flex bg-white/5 p-1 rounded-full border border-white/10 overflow-x-auto max-w-full">
-                    <button onClick={() => setPeriod('daily')} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap ${period === 'daily' ? 'bg-fiber-orange text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
+                <div className="flex bg-white/5 p-1 rounded-full border border-white/10">
+                    <button onClick={() => setPeriod('daily')} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${period === 'daily' ? 'bg-fiber-orange text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
                         Diário
                     </button>
-                    <button onClick={() => setPeriod('weekly')} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap ${period === 'weekly' ? 'bg-fiber-orange text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
-                        Semanal
-                    </button>
-                    <button onClick={() => setPeriod('monthly')} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap ${period === 'monthly' ? 'bg-fiber-orange text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
+                    <button onClick={() => setPeriod('monthly')} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${period === 'monthly' ? 'bg-fiber-orange text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
                         Mensal
                     </button>
                 </div>
             </div>
             <div className="h-64 w-full relative group">
-                <div className="absolute left-0 top-0 bottom-6 flex flex-col justify-between text-[10px] text-gray-600 font-mono pointer-events-none z-0">
+                <div className="absolute left-0 top-0 bottom-8 flex flex-col justify-between text-[10px] text-gray-500 font-mono pointer-events-none z-0">
                     <span>{Math.round(maxVal)} GB</span><span>{Math.round(maxVal / 2)} GB</span><span>0 GB</span>
                 </div>
-                
-                <div className="ml-8 h-full pb-6">
+                <div className="ml-8 h-full">
                     <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="w-full h-full overflow-visible">
                         <defs>
                             <linearGradient id="gradDownload" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#1E90FF" stopOpacity="0.3" /><stop offset="100%" stopColor="#1E90FF" stopOpacity="0" /></linearGradient>
                             <linearGradient id="gradUpload" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#FF6B00" stopOpacity="0.3" /><stop offset="100%" stopColor="#FF6B00" stopOpacity="0" /></linearGradient>
                         </defs>
-                        
                         <path d={getAreaPath('download')} fill="url(#gradDownload)" className="transition-all duration-500" />
-                        <path d={getPath('download')} fill="none" stroke="#1E90FF" strokeWidth="0.5" strokeLinecap="round" strokeLinejoin="round" className="transition-all duration-500 drop-shadow-lg" />
-                        
+                        <path d={getPath('download')} fill="none" stroke="#1E90FF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="transition-all duration-500 drop-shadow-lg" />
                         <path d={getAreaPath('upload')} fill="url(#gradUpload)" className="transition-all duration-500" />
-                        <path d={getPath('upload')} fill="none" stroke="#FF6B00" strokeWidth="0.5" strokeLinecap="round" strokeLinejoin="round" className="transition-all duration-500 drop-shadow-lg" />
-                        
-                        {data.map((d: any, i: number) => (
+                        <path d={getPath('upload')} fill="none" stroke="#FF6B00" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="transition-all duration-500 drop-shadow-lg" />
+                        {data.map((d, i) => (
                             <g key={i} className="group/point">
-                                <rect x={getX(i) - (data.length > 20 ? 0.5 : 1)} y="0" width={data.length > 20 ? 1 : 2} height={height} fill="transparent" className="cursor-pointer" onMouseEnter={() => setActivePoint(d)} onMouseLeave={() => setActivePoint(null)} />
-                                {data.length <= 40 && (
-                                    <>
-                                        <circle cx={getX(i)} cy={getY(d.download)} r={data.length > 20 ? 0.4 : 0.8} className="fill-[#1E90FF] opacity-0 group-hover/point:opacity-100 transition-opacity" />
-                                        <circle cx={getX(i)} cy={getY(d.upload)} r={data.length > 20 ? 0.4 : 0.8} className="fill-[#FF6B00] opacity-0 group-hover/point:opacity-100 transition-opacity" />
-                                    </>
-                                )}
+                                <rect x={getX(i) - 2} y="0" width="4" height="100" fill="transparent" className="cursor-pointer" onMouseEnter={() => setActivePoint(d)} onMouseLeave={() => setActivePoint(null)} />
+                                <circle cx={getX(i)} cy={getY(d.download)} r="1.5" className="fill-[#1E90FF] opacity-0 group-hover/point:opacity-100" />
+                                <circle cx={getX(i)} cy={getY(d.upload)} r="1.5" className="fill-[#FF6B00] opacity-0 group-hover/point:opacity-100" />
                             </g>
                         ))}
                     </svg>
                 </div>
-
-                <div className="absolute bottom-0 left-8 right-0 flex justify-between text-[10px] text-gray-500 font-medium px-2">
+                <div className="absolute bottom-0 left-8 right-0 flex justify-between text-[10px] text-gray-400 font-medium px-2">
                     <span>{data[0]?.label}</span>
-                    {data.length > 5 && <span>{data[Math.floor(data.length / 4)]?.label}</span>}
                     <span>{data[Math.floor(data.length / 2)]?.label}</span>
-                    {data.length > 5 && <span>{data[Math.floor(data.length * 0.75)]?.label}</span>}
                     <span>{data[data.length - 1]?.label}</span>
                 </div>
-
                 {activePoint && (
-                    <div className="absolute top-0 left-1/2 transform -translate-x-1/2 bg-neutral-900 border border-white/20 p-3 rounded-lg shadow-2xl z-10 pointer-events-none animate-fadeIn backdrop-blur-md min-w-[120px]">
-                        <div className="text-xs font-bold text-white mb-1 border-b border-white/10 pb-1 text-center">{activePoint.label}</div>
-                        <div className="flex items-center justify-between gap-4 text-xs text-fiber-blue mb-0.5">
-                             <span>Download</span>
-                             <span className="font-mono flex items-center gap-1"><ArrowDown size={10} /> {activePoint.download.toFixed(1)} GB</span>
-                        </div>
-                        <div className="flex items-center justify-between gap-4 text-xs text-fiber-orange">
-                             <span>Upload</span>
-                             <span className="font-mono flex items-center gap-1"><ArrowUp size={10} /> {activePoint.upload.toFixed(1)} GB</span>
-                        </div>
+                    <div className="absolute top-0 left-1/2 transform -translate-x-1/2 bg-neutral-900 border border-white/20 p-3 rounded-lg shadow-2xl z-10 pointer-events-none animate-fadeIn backdrop-blur-md">
+                        <div className="text-xs font-bold text-white mb-1 border-b border-white/10 pb-1">{activePoint.label}</div>
+                        <div className="flex items-center gap-2 text-xs text-fiber-blue"><ArrowDown size={12} /> {activePoint.download.toFixed(2)} GB</div>
+                        <div className="flex items-center gap-2 text-xs text-fiber-orange"><ArrowUp size={12} /> {activePoint.upload.toFixed(2)} GB</div>
                     </div>
                 )}
             </div>
-            
-            <div className="flex justify-center gap-6 mt-6">
-                <div className="flex items-center gap-2 bg-white/5 px-3 py-1 rounded-full border border-fiber-blue/20">
-                    <div className="w-2 h-2 rounded-full bg-fiber-blue"></div>
-                    <span className="text-xs text-gray-300">Download</span>
-                </div>
-                <div className="flex items-center gap-2 bg-white/5 px-3 py-1 rounded-full border border-fiber-orange/20">
-                    <div className="w-2 h-2 rounded-full bg-fiber-orange"></div>
-                    <span className="text-xs text-gray-300">Upload</span>
-                </div>
+            <div className="flex justify-center gap-6 mt-4">
+                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-fiber-blue"></div><span className="text-xs text-gray-400">Download</span></div>
+                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-fiber-orange"></div><span className="text-xs text-gray-400">Upload</span></div>
             </div>
         </div>
     );
@@ -169,6 +128,7 @@ const ClientArea: React.FC = () => {
     const [dashboardData, setDashboardData] = useState<DashboardResponse | null>(() => {
         try {
             const cached = localStorage.getItem(DASH_CACHE_KEY);
+            // Validar se o cache tem a estrutura nova
             if (cached) {
                 const parsed = JSON.parse(cached);
                 if (parsed.contratos && parsed.clientes) return parsed;
@@ -205,7 +165,9 @@ const ClientArea: React.FC = () => {
     const [showNewPass, setShowNewPass] = useState(false);
     const [actionStatus, setActionStatus] = useState<{ [key: string]: { status: 'idle' | 'loading' | 'success' | 'error', message?: string } }>({});
     const [diagResult, setDiagResult] = useState<{ download: string, upload: string } | null>(null);
-    const [selectedLoginConsumo, setSelectedLoginConsumo] = useState<number | 'total'>('total');
+    
+    // IP Público removido conforme solicitação
+    
     const [loginView, setLoginView] = useState<'login' | 'forgot'>('login');
     const [rememberMe, setRememberMe] = useState(false);
     const [emailInput, setEmailInput] = useState('');
@@ -213,21 +175,22 @@ const ClientArea: React.FC = () => {
     const [recoveryMessage, setRecoveryMessage] = useState('');
     const [loadingPix, setLoadingPix] = useState<{[key: string]: boolean}>({});
 
+    // Chat AI State
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
         { id: '1', sender: 'bot', text: 'Olá! Sou a IA da Fiber.Net. Como posso ajudar você hoje?', timestamp: new Date() }
     ]);
     const [chatInput, setChatInput] = useState('');
     const [isChatTyping, setIsChatTyping] = useState(false);
-    const chatContainerRef = useRef<HTMLDivElement>(null);
+    const chatEndRef = useRef<HTMLDivElement>(null);
+    const chatInputRef = useRef<HTMLInputElement>(null);
 
-    // Efeito para rolar para o topo ao mudar de aba
-    useEffect(() => {
-        window.scrollTo(0, 0); 
-        const timer = setTimeout(() => {
-            window.scrollTo(0, 0);
-        }, 10);
-        return () => clearTimeout(timer);
-    }, [activeTab]);
+    const CHAT_SUGGESTIONS = [
+        { label: "Minha fatura vence quando?", icon: FileText },
+        { label: "O WhatsApp caiu?", icon: Globe },
+        { label: "Instagram com problemas?", icon: Activity },
+        { label: "Minha conexão está lenta", icon: Wifi },
+        { label: "Quero a 2ª via do boleto", icon: QrCode },
+    ];
 
     const fetchDashboardData = async () => {
         setIsRefetching(true);
@@ -268,7 +231,7 @@ const ClientArea: React.FC = () => {
 
             setIsAuthenticated(true);
             setActiveTab('dashboard');
-            window.scrollTo({ top: 0, behavior: 'auto' });
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         } catch (error: any) {
             setLoginError(error.message || 'Falha na autenticação.');
             localStorage.removeItem('authToken');
@@ -415,7 +378,13 @@ const ClientArea: React.FC = () => {
     };
 
     const handleSuggestionClick = (suggestion: string) => {
-        processMessage(suggestion);
+        setChatInput(suggestion);
+        setTimeout(() => {
+             if (chatInputRef.current) {
+                chatInputRef.current.focus();
+                chatInputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }, 100);
     };
 
     const handleClearChat = () => {
@@ -433,8 +402,8 @@ const ClientArea: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        if (activeTab === 'ai_support' && chatContainerRef.current) {
-            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        if (activeTab === 'ai_support' && chatEndRef.current) {
+            chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
         }
     }, [chatMessages, activeTab]);
 
@@ -569,6 +538,7 @@ const ClientArea: React.FC = () => {
                                     <div className="flex items-center gap-3">
                                         <tab.icon size={18} /> {tab.label}
                                     </div>
+                                    {/* Exibe Badge se existir (Ex: NOVO na IA) */}
                                     {tab.badge && (
                                         <span className="bg-white text-fiber-orange text-[10px] font-bold px-1.5 py-0.5 rounded">
                                             {tab.badge}
@@ -589,216 +559,143 @@ const ClientArea: React.FC = () => {
                                         <LayoutDashboard className="text-fiber-orange"/> Visão Geral
                                     </h2>
                                     
+                                    {/* COMPONENTE DE INSIGHTS DE IA */}
                                     <AIInsights data={dashboardData.ai_analysis} />
 
-                                    {/* ✅ VERIFICAR SE HÁ CONTRATOS ATIVOS */}
-                                    {dashboardData.contratos.length === 0 ? (
-                                        <div className="bg-neutral-900 border border-white/10 rounded-xl p-8 text-center">
-                                            <AlertCircle size={48} className="text-yellow-500 mx-auto mb-4" />
-                                            <p className="text-white font-bold mb-2">Nenhum contrato ativo encontrado</p>
-                                            <p className="text-gray-400 text-sm">Entre em contato com o suporte para mais informações.</p>
-                                        </div>
-                                    ) : (
-                                        dashboardData.contratos.map((contrato) => {
-                                            if (contrato.status !== 'A') {
-                                                console.warn('⚠️ Contrato não ativo detectado:', contrato.id);
-                                                return null;
-                                            }
+                                    {dashboardData.contratos.map((contrato) => {
+                                        // Filtra os logins que pertencem a este contrato específico
+                                        const loginsDoContrato = dashboardData.logins.filter(l => Number(l.contrato_id) === Number(contrato.id));
+                                        
+                                        // Filtra as faturas que pertencem a este contrato (ou exibe todas se não houver vínculo explícito para evitar sumir dados)
+                                        const faturasDoContrato = dashboardData.faturas.filter(f => f.contrato_id ? Number(f.contrato_id) === Number(contrato.id) : true);
+                                        
+                                        // Filtra notas fiscais
+                                        const notasDoContrato = dashboardData.notas?.filter(n => n.contrato_id ? Number(n.contrato_id) === Number(contrato.id) : true) || [];
 
-                                            const loginsDoContrato = dashboardData.logins.filter(l => 
-                                                Number(l.contrato_id) === Number(contrato.id)
-                                            );
-                                            
-                                            // Filtra faturas para o dashboard (apenas abertas)
-                                            const faturasDoContrato = dashboardData.faturas.filter(f => 
-                                                f.contrato_id ? Number(f.contrato_id) === Number(contrato.id) : true
-                                            ).filter(f => f.status === 'A'); 
-                                            
-                                            const notasDoContrato = dashboardData.notas?.filter(n => 
-                                                n.contrato_id ? Number(n.contrato_id) === Number(contrato.id) : true
-                                            ) || [];
-
-                                            return (
-                                                <div key={contrato.id} className="bg-neutral-900 border border-white/10 rounded-xl p-6 mb-6 shadow-lg">
-                                                    
-                                                    {/* CABEÇALHO DO CONTRATO */}
-                                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-white/5 pb-4">
-                                                        <div>
-                                                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                                                                <FileSignature size={20} className="text-fiber-orange" />
-                                                                {contrato.descricao_aux_plano_venda || contrato.plano || `Contrato #${contrato.id}`}
-                                                            </h3>
-                                                            <p className="text-gray-400 text-sm mt-1 flex items-center gap-2">
-                                                                <MapPin size={14} className="text-gray-500" /> 
-                                                                {contrato.endereco || 'Endereço não informado'}
-                                                                {contrato.bairro && ` - ${contrato.bairro}`}
-                                                                {contrato.cidade && `, ${contrato.cidade}`}
-                                                            </p>
-                                                        </div>
-                                                        <span className="mt-2 md:mt-0 px-3 py-1 rounded-full text-xs font-bold bg-green-500/20 text-green-400">
-                                                            ✓ ATIVO
-                                                        </span>
+                                        return (
+                                            <div key={contrato.id} className="bg-neutral-900 border border-white/10 rounded-xl p-6 mb-6 shadow-lg">
+                                                
+                                                {/* CABEÇALHO DO CONTRATO (ENDEREÇO) */}
+                                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-white/5 pb-4">
+                                                    <div>
+                                                        <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                                            <FileSignature size={20} className="text-fiber-orange" />
+                                                            {contrato.descricao_aux_plano_venda || `Contrato #${contrato.id}`}
+                                                        </h3>
+                                                        <p className="text-gray-400 text-sm mt-1 flex items-center gap-2">
+                                                            <MapPin size={14} className="text-gray-500" /> 
+                                                            {contrato.endereco || 'Endereço Principal'} 
+                                                            {contrato.bairro && ` - ${contrato.bairro}`}
+                                                            {contrato.cidade && `, ${contrato.cidade}`}
+                                                        </p>
                                                     </div>
+                                                    <span className={`mt-2 md:mt-0 px-3 py-1 rounded-full text-xs font-bold ${contrato.status === 'A' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                                                        {contrato.status === 'A' ? 'Ativo' : 'Inativo'}
+                                                    </span>
+                                                </div>
 
-                                                    {/* CONEXÕES (ONT) */}
-                                                    <div className="mb-8">
-                                                        <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                                            <Router size={14} /> Conexões e Equipamentos
-                                                        </h4>
-                                                        
-                                                        {loginsDoContrato.length > 0 ? (
-                                                            <div className="grid grid-cols-1 gap-4">
-                                                                {loginsDoContrato.map(login => (
-                                                                    <div key={login.id} className="bg-black/40 border border-white/5 rounded-lg p-4 flex flex-col md:flex-row justify-between items-center gap-4">
-                                                                        <div className="flex items-center gap-4">
-                                                                             <div className={`w-3 h-3 rounded-full ${login.online === 'S' ? 'bg-fiber-green animate-pulse' : 'bg-gray-500'}`} title={login.online === 'S' ? 'Online' : 'Offline'}></div>
-                                                                             <div>
-                                                                                 <p className="font-bold text-white text-sm">{login.login}</p>
-                                                                                 <p className="text-xs text-gray-500 font-mono mt-0.5">IP: {login.ip_privado || 'N/A'}</p>
-                                                                             </div>
+                                                {/* SEÇÃO DE CONEXÕES (LOGINS & ONT) */}
+                                                <div className="mb-8">
+                                                    <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                                        <Router size={14} /> Conexões e Equipamentos
+                                                    </h4>
+                                                    
+                                                    {loginsDoContrato.length > 0 ? (
+                                                        <div className="grid grid-cols-1 gap-4">
+                                                            {loginsDoContrato.map(login => (
+                                                                <div key={login.id} className="bg-black/40 border border-white/5 rounded-lg p-4 flex flex-col md:flex-row justify-between items-center gap-4">
+                                                                    <div className="flex items-center gap-4">
+                                                                         <div className={`w-3 h-3 rounded-full ${login.online === 'S' ? 'bg-fiber-green animate-pulse' : 'bg-gray-500'}`}></div>
+                                                                         <div>
+                                                                             <p className="font-bold text-white text-sm">{login.login}</p>
+                                                                             <p className="text-xs text-gray-500 font-mono mt-0.5">IP Privado: {login.ip_privado || '--'}</p>
+                                                                         </div>
+                                                                    </div>
+                                                                    
+                                                                    <div className="flex items-center gap-6 text-xs text-gray-400">
+                                                                        <div className="flex items-center gap-2" title="Modelo da ONU">
+                                                                            <Router size={14}/> {login.ont_modelo || 'ONU Padrão'}
                                                                         </div>
-                                                                        
-                                                                        <div className="flex items-center gap-6 text-xs text-gray-400">
-                                                                            <div className="flex items-center gap-2" title="Modelo da ONU">
-                                                                                <Router size={14}/> {login.ont_modelo || 'N/A'}
-                                                                            </div>
-                                                                            <div className="flex items-center gap-2" title="Sinal Óptico (RX)">
-                                                                                <Activity size={14}/> 
-                                                                                <span className={`font-mono ${
-                                                                                !login.sinal_ultimo_atendimento || login.sinal_ultimo_atendimento === 'N/A' 
-                                                                                    ? 'text-gray-500' 
-                                                                                    : parseFloat(login.sinal_ultimo_atendimento) < -27 
-                                                                                    ? 'text-red-400' 
-                                                                                    : parseFloat(login.sinal_ultimo_atendimento) < -25
-                                                                                        ? 'text-yellow-400'
-                                                                                        : 'text-fiber-green'
-                                                                                }`}>
-                                                                                {login.sinal_ultimo_atendimento || 'N/A'} 
-                                                                                </span>
-                                                                            </div>
-                                                                             <div className="flex items-center gap-2" title="Tempo Conectado">
-                                                                                <Clock size={14}/> {login.tempo_conectado || 'Recente'}
-                                                                            </div>
+                                                                        <div className="flex items-center gap-2" title="Sinal Óptico">
+                                                                            <Activity size={14}/> 
+                                                                            <span className={parseFloat(login.sinal_ultimo_atendimento) < -27 ? 'text-red-400' : 'text-fiber-green'}>
+                                                                                {login.sinal_ultimo_atendimento || '- dBm'}
+                                                                            </span>
+                                                                        </div>
+                                                                         <div className="flex items-center gap-2" title="Tempo Conectado">
+                                                                            <Clock size={14}/> {login.tempo_conectado || 'Recente'}
                                                                         </div>
                                                                     </div>
-                                                                ))}
-                                                            </div>
-                                                        ) : (
-                                                            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 flex items-start gap-3">
-                                                                <AlertTriangle size={18} className="text-yellow-500 flex-shrink-0 mt-0.5" />
-                                                                <div>
-                                                                    <p className="text-yellow-400 font-bold text-sm">Nenhuma conexão ativa</p>
-                                                                    <p className="text-gray-400 text-xs mt-1">Não há logins vinculados a este contrato.</p>
                                                                 </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-
-                                                    {/* FATURAS PENDENTES */}
-                                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                                        <div>
-                                                            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                                                <FileText size={14} /> Faturas Pendentes
-                                                            </h4>
-                                                            <div className="space-y-3">
-                                                                {faturasDoContrato.length > 0 ? (
-                                                                    faturasDoContrato.map(fatura => {
-                                                                        const isLoadingPixForThis = loadingPix[fatura.id] || false;
-                                                                        return (
-                                                                            <div key={fatura.id} className="flex justify-between items-center bg-white/5 p-3 rounded-lg border-l-2 border-fiber-orange hover:bg-white/10 transition-colors">
-                                                                                <div>
-                                                                                    <p className="text-white font-bold text-sm">R$ {fatura.valor}</p>
-                                                                                    <p className="text-[10px] text-gray-400">
-                                                                                        Venc: {fatura.data_vencimento}
-                                                                                    </p>
-                                                                                </div>
-                                                                                <div className="flex gap-2">
-                                                                                    <button 
-                                                                                        onClick={() => {
-                                                                                            if (fatura.pix_qrcode) {
-                                                                                                handleOpenPixModal(fatura.pix_qrcode);
-                                                                                            } else {
-                                                                                                fetchPixCode(Number(fatura.id));
-                                                                                            }
-                                                                                        }}
-                                                                                        disabled={isLoadingPixForThis}
-                                                                                        className="text-[10px] bg-fiber-green/20 text-fiber-green px-2 py-1 rounded hover:bg-fiber-green/30 transition font-bold flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                                                    >
-                                                                                        {isLoadingPixForThis ? (
-                                                                                            <><Loader2 size={10} className="animate-spin"/> ...</>
-                                                                                        ) : (
-                                                                                            <><QrCode size={10}/> PIX</>
-                                                                                        )}
-                                                                                    </button>
-                                                                                    
-                                                                                    {fatura.linha_digitavel && (
-                                                                                        <button 
-                                                                                            onClick={() => handleCopy(fatura.linha_digitavel!, String(fatura.id))} 
-                                                                                            className="text-[10px] bg-white/10 text-white px-2 py-1 rounded hover:bg-white/20 transition flex items-center gap-1"
-                                                                                        >
-                                                                                            {copiedBarcodeId === String(fatura.id) ? (
-                                                                                                <><CheckCircle size={10}/> Copiado</>
-                                                                                            ) : (
-                                                                                                <><Copy size={10}/> Código</>
-                                                                                            )}
-                                                                                        </button>
-                                                                                    )}
-                                                                                </div>
-                                                                            </div>
-                                                                        );
-                                                                    })
-                                                                ) : (
-                                                                    <p className="text-gray-500 text-sm italic flex items-center gap-2">
-                                                                        <CheckCircle size={14} className="text-green-500"/> 
-                                                                        Nenhuma fatura pendente
-                                                                    </p>
-                                                                )}
-                                                            </div>
+                                                            ))}
                                                         </div>
-
-                                                        {/* NOTAS FISCAIS */}
-                                                        <div>
-                                                            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                                                <ScrollText size={14} /> Últimas Notas Fiscais
-                                                            </h4>
-                                                            <div className="space-y-2 max-h-40 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 pr-2">
-                                                                {notasDoContrato.length > 0 ? (
-                                                                    notasDoContrato.slice(0,3).map(nota => (
-                                                                        <div key={nota.id} className="flex justify-between items-center p-2 hover:bg-white/5 rounded transition-colors border-b border-white/5 last:border-0">
-                                                                            <div>
-                                                                                <p className="text-xs text-white">NF #{nota.numero_nota}</p>
-                                                                                <p className="text-[10px] text-gray-500">{nota.data_emissao}</p>
-                                                                            </div>
-                                                                            <div className="flex items-center gap-3">
-                                                                                <span className="text-xs font-mono text-gray-300">R$ {nota.valor}</span>
-                                                                                {nota.link_pdf && (
-                                                                                    <a 
-                                                                                        href={nota.link_pdf} 
-                                                                                        target="_blank" 
-                                                                                        rel="noopener noreferrer" 
-                                                                                        className="text-fiber-blue hover:text-white transition-colors" 
-                                                                                        title="Baixar PDF"
-                                                                                    >
-                                                                                        <Download size={14} />
-                                                                                    </a>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                    ))
-                                                                ) : (
-                                                                    <p className="text-gray-500 text-sm italic">Nenhuma nota disponível</p>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
+                                                    ) : (
+                                                        <p className="text-gray-500 text-sm italic px-4">Nenhuma conexão ativa para este contrato.</p>
+                                                    )}
                                                 </div>
-                                            );
-                                        }).filter(Boolean) 
-                                    )}
+
+                                                {/* SEÇÃO FINANCEIRA (FATURAS ABERTO) */}
+                                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                                    <div>
+                                                        <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                                            <FileText size={14} /> Faturas Pendentes
+                                                        </h4>
+                                                        <div className="space-y-3">
+                                                            {faturasDoContrato.filter(f => f.status === 'A').length > 0 ? (
+                                                                faturasDoContrato.filter(f => f.status === 'A').map(fatura => (
+                                                                    <div key={fatura.id} className="flex justify-between items-center bg-white/5 p-3 rounded-lg border-l-2 border-fiber-orange hover:bg-white/10 transition-colors">
+                                                                        <div>
+                                                                            <p className="text-white font-bold text-sm">R$ {fatura.valor}</p>
+                                                                            <p className="text-[10px] text-gray-400">Venc: {fatura.data_vencimento}</p>
+                                                                        </div>
+                                                                        <div className="flex gap-2">
+                                                                            {fatura.pix_txid && <button onClick={() => handleOpenPixModal(fatura.pix_txid!)} className="text-[10px] bg-fiber-green/20 text-fiber-green px-2 py-1 rounded hover:bg-fiber-green/30 transition font-bold flex items-center gap-1"><QrCode size={10}/> PIX</button>}
+                                                                            {fatura.linha_digitavel && <button onClick={() => handleCopy(fatura.linha_digitavel!, String(fatura.id))} className="text-[10px] bg-white/10 text-white px-2 py-1 rounded hover:bg-white/20 transition flex items-center gap-1"><Copy size={10}/> Código</button>}
+                                                                        </div>
+                                                                    </div>
+                                                                ))
+                                                            ) : (
+                                                                <p className="text-gray-500 text-sm italic flex items-center gap-2"><CheckCircle size={14} className="text-green-500"/> Nenhuma fatura pendente.</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Notas Fiscais */}
+                                                    <div>
+                                                        <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                                            <ScrollText size={14} /> Últimas Notas Fiscais
+                                                        </h4>
+                                                        <div className="space-y-2 max-h-40 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 pr-2">
+                                                            {notasDoContrato.length > 0 ? (
+                                                                notasDoContrato.slice(0,3).map(nota => (
+                                                                    <div key={nota.id} className="flex justify-between items-center p-2 hover:bg-white/5 rounded transition-colors border-b border-white/5 last:border-0">
+                                                                        <div>
+                                                                            <p className="text-xs text-white">NF #{nota.numero_nota}</p>
+                                                                            <p className="text-[10px] text-gray-500">{nota.data_emissao}</p>
+                                                                        </div>
+                                                                        <div className="flex items-center gap-3">
+                                                                            <span className="text-xs font-mono text-gray-300">R$ {nota.valor}</span>
+                                                                            {nota.link_pdf && (
+                                                                                <a href={nota.link_pdf} target="_blank" rel="noopener noreferrer" className="text-fiber-blue hover:text-white transition-colors" title="Baixar PDF">
+                                                                                    <Download size={14} />
+                                                                                </a>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                ))
+                                                            ) : (
+                                                                <p className="text-gray-500 text-sm italic">Nenhuma nota disponível.</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             )}
 
+                            {/* === NOVA ABA: SUPORTE IA === */}
                             {activeTab === 'ai_support' && (
                                 <div className="h-[600px] flex flex-col">
                                     <div className="mb-6 flex justify-between items-center">
@@ -808,39 +705,40 @@ const ClientArea: React.FC = () => {
                                             </h2>
                                             <p className="text-gray-400 text-sm">Tire dúvidas sobre sua fatura, conexão e mais.</p>
                                         </div>
-                                        <Button variant="secondary" onClick={handleClearChat} className="!py-2 !px-3 text-xs gap-2" title="Limpar conversa">
-                                            <Trash2 size={14} /> Limpar Conversa
-                                        </Button>
+                                        {/* Botão de Limpar Conversa */}
+                                        <button 
+                                            onClick={handleClearChat}
+                                            className="text-xs flex items-center gap-1 text-gray-400 hover:text-red-400 transition-colors bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg border border-white/5"
+                                            title="Limpar histórico da conversa"
+                                        >
+                                            <Trash2 size={12} /> Limpar Conversa
+                                        </button>
                                     </div>
                                     
                                     <div className="flex-grow bg-neutral-900 border border-white/10 rounded-xl overflow-hidden flex flex-col">
-                                        <div ref={chatContainerRef} className="flex-grow p-4 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-fiber-orange/20">
-                                            {/* ÁREA DE SUGESTÕES INICIAIS */}
-                                            {chatMessages.length <= 1 && !isChatTyping && (
-                                                <div className="mb-6 bg-white/5 p-4 rounded-xl border border-white/10">
-                                                    <p className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-                                                        <HelpCircle size={16} className="text-fiber-orange"/> Sugestões de Dúvidas
-                                                    </p>
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                                        {CHAT_SUGGESTIONS.map((suggestion, index) => (
-                                                            <button 
-                                                                key={index}
-                                                                onClick={() => handleSuggestionClick(suggestion.label)}
-                                                                className="flex items-center gap-3 p-3 bg-neutral-800 hover:bg-neutral-700 border border-white/5 hover:border-fiber-orange/50 rounded-xl text-left transition-all group"
-                                                            >
-                                                                <div className="p-2 bg-fiber-orange/10 rounded-lg group-hover:bg-fiber-orange group-hover:text-white text-fiber-orange transition-colors">
-                                                                    <suggestion.icon size={18} />
-                                                                </div>
-                                                                <span className="text-xs font-bold text-gray-300 group-hover:text-white">{suggestion.label}</span>
-                                                            </button>
-                                                        ))}
-                                                    </div>
+                                        {/* Área de Mensagens */}
+                                        <div className="flex-grow p-4 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-fiber-orange/20">
+                                            {/* Sugestões Iniciais (só aparecem se chat estiver no estado inicial) */}
+                                            {chatMessages.length === 1 && (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+                                                    {CHAT_SUGGESTIONS.map((sug, idx) => (
+                                                        <button 
+                                                            key={idx}
+                                                            onClick={() => handleSuggestionClick(sug.label)}
+                                                            className="flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-left transition-all hover:scale-[1.02] group"
+                                                        >
+                                                            <div className="p-2 bg-neutral-800 rounded-lg text-fiber-orange group-hover:bg-fiber-orange group-hover:text-white transition-colors">
+                                                                <sug.icon size={16} />
+                                                            </div>
+                                                            <span className="text-sm text-gray-300 group-hover:text-white font-medium">{sug.label}</span>
+                                                        </button>
+                                                    ))}
                                                 </div>
                                             )}
 
                                             {chatMessages.map((msg) => (
                                                 <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                                    <div className={`max-w-[85%] rounded-2xl p-4 ${
+                                                    <div className={`max-w-[80%] rounded-2xl p-4 ${
                                                         msg.sender === 'user' 
                                                             ? 'bg-fiber-orange text-white rounded-br-none' 
                                                             : 'bg-white/10 text-gray-200 rounded-bl-none'
@@ -872,7 +770,6 @@ const ClientArea: React.FC = () => {
                                                     </div>
                                                 </div>
                                             ))}
-
                                             {isChatTyping && (
                                                 <div className="flex justify-start">
                                                     <div className="bg-white/10 text-gray-400 rounded-2xl rounded-bl-none p-4 text-xs italic flex items-center gap-2">
@@ -880,10 +777,13 @@ const ClientArea: React.FC = () => {
                                                     </div>
                                                 </div>
                                             )}
+                                            <div ref={chatEndRef} />
                                         </div>
 
+                                        {/* Input */}
                                         <form onSubmit={handleSendMessage} className="p-4 bg-neutral-800 border-t border-white/5 flex gap-2">
                                             <input 
+                                                ref={chatInputRef}
                                                 type="text" 
                                                 value={chatInput}
                                                 onChange={(e) => setChatInput(e.target.value)}
@@ -898,6 +798,7 @@ const ClientArea: React.FC = () => {
                                 </div>
                             )}
 
+                            {/* --- MANTENHO AS OUTRAS ABAS COMO LISTAS SIMPLES --- */}
                             {activeTab === 'invoices' && (
                                 <div>
                                     <h2 className="text-2xl font-bold text-white mb-6">Todas as Faturas</h2>
@@ -907,22 +808,10 @@ const ClientArea: React.FC = () => {
                                         ))}
                                     </div>
                                     <div className="space-y-3">
-                                        {(dashboardData?.faturas || []).filter(inv => {
-                                            if (invoiceStatusFilter === 'todas') return true;
-                                            if (invoiceStatusFilter === 'aberto') return inv.status === 'A';
-                                            if (invoiceStatusFilter === 'pago') return inv.status !== 'A';
-                                            return true;
-                                        }).map(invoice => (
+                                        {(dashboardData?.faturas || []).filter(inv => invoiceStatusFilter === 'todas' ? true : (inv.status === 'A' ? 'aberto' : 'pago') === invoiceStatusFilter).map(invoice => (
                                             <div key={invoice.id} className="bg-neutral-900 border border-white/10 rounded-xl p-4 flex justify-between items-center">
-                                                 <div>
-                                                     <p className="font-bold text-white">R$ {invoice.valor}</p>
-                                                     <p className="text-xs text-gray-500">{invoice.data_vencimento}</p>
-                                                     <span className={`text-[10px] uppercase font-bold ${invoice.status === 'A' ? 'text-red-400' : 'text-green-500'}`}>{invoice.status === 'A' ? 'Aberto' : 'Pago'}</span>
-                                                 </div>
-                                                 <div className="flex gap-2">
-                                                     {invoice.linha_digitavel && <Button variant="secondary" onClick={() => handleCopy(invoice.linha_digitavel!, String(invoice.id))} className="!py-1 !px-3 !text-xs">Copiar</Button>}
-                                                     <Button variant="outline" className="!py-1 !px-3 !text-xs" onClick={() => fetchPixCode(Number(invoice.id))}>PIX</Button>
-                                                 </div>
+                                                 <div><p className="font-bold text-white">R$ {invoice.valor}</p><p className="text-xs text-gray-500">{invoice.data_vencimento}</p></div>
+                                                 <div className="flex gap-2">{invoice.linha_digitavel && <Button variant="secondary" onClick={() => handleCopy(invoice.linha_digitavel!, String(invoice.id))} className="!py-1 !px-3 !text-xs">Copiar</Button>}</div>
                                             </div>
                                         ))}
                                     </div>
@@ -930,42 +819,7 @@ const ClientArea: React.FC = () => {
                             )}
 
                             {activeTab === 'consumption' && (
-                                <div>
-                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                                        <h2 className="text-2xl font-bold text-white">Extrato de Uso</h2>
-                                        
-                                        <div className="relative">
-                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                <Router size={16} className="text-fiber-orange" />
-                                            </div>
-                                            <select 
-                                                value={selectedLoginConsumo} 
-                                                onChange={(e) => setSelectedLoginConsumo(e.target.value === 'total' ? 'total' : Number(e.target.value))}
-                                                className="bg-neutral-900 border border-white/10 text-white text-sm rounded-lg pl-10 pr-8 py-2.5 focus:ring-fiber-orange focus:border-fiber-orange block w-full appearance-none cursor-pointer hover:bg-neutral-800 transition-colors"
-                                            >
-                                                <option value="total">Visão Geral (Todos)</option>
-                                                {dashboardData?.logins.map(l => (
-                                                    <option key={l.id} value={l.id}>{l.login}</option>
-                                                ))}
-                                            </select>
-                                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                                                <ChevronDown size={14} className="text-gray-400" />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <ConsumptionChart 
-                                        history={
-                                            selectedLoginConsumo === 'total' 
-                                            ? dashboardData?.consumo.history 
-                                            : dashboardData?.logins.find(l => l.id === selectedLoginConsumo)?.history || dashboardData?.consumo.history
-                                        } 
-                                    />
-                                    
-                                    <p className="text-xs text-gray-500 mt-4 text-center">
-                                        * Dados atualizados a cada 15 minutos. Para diagnóstico em tempo real, use a aba "Conexões".
-                                    </p>
-                                </div>
+                                <div><h2 className="text-2xl font-bold text-white mb-4">Extrato de Uso</h2><ConsumptionChart history={dashboardData?.consumo.history} /></div>
                             )}
                             
                             {activeTab === 'contracts' && dashboardData && (
@@ -1035,10 +889,12 @@ const ClientArea: React.FC = () => {
                                                     <div className="flex items-center gap-2 text-gray-400"><Server size={14}/> <strong>ONT:</strong> <span className="text-white">{login.sinal_ultimo_atendimento || 'N/A'}</span></div>
                                                     <div className="flex items-center gap-2 text-gray-400"><Clock size={14}/> <strong>Uptime:</strong> <span className="text-white">{login.tempo_conectado || 'N/A'}</span></div>
                                                     
+                                                    {/* --- IP Privado Mantido, IP Público Removido --- */}
                                                     <div className="flex items-center gap-2 text-gray-400">
                                                         <Activity size={14}/> <strong>IP Privado:</strong> 
                                                         <span className="text-white font-mono text-xs">{login.ip_privado || '--'}</span>
                                                     </div>
+                                                    {/* ------------------------- */}
                                                 </div>
                                                 <div className="flex flex-col sm:flex-row gap-3">
                                                     <Button onClick={() => performLoginAction(login.id, 'limpar-mac')} variant="secondary" className="!text-xs !py-2 !px-4 gap-2" disabled={actionStatus[login.id]?.status === 'loading'}>{actionStatus[login.id]?.status === 'loading' ? <Loader2 size={14} className="animate-spin" /> : <X size={14}/>} Limpar MAC</Button>

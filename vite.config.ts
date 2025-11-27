@@ -15,6 +15,9 @@ export default defineConfig({
       '@': path.resolve(__dirname, './')
     }
   },
+  optimizeDeps: {
+    include: ['@google/genai']
+  },
   server: {
     host: true,
     proxy: {
