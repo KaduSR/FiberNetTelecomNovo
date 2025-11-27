@@ -13,8 +13,8 @@ export interface Contrato {
   id: number;
   id_cliente: number;
   login: string; 
-  plano: string; 
-  status: string; 
+  plano: string; // Adicionado para compatibilidade
+  status: string; // 'A', 'S', 'C'
   desbloqueio_confianca: 'S' | 'N';
   descricao_aux_plano_venda?: string; 
   pdf_link?: string; 
@@ -33,45 +33,14 @@ export interface Fatura {
   data_vencimento: string; 
   vencimento?: string; 
   valor: string;
-  status: string; 
+  status: string; // "pago" | "aberto" | "A" | "B" | "C"
   linha_digitavel: string;
   pix_txid?: string;
   pix_code?: string;
-  pix_qrcode?: string; 
-  pix_imagem?: string; 
+  pix_qrcode?: string; // QR Code completo (CopyPaste)
+  pix_imagem?: string; // Novo campo para imagem base64
   boleto?: string;
   descricao?: string;
-}
-
-// New Types for Invoice Search
-export interface BoletoSearchItem {
-  id: number;
-  clienteId: number;
-  clienteNome: string;
-  documento: string;
-  vencimento: string;
-  vencimentoFormatado: string;
-  valor: number;
-  valorFormatado: string;
-  linhaDigitavel: string;
-  pixCopiaECola?: string;
-  boleto_pdf_link?: string;
-  status: string;
-  statusCor: string;
-  diasVencimento: number;
-}
-
-export interface BoletoSearchResponse {
-  success: boolean;
-  cpfCnpj: string;
-  resumo: {
-    totalBoletos: number;
-    totalEmAberto: number;
-    totalEmAbertoFormatado: string;
-    boletosVencidos: number;
-    boletosAVencer: number;
-  };
-  boletos: BoletoSearchItem[];
 }
 
 export interface NotaFiscal {
@@ -106,9 +75,10 @@ export interface Login {
   contrato_id: number;
   online: 'S' | 'N';
   status?: string; 
-  uptime?: string; 
+  uptime?: string; // tempo em segundos ou string formatada
   sinal_ultimo_atendimento: string;
   
+  // ONT Details
   ont_modelo?: string;
   ont_sinal_rx?: string;
   ont_sinal_tx?: string;
@@ -132,36 +102,13 @@ export interface Consumo {
   history: HistoryData;
 }
 
-// Service Orders & Tickets
 export interface OrdemServico {
   id: string;
-  protocolo: string;
   tipo: string;
-  assunto: string;
-  mensagem: string;
   status: string;
-  statusCor: string;
-  dataAbertura: string;
-  dataFechamento: string | null;
-  endereco: string;
-  resposta: string | null;
-  podeAvaliar: boolean;
-}
-
-export interface TicketType {
-  id: string;
-  nome: string;
-  descricao: string;
-  icone: string;
-}
-
-export interface TicketCreatePayload {
-  assunto: string;
+  protocolo: string;
+  data_abertura: string;
   mensagem: string;
-  prioridade?: string;
-  tipo?: string;
-  contratoId?: number;
-  loginId?: number;
 }
 
 export interface OntInfo {
@@ -174,6 +121,15 @@ export interface OntInfo {
   mac?: string;
   onu_tipo?: string;
   id_login?: number | string;
+}
+
+export interface Task {
+  id: string;
+  title: string;
+  description: string;
+  status?: string;
+  analysis?: string; 
+  createdAt?: string;
 }
 
 export interface AiInsight {
@@ -195,7 +151,7 @@ export interface DashboardResponse {
   faturas: Fatura[];
   logins: Login[];
   notas: NotaFiscal[]; 
-  ordensServico: OrdemServico[]; // Updated type
+  ordensServico: OrdemServico[];
   ontInfo: OntInfo[];
   consumo: Consumo;
   ai_analysis?: AiAnalysis; 

@@ -1,14 +1,13 @@
-
 import React, { useState } from 'react';
 import { Search, FileText, Download, Copy, CheckCircle, AlertCircle, CreditCard, Loader2, QrCode, X } from 'lucide-react';
 import Button from './Button';
-import { apiService } from '../src/services/apiService';
-import { BoletoSearchResponse, BoletoSearchItem } from '../src/types/api';
+import { Invoice } from '../types';
+import { ENDPOINTS } from '../src/config';
 
 const InvoiceFetcher: React.FC = () => {
   const [cpf, setCpf] = useState('');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<BoletoSearchResponse | null>(null);
+  const [invoices, setInvoices] = useState<Invoice[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   
@@ -39,19 +38,39 @@ const InvoiceFetcher: React.FC = () => {
 
     setLoading(true);
     setError(null);
-    setResult(null);
+    setInvoices(null);
 
     try {
-      const data = await apiService.searchInvoicesByCpf(cleanCpf);
+      // Using centralized endpoint configuration
+      const response = await fetch(ENDPOINTS.INVOICES, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ document: cleanCpf }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Cliente não encontrado ou sem faturas em aberto.');
+      }
+
+      const data = await response.json();
       
-      if (!data.success || data.resumo.totalBoletos === 0) {
+      // Handle different API structures (defensive coding)
+      // Assuming API returns array of invoices or object with faturas key
+      const boletos = Array.isArray(data) ? data : (data.faturas || data.boletos || []);
+      
+      if (boletos.length === 0) {
         setError('Nenhuma fatura em aberto encontrada para este CPF.');
       } else {
-        setResult(data);
+        setInvoices(boletos);
       }
     } catch (err: any) {
       console.error('API Error:', err);
-      setError(err.message || 'Não foi possível localizar faturas para este CPF. Verifique o número ou entre em contato com o suporte.');
+      // For demo purposes, if the API fails due to CORS/Network in this preview environment, 
+      // we show a user-friendly message or fallback (remove fallback in prod)
+      setError('Não foi possível localizar faturas para este CPF. Verifique o número ou entre em contato com o suporte.');
     } finally {
       setLoading(false);
     }
@@ -124,64 +143,44 @@ const InvoiceFetcher: React.FC = () => {
             </div>
           )}
 
-          {result && (
-            <div className="space-y-6 animate-fadeIn">
-              {/* Summary Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="bg-white/5 p-3 rounded-lg border border-white/5">
-                    <p className="text-xs text-gray-500 uppercase">Total Boletos</p>
-                    <p className="text-lg font-bold text-white">{result.resumo.totalBoletos}</p>
-                </div>
-                <div className="bg-white/5 p-3 rounded-lg border border-white/5">
-                    <p className="text-xs text-gray-500 uppercase">A Pagar</p>
-                    <p className="text-lg font-bold text-white">{result.resumo.totalEmAbertoFormatado}</p>
-                </div>
-                 <div className="bg-red-500/10 p-3 rounded-lg border border-red-500/20">
-                    <p className="text-xs text-red-400 uppercase">Vencidos</p>
-                    <p className="text-lg font-bold text-red-400">{result.resumo.boletosVencidos}</p>
-                </div>
-                <div className="bg-fiber-green/10 p-3 rounded-lg border border-fiber-green/20">
-                    <p className="text-xs text-fiber-green uppercase">A Vencer</p>
-                    <p className="text-lg font-bold text-fiber-green">{result.resumo.boletosAVencer}</p>
-                </div>
-              </div>
-
-              <h3 className="text-white font-bold text-lg mb-4 flex items-center border-t border-white/10 pt-4">
+          {invoices && (
+            <div className="space-y-4 animate-fadeIn">
+              <h3 className="text-white font-bold text-lg mb-4 flex items-center">
                 <CheckCircle className="text-fiber-green w-5 h-5 mr-2" />
                 Faturas Encontradas
               </h3>
               
-              {result.boletos.map((invoice, idx) => (
-                <div key={invoice.id} className="bg-fiber-dark border border-white/10 rounded-xl p-6 flex flex-col md:flex-row justify-between items-center gap-6 hover:border-fiber-orange/30 transition-colors">
+              {invoices.map((invoice, idx) => (
+                <div key={idx} className="bg-fiber-dark border border-white/10 rounded-xl p-6 flex flex-col md:flex-row justify-between items-center gap-6 hover:border-fiber-orange/30 transition-colors">
                   <div className="flex-1 w-full md:w-auto text-center md:text-left">
                     <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 mb-2">
                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider w-fit mx-auto md:mx-0 ${
-                          invoice.statusCor === 'danger' || invoice.status.includes('Vencid')
+                          invoice.status === 'vencido' 
                             ? 'bg-red-500/10 text-red-500' 
                             : 'bg-fiber-green/10 text-fiber-green'
                        }`}>
                           {invoice.status}
                        </span>
-                       <span className="text-gray-500 text-sm">{invoice.clienteNome}</span>
+                       <span className="text-gray-500 text-sm">{invoice.descricao || 'Fatura Internet Banda Larga'}</span>
                     </div>
                     <div className="flex flex-col md:flex-row gap-6">
                         <div>
                             <span className="text-gray-400 text-xs block uppercase tracking-wider">Vencimento</span>
-                            <span className={`text-xl font-bold ${invoice.statusCor === 'danger' ? 'text-red-400' : 'text-white'}`}>
-                                {invoice.vencimentoFormatado}
+                            <span className={`text-xl font-bold ${invoice.status === 'vencido' ? 'text-red-400' : 'text-white'}`}>
+                                {invoice.vencimento}
                             </span>
                         </div>
                         <div>
                             <span className="text-gray-400 text-xs block uppercase tracking-wider">Valor</span>
-                            <span className="text-xl font-bold text-white">{invoice.valorFormatado}</span>
+                            <span className="text-xl font-bold text-white">R$ {invoice.valor}</span>
                         </div>
                     </div>
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto flex-wrap justify-center md:justify-end">
-                    {invoice.linhaDigitavel && (
+                    {invoice.linha_digitavel && (
                         <button 
-                            onClick={() => copyToClipboard(invoice.linhaDigitavel!, `bar-${idx}`)}
+                            onClick={() => copyToClipboard(invoice.linha_digitavel!, `bar-${idx}`)}
                             className="flex items-center justify-center px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-sm font-medium transition-colors border border-white/5 focus:outline-none focus:ring-2 focus:ring-fiber-orange whitespace-nowrap"
                             title="Copiar Código de Barras"
                         >
@@ -190,9 +189,9 @@ const InvoiceFetcher: React.FC = () => {
                         </button>
                     )}
 
-                    {invoice.pixCopiaECola && (
+                    {invoice.pix_code && (
                         <button 
-                            onClick={() => openPixModal(invoice.pixCopiaECola!)}
+                            onClick={() => openPixModal(invoice.pix_code!)}
                             className="flex items-center justify-center px-4 py-2 bg-fiber-green/10 hover:bg-fiber-green/20 text-fiber-green rounded-lg text-sm font-medium transition-colors border border-fiber-green/30 focus:outline-none focus:ring-2 focus:ring-fiber-green whitespace-nowrap"
                         >
                             <QrCode size={16} className="mr-2" />
@@ -200,14 +199,14 @@ const InvoiceFetcher: React.FC = () => {
                         </button>
                     )}
                     
-                    {invoice.boleto_pdf_link ? (
+                    {invoice.link_pdf ? (
                         <Button 
                             variant="outline" 
                             className="!py-2 !px-4 whitespace-nowrap"
-                            onClick={() => window.open(invoice.boleto_pdf_link, '_blank')}
+                            onClick={() => window.open(invoice.link_pdf, '_blank')}
                         >
-                            <FileText size={16} className="mr-2" />
-                            Ver PDF
+                            <Download size={16} className="mr-2" />
+                            Baixar PDF
                         </Button>
                     ) : (
                          <Button 
