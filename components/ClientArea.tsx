@@ -1,20 +1,20 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   User, Lock, FileText, Download, Copy, CheckCircle, AlertCircle, Loader2, 
   QrCode, X, LogOut, Wifi, Activity, 
   Clock, Settings, Eye, EyeOff, Mail, ArrowUp, ArrowDown, LayoutDashboard, Ban,
-  FileSignature, BarChart3, ScrollText, Zap, Power, Server, Link2, ThumbsUp, Printer, Trash2, ArrowLeft, MessageCircle, Globe,
-  MapPin, Router, Bot, Send, Search
+  FileSignature, BarChart3, ScrollText, Power, Server, Link2, ThumbsUp, Printer, Trash2, ArrowLeft, MessageCircle, Globe,
+  MapPin, Router, Bot, Send
 } from 'lucide-react';
 import Button from './Button';
-import { GoogleGenAI } from "@google/genai";
 import { DashboardResponse, Consumo, Fatura, ChatMessage } from '../src/types/api';
 import { apiService } from '../src/services/apiService';
 import { CONTACT_INFO } from '../constants';
 import AIInsights from '../src/components/AIInsights';
 
 // MUDANÇA DE CHAVE PARA FORÇAR LIMPEZA DE CACHE ANTIGO
-const DASH_CACHE_KEY = 'fiber_dashboard_cache_v7_ont_details';
+const DASH_CACHE_KEY = 'fiber_dashboard_cache_v6_clean';
 
 // === HELPERS ===
 const formatBytes = (bytes: number | string | undefined, decimals = 2) => {
@@ -31,16 +31,24 @@ const bytesToGB = (bytes: number) => {
 
 // === SUB-COMPONENT: CONSUMPTION CHART ===
 const ConsumptionChart: React.FC<{ history?: Consumo['history'] }> = ({ history }) => {
-    const [period, setPeriod] = useState<'daily' | 'monthly'>('daily');
+    const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
     const [activePoint, setActivePoint] = useState<{ label: string, download: number, upload: number } | null>(null);
 
     const rawData = history?.[period] || [];
     
-    const data = rawData.map(item => ({
-        label: period === 'daily' ? (item.data || '') : (item.mes_ano || ''),
-        download: bytesToGB(item.download_bytes),
-        upload: bytesToGB(item.upload_bytes)
-    })).reverse(); 
+    // Map data based on period
+    const data = rawData.map(item => {
+        let label = '';
+        if (period === 'daily') label = item.data || '';
+        else if (period === 'weekly') label = item.semana || '';
+        else label = item.mes_ano || '';
+
+        return {
+            label,
+            download: bytesToGB(item.download_bytes),
+            upload: bytesToGB(item.upload_bytes)
+        };
+    }).reverse(); 
 
     if(!history || data.length === 0){
         return (
@@ -71,6 +79,9 @@ const ConsumptionChart: React.FC<{ history?: Consumo['history'] }> = ({ history 
                 <div className="flex bg-white/5 p-1 rounded-full border border-white/10">
                     <button onClick={() => setPeriod('daily')} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${period === 'daily' ? 'bg-fiber-orange text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
                         Diário
+                    </button>
+                    <button onClick={() => setPeriod('weekly')} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${period === 'weekly' ? 'bg-fiber-orange text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
+                        Semanal
                     </button>
                     <button onClick={() => setPeriod('monthly')} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${period === 'monthly' ? 'bg-fiber-orange text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
                         Mensal
@@ -163,7 +174,6 @@ const ClientArea: React.FC = () => {
     const [passwordChangeStatus, setPasswordChangeStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
     const [showNewPass, setShowNewPass] = useState(false);
     const [actionStatus, setActionStatus] = useState<{ [key: string]: { status: 'idle' | 'loading' | 'success' | 'error', message?: string } }>({});
-    const [diagResult, setDiagResult] = useState<{ download: string, upload: string } | null>(null);
     
     // IP Público removido conforme solicitação
     
@@ -172,7 +182,6 @@ const ClientArea: React.FC = () => {
     const [emailInput, setEmailInput] = useState('');
     const [recoveryStatus, setRecoveryStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
     const [recoveryMessage, setRecoveryMessage] = useState('');
-    const [loadingPix, setLoadingPix] = useState<{[key: string]: boolean}>({});
 
     // Chat AI State
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
@@ -181,14 +190,6 @@ const ClientArea: React.FC = () => {
     const [chatInput, setChatInput] = useState('');
     const [isChatTyping, setIsChatTyping] = useState(false);
     const chatEndRef = useRef<HTMLDivElement>(null);
-
-    const CHAT_SUGGESTIONS = [
-        { label: "Minha fatura vence quando?", icon: FileText },
-        { label: "O WhatsApp caiu?", icon: Globe },
-        { label: "Instagram com problemas?", icon: Activity },
-        { label: "Minha conexão está lenta", icon: Wifi },
-        { label: "Quero a 2ª via do boleto", icon: QrCode },
-    ];
 
     const fetchDashboardData = async () => {
         setIsRefetching(true);
@@ -246,14 +247,12 @@ const ClientArea: React.FC = () => {
         setLoginView('login');
     };
 
-    const performLoginAction = async (loginId: string | number, action: 'limpar-mac' | 'desconectar' | 'diagnostico') => {
+    const performLoginAction = async (loginId: string | number, action: 'limpar-mac' | 'desconectar') => {
         const id = Number(loginId);
         setActionStatus(prev => ({ ...prev, [loginId]: { status: 'loading' as const } }));
-        setDiagResult(null);
 
         try {
             const data = await apiService.performLoginAction(id, action);
-            if (action === 'diagnostico' && data.consumo) setDiagResult(data.consumo);
             setActionStatus(prev => ({ ...prev, [loginId]: { status: 'success' as const, message: data.message } }));
         } catch (error: any) {
             setActionStatus(prev => ({ ...prev, [loginId]: { status: 'error' as const, message: error.message } }));
@@ -291,129 +290,46 @@ const ClientArea: React.FC = () => {
         }
     }
 
-    const processMessage = async (text: string) => {
-        if (!text.trim()) return;
+    const handleSendMessage = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!chatInput.trim()) return;
 
-        const userMsg: ChatMessage = { id: Date.now().toString(), sender: 'user', text: text, timestamp: new Date() };
+        const userMsg: ChatMessage = { id: Date.now().toString(), sender: 'user', text: chatInput, timestamp: new Date() };
         setChatMessages(prev => [...prev, userMsg]);
+        setChatInput('');
         setIsChatTyping(true);
 
-        try {
-            const apiKey = process.env.API_KEY;
-            
-            if (!apiKey) {
-                throw new Error("API Key não configurada. Por favor, entre em contato com o suporte.");
-            }
-
-            const ai = new GoogleGenAI({ apiKey });
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: text,
-                config: {
-                    systemInstruction: `Você é o assistente virtual da Fiber.Net Telecom. 
-                    Seu nome é Fiber.IA.
-                    Você deve ser educado, prestativo e focar em suporte técnico de internet e questões financeiras básicas.
-                    A empresa oferece planos de fibra óptica.
-                    
-                    IMPORTANTE: Se o usuário perguntar se um aplicativo ou serviço (como WhatsApp, Instagram, Facebook, Bancos, etc) caiu ou está fora do ar, VOCÊ DEVE usar a ferramenta de busca do Google para verificar sites como DownDetector, G1, TechTudo ou notícias recentes.
-                    Responda com base no que encontrar na busca. Se encontrar relatos de queda, informe ao usuário e forneça as fontes.
-                    
-                    Se o usuário relatar lentidão, sugira reiniciar o modem e testar via cabo.
-                    Se perguntar sobre faturas, oriente a baixar na aba Faturas.
-                    
-                    Não invente dados de clientes.
-                    Se não souber responder, sugira contato via WhatsApp ${CONTACT_INFO.whatsapp}.`,
-                    tools: [{ googleSearch: {} }],
-                }
-            });
-
-            const botText = response.text || "Desculpe, não consegui processar sua resposta no momento.";
-            
-            let sources: { title: string; url: string }[] = [];
-            if (response.candidates?.[0]?.groundingMetadata?.groundingChunks) {
-                sources = response.candidates[0].groundingMetadata.groundingChunks
-                    .map((chunk: any) => {
-                        if (chunk.web?.uri && chunk.web?.title) {
-                            return { title: chunk.web.title, url: chunk.web.uri };
-                        }
-                        return null;
-                    })
-                    .filter((s: any) => s !== null);
-            }
-
+        // Simulando resposta da IA (Aqui você conectaria com apiService.analyzeTask ou um endpoint específico de chat)
+        setTimeout(() => {
+            const responses = [
+                "Entendi. Para resolver isso, tente reiniciar seu modem retirando-o da tomada por 30 segundos.",
+                "Posso verificar sua conexão. Um momento...",
+                "Para questões financeiras, você pode baixar sua fatura na aba 'Faturas'.",
+                "Estou aprendendo sobre isso. Por favor, entre em contato com nosso suporte humano no WhatsApp para mais detalhes."
+            ];
             const botMsg: ChatMessage = { 
                 id: (Date.now() + 1).toString(), 
                 sender: 'bot', 
-                text: botText, 
-                timestamp: new Date(),
-                sources: sources
-            };
-            setChatMessages(prev => [...prev, botMsg]);
-
-        } catch (error: any) {
-            console.error("Gemini AI Error:", error);
-            const errorText = error.message?.includes("API Key") 
-                ? "O serviço de IA está temporariamente indisponível. Por favor, tente novamente mais tarde." 
-                : "Desculpe, estou enfrentando instabilidade técnica. Por favor, tente novamente mais tarde ou contate o suporte humano.";
-                
-            const errorMsg: ChatMessage = { 
-                id: (Date.now() + 1).toString(), 
-                sender: 'bot', 
-                text: errorText, 
+                text: responses[Math.floor(Math.random() * responses.length)], 
                 timestamp: new Date() 
             };
-            setChatMessages(prev => [...prev, errorMsg]);
-        } finally {
+            setChatMessages(prev => [...prev, botMsg]);
             setIsChatTyping(false);
-        }
-    };
-
-    const handleSendMessage = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const text = chatInput;
-        setChatInput(''); 
-        await processMessage(text);
-    };
-
-    const handleSuggestionClick = (suggestion: string) => {
-        setChatInput(suggestion);
-        if (chatInputRef.current) {
-            chatInputRef.current.focus();
-            chatInputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-    };
-
-    // Ref para o input de chat
-    const chatInputRef = useRef<HTMLInputElement>(null);
-
-    const handleClearChat = () => {
-        setChatMessages([
-            { id: Date.now().toString(), sender: 'bot', text: 'Olá! Sou a IA da Fiber.Net. Como posso ajudar você hoje?', timestamp: new Date() }
-        ]);
+        }, 1500);
     };
 
     useEffect(() => {
         const saved = localStorage.getItem('fiber_saved_email');
         if (saved) { setEmailInput(saved); setRememberMe(true); }
         if (isAuthenticated) {
+            // Removida busca de IP Público conforme solicitado
             fetchDashboardData();
         }
     }, []);
 
     useEffect(() => {
         if (activeTab === 'ai_support' && chatEndRef.current) {
-            // Pequeno delay para garantir que a UI atualizou
-            setTimeout(() => {
-                // Scroll container to bottom
-                if (chatEndRef.current) {
-                    chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
-                }
-            }, 100);
-        }
-        
-        // Quando mudar para suporte IA, rolar a página para o topo da aba
-        if (activeTab === 'ai_support') {
-            window.scrollTo({ top: 0, behavior: 'auto' });
+            chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
         }
     }, [chatMessages, activeTab]);
 
@@ -433,41 +349,9 @@ const ClientArea: React.FC = () => {
         setTimeout(() => setIsPixCopied(false), 2000);
     };
 
-    // Nova função para buscar PIX dinamicamente com suporte a objeto
-    const fetchPixCode = async (faturaId: number) => {
-        if (loadingPix[faturaId]) return;
-      
-        setLoadingPix(prev => ({ ...prev, [faturaId]: true }));
-      
-        try {
-          const response = await apiService.getPixCode(faturaId);
-          const pixCode = response.qrcode; // Agora extraímos do objeto
-          
-          if (pixCode) {
-            // Atualizar estado local para manter consistência
-            setDashboardData(prev => {
-                if (!prev) return prev;
-                return {
-                    ...prev,
-                    faturas: prev.faturas.map(f => Number(f.id) === Number(faturaId) ? { ...f, pix_qrcode: pixCode } : f)
-                };
-            });
-            setActivePixCode(pixCode);
-            setPixModalOpen(true);
-          } else {
-             alert('Código PIX não disponível para esta fatura no momento.');
-          }
-        } catch (error) {
-          console.error('Erro ao buscar PIX:', error);
-          alert('Erro ao buscar o código PIX. Tente novamente ou use o código de barras.');
-        } finally {
-          setLoadingPix(prev => ({ ...prev, [faturaId]: false }));
-        }
-    };
-
     const TABS = [
       { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
-      { id: 'ai_support', label: 'Suporte IA', icon: Bot, badge: 'NOVO' }, 
+      { id: 'ai_support', label: 'Suporte IA', icon: Bot, badge: 'NOVO' }, // ABA SUPORTE IA COM BADGE
       { id: 'invoices', label: 'Faturas', icon: FileText },
       { id: 'connections', label: 'Conexões', icon: Wifi },
       { id: 'consumption', label: 'Extrato', icon: BarChart3 },
@@ -506,7 +390,7 @@ const ClientArea: React.FC = () => {
                             </form>
                         </>
                     ) : (
-                         <>
+                        <>
                              <button onClick={() => setLoginView('login')} className="mb-6 text-gray-400 hover:text-white flex items-center gap-2 text-sm"><ArrowLeft size={16} /> Voltar</button>
                              <h2 className="text-2xl font-bold text-white text-center mb-8">Recuperar Senha</h2>
                              {recoveryStatus !== 'success' ? (
@@ -614,7 +498,7 @@ const ClientArea: React.FC = () => {
                                                         <div className="grid grid-cols-1 gap-4">
                                                             {loginsDoContrato.map(login => (
                                                                 <div key={login.id} className="bg-black/40 border border-white/5 rounded-lg p-4 flex flex-col md:flex-row justify-between items-center gap-4">
-                                                                    <div className="flex items-center gap-4 min-w-[200px]">
+                                                                    <div className="flex items-center gap-4">
                                                                          <div className={`w-3 h-3 rounded-full ${login.online === 'S' ? 'bg-fiber-green animate-pulse' : 'bg-gray-500'}`}></div>
                                                                          <div>
                                                                              <p className="font-bold text-white text-sm">{login.login}</p>
@@ -622,39 +506,19 @@ const ClientArea: React.FC = () => {
                                                                          </div>
                                                                     </div>
                                                                     
-                                                                    {/* DETALHES COMPLETOS DA ONT */}
-                                                                    <div className="flex flex-wrap items-center gap-4 md:gap-6 text-xs text-gray-400 mt-2 md:mt-0">
-                                                                        {/* Modelo/Tipo */}
-                                                                        <div className="flex items-center gap-1.5" title="Modelo da ONU">
-                                                                            <Router size={14} className="text-fiber-blue"/> 
-                                                                            <span className="text-white">{login.ont_modelo || 'ONU Padrão'}</span>
+                                                                    <div className="flex items-center gap-6 text-xs text-gray-400">
+                                                                        <div className="flex items-center gap-2" title="Modelo da ONU">
+                                                                            <Router size={14}/> {login.ont_modelo || 'ONU Padrão'}
                                                                         </div>
-
-                                                                        {/* Sinal RX */}
-                                                                        <div className="flex items-center gap-1.5" title="Sinal de Recepção (RX)">
-                                                                            <ArrowDown size={14} className="text-fiber-orange"/> 
-                                                                            <span className={parseFloat(login.ont_sinal_rx || login.sinal_ultimo_atendimento) < -27 ? 'text-red-400 font-bold' : 'text-fiber-green font-bold'}>
-                                                                                RX: {login.ont_sinal_rx || login.sinal_ultimo_atendimento || '-'}
+                                                                        <div className="flex items-center gap-2" title="Sinal Óptico">
+                                                                            <Activity size={14}/> 
+                                                                            <span className={parseFloat(login.sinal_ultimo_atendimento) < -27 ? 'text-red-400' : 'text-fiber-green'}>
+                                                                                {login.sinal_ultimo_atendimento || '- dBm'}
                                                                             </span>
                                                                         </div>
-
-                                                                        {/* Sinal TX */}
-                                                                        {login.ont_sinal_tx && (
-                                                                            <div className="flex items-center gap-1.5" title="Sinal de Transmissão (TX)">
-                                                                                <ArrowUp size={14} className="text-fiber-blue"/> 
-                                                                                <span className="text-gray-300">TX: {login.ont_sinal_tx}</span>
-                                                                            </div>
-                                                                        )}
-
-                                                                        {/* Temperatura */}
-                                                                        {login.ont_temperatura && (
-                                                                            <div className="flex items-center gap-1.5" title="Temperatura da ONU">
-                                                                                <Activity size={14} className={parseFloat(login.ont_temperatura) > 60 ? 'text-red-400' : 'text-gray-400'}/> 
-                                                                                <span className={parseFloat(login.ont_temperatura) > 60 ? 'text-red-400 font-bold' : 'text-gray-300'}>
-                                                                                    {login.ont_temperatura}°C
-                                                                                </span>
-                                                                            </div>
-                                                                        )}
+                                                                         <div className="flex items-center gap-2" title="Tempo Conectado">
+                                                                            <Clock size={14}/> {login.tempo_conectado || 'Recente'}
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             ))}
@@ -735,37 +599,11 @@ const ClientArea: React.FC = () => {
                                             </h2>
                                             <p className="text-gray-400 text-sm">Tire dúvidas sobre sua fatura, conexão e mais.</p>
                                         </div>
-                                        {/* Botão de Limpar Conversa */}
-                                        <button 
-                                            onClick={handleClearChat}
-                                            className="text-xs flex items-center gap-1 text-gray-400 hover:text-red-400 transition-colors bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg border border-white/5"
-                                            title="Limpar histórico da conversa"
-                                        >
-                                            <Trash2 size={12} /> Limpar Conversa
-                                        </button>
                                     </div>
                                     
                                     <div className="flex-grow bg-neutral-900 border border-white/10 rounded-xl overflow-hidden flex flex-col">
                                         {/* Área de Mensagens */}
                                         <div className="flex-grow p-4 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-fiber-orange/20">
-                                            {/* Sugestões Iniciais (só aparecem se chat estiver no estado inicial) */}
-                                            {chatMessages.length === 1 && (
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-                                                    {CHAT_SUGGESTIONS.map((sug, idx) => (
-                                                        <button 
-                                                            key={idx}
-                                                            onClick={() => handleSuggestionClick(sug.label)}
-                                                            className="flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-left transition-all hover:scale-[1.02] group"
-                                                        >
-                                                            <div className="p-2 bg-neutral-800 rounded-lg text-fiber-orange group-hover:bg-fiber-orange group-hover:text-white transition-colors">
-                                                                <sug.icon size={16} />
-                                                            </div>
-                                                            <span className="text-sm text-gray-300 group-hover:text-white font-medium">{sug.label}</span>
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            )}
-
                                             {chatMessages.map((msg) => (
                                                 <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                                                     <div className={`max-w-[80%] rounded-2xl p-4 ${
@@ -773,27 +611,7 @@ const ClientArea: React.FC = () => {
                                                             ? 'bg-fiber-orange text-white rounded-br-none' 
                                                             : 'bg-white/10 text-gray-200 rounded-bl-none'
                                                     }`}>
-                                                        <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                                                        {msg.sources && msg.sources.length > 0 && (
-                                                            <div className="mt-3 pt-3 border-t border-white/10">
-                                                                <p className="text-[10px] text-gray-400 font-bold uppercase mb-2 flex items-center gap-1">
-                                                                    <Search size={10} /> Fontes Pesquisadas:
-                                                                </p>
-                                                                <div className="flex flex-wrap gap-2">
-                                                                    {msg.sources.map((source, idx) => (
-                                                                        <a 
-                                                                            key={idx} 
-                                                                            href={source.url} 
-                                                                            target="_blank" 
-                                                                            rel="noopener noreferrer"
-                                                                            className="text-[10px] bg-white/5 hover:bg-white/10 border border-white/10 px-2 py-1 rounded-full text-fiber-blue truncate max-w-[200px] flex items-center gap-1 transition-colors"
-                                                                        >
-                                                                            <Link2 size={8} /> {source.title}
-                                                                        </a>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                        )}
+                                                        <p className="text-sm">{msg.text}</p>
                                                         <span className="text-[10px] opacity-50 mt-1 block text-right">
                                                             {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                         </span>
@@ -813,7 +631,6 @@ const ClientArea: React.FC = () => {
                                         {/* Input */}
                                         <form onSubmit={handleSendMessage} className="p-4 bg-neutral-800 border-t border-white/5 flex gap-2">
                                             <input 
-                                                ref={chatInputRef}
                                                 type="text" 
                                                 value={chatInput}
                                                 onChange={(e) => setChatInput(e.target.value)}
@@ -915,52 +732,23 @@ const ClientArea: React.FC = () => {
                                                         {login.online === 'S' ? 'Online' : 'Offline'}
                                                     </div>
                                                 </div>
-
-                                                {/* Detalhamento de Conexão (Grid Melhorado) */}
-                                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 text-sm mb-6 bg-black/20 p-4 rounded-lg">
-                                                    {/* Modelo */}
-                                                    <div className="flex flex-col gap-1">
-                                                        <span className="text-xs text-gray-500 flex items-center gap-1"><Router size={12}/> Modelo (ONU)</span>
-                                                        <span className="text-white font-medium">{login.ont_modelo || 'Padrão'}</span>
-                                                    </div>
-
-                                                    {/* RX */}
-                                                    <div className="flex flex-col gap-1">
-                                                        <span className="text-xs text-gray-500 flex items-center gap-1"><ArrowDown size={12}/> Sinal RX</span>
-                                                        <span className={`font-bold ${parseFloat(login.ont_sinal_rx || login.sinal_ultimo_atendimento || '0') < -27 ? 'text-red-400' : 'text-fiber-green'}`}>
-                                                            {login.ont_sinal_rx || login.sinal_ultimo_atendimento || 'N/A'}
-                                                        </span>
-                                                    </div>
-
-                                                    {/* TX */}
-                                                    <div className="flex flex-col gap-1">
-                                                        <span className="text-xs text-gray-500 flex items-center gap-1"><ArrowUp size={12}/> Sinal TX</span>
-                                                        <span className="text-white font-medium">{login.ont_sinal_tx || 'N/A'}</span>
-                                                    </div>
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-6">
+                                                    <div className="flex items-center gap-2 text-gray-400"><Server size={14}/> <strong>ONT:</strong> <span className="text-white">{login.sinal_ultimo_atendimento || 'N/A'}</span></div>
+                                                    <div className="flex items-center gap-2 text-gray-400"><Clock size={14}/> <strong>Uptime:</strong> <span className="text-white">{login.tempo_conectado || 'N/A'}</span></div>
                                                     
-                                                    {/* Temperatura */}
-                                                    <div className="flex flex-col gap-1">
-                                                        <span className="text-xs text-gray-500 flex items-center gap-1"><Activity size={12}/> Temp.</span>
-                                                        <span className={`font-medium ${parseFloat(login.ont_temperatura || '0') > 65 ? 'text-red-400' : 'text-white'}`}>
-                                                            {login.ont_temperatura ? `${login.ont_temperatura}°C` : 'N/A'}
-                                                        </span>
+                                                    {/* --- IP Privado Mantido, IP Público Removido --- */}
+                                                    <div className="flex items-center gap-2 text-gray-400">
+                                                        <Activity size={14}/> <strong>IP Privado:</strong> 
+                                                        <span className="text-white font-mono text-xs">{login.ip_privado || '--'}</span>
                                                     </div>
-
-                                                    {/* Uptime */}
-                                                    <div className="flex flex-col gap-1">
-                                                         <span className="text-xs text-gray-500 flex items-center gap-1"><Clock size={12}/> Uptime</span>
-                                                         <span className="text-white text-xs">{login.tempo_conectado || 'Recente'}</span>
-                                                    </div>
+                                                    {/* ------------------------- */}
                                                 </div>
-
                                                 <div className="flex flex-col sm:flex-row gap-3">
                                                     <Button onClick={() => performLoginAction(login.id, 'limpar-mac')} variant="secondary" className="!text-xs !py-2 !px-4 gap-2" disabled={actionStatus[login.id]?.status === 'loading'}>{actionStatus[login.id]?.status === 'loading' ? <Loader2 size={14} className="animate-spin" /> : <X size={14}/>} Limpar MAC</Button>
                                                     <Button onClick={() => performLoginAction(login.id, 'desconectar')} variant="secondary" className="!text-xs !py-2 !px-4 gap-2" disabled={actionStatus[login.id]?.status === 'loading'}>{actionStatus[login.id]?.status === 'loading' ? <Loader2 size={14} className="animate-spin" /> : <Power size={14}/>} Desconectar</Button>
-                                                    <Button onClick={() => performLoginAction(login.id, 'diagnostico')} variant="outline" className="!text-xs !py-2 !px-4 gap-2" disabled={actionStatus[login.id]?.status === 'loading'}>{actionStatus[login.id]?.status === 'loading' ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14}/>} Diagnóstico</Button>
                                                 </div>
                                                 {actionStatus[login.id]?.status === 'success' && <p className="text-green-500 text-xs mt-3">{actionStatus[login.id]?.message}</p>}
                                                 {actionStatus[login.id]?.status === 'error' && <p className="text-red-500 text-xs mt-3">{actionStatus[login.id]?.message}</p>}
-                                                {diagResult && <p className="text-blue-400 text-xs mt-3 font-mono">Consumo Atual: DL {diagResult.download} / UL {diagResult.upload}</p>}
                                             </div>
                                         ))}
                                     </div>
