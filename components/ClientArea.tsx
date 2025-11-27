@@ -14,7 +14,7 @@ import { CONTACT_INFO } from '../constants';
 import AIInsights from '../src/components/AIInsights';
 
 // MUDANÇA DE CHAVE PARA FORÇAR LIMPEZA DE CACHE ANTIGO
-const DASH_CACHE_KEY = 'fiber_dashboard_cache_v7_clean';
+const DASH_CACHE_KEY = 'fiber_dashboard_cache_v6_nodiag';
 
 // === HELPERS ===
 const formatBytes = (bytes: number | string | undefined, decimals = 2) => {
@@ -31,24 +31,16 @@ const bytesToGB = (bytes: number) => {
 
 // === SUB-COMPONENT: CONSUMPTION CHART ===
 const ConsumptionChart: React.FC<{ history?: Consumo['history'] }> = ({ history }) => {
-    const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+    const [period, setPeriod] = useState<'daily' | 'monthly'>('daily');
     const [activePoint, setActivePoint] = useState<{ label: string, download: number, upload: number } | null>(null);
 
     const rawData = history?.[period] || [];
     
-    // Map data based on period
-    const data = rawData.map(item => {
-        let label = '';
-        if (period === 'daily') label = item.data || '';
-        else if (period === 'weekly') label = item.semana || '';
-        else label = item.mes_ano || '';
-
-        return {
-            label,
-            download: bytesToGB(item.download_bytes),
-            upload: bytesToGB(item.upload_bytes)
-        };
-    }).reverse(); 
+    const data = rawData.map(item => ({
+        label: period === 'daily' ? (item.data || '') : (item.mes_ano || ''),
+        download: bytesToGB(item.download_bytes),
+        upload: bytesToGB(item.upload_bytes)
+    })).reverse(); 
 
     if(!history || data.length === 0){
         return (
@@ -79,9 +71,6 @@ const ConsumptionChart: React.FC<{ history?: Consumo['history'] }> = ({ history 
                 <div className="flex bg-white/5 p-1 rounded-full border border-white/10">
                     <button onClick={() => setPeriod('daily')} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${period === 'daily' ? 'bg-fiber-orange text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
                         Diário
-                    </button>
-                    <button onClick={() => setPeriod('weekly')} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${period === 'weekly' ? 'bg-fiber-orange text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
-                        Semanal
                     </button>
                     <button onClick={() => setPeriod('monthly')} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${period === 'monthly' ? 'bg-fiber-orange text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
                         Mensal
