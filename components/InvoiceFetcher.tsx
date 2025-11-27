@@ -206,8 +206,8 @@ const InvoiceFetcher: React.FC = () => {
                             className="!py-2 !px-4 whitespace-nowrap"
                             onClick={() => window.open(invoice.boleto_pdf_link, '_blank')}
                         >
-                            <Download size={16} className="mr-2" />
-                            Baixar PDF
+                            <FileText size={16} className="mr-2" />
+                            Ver PDF
                         </Button>
                     ) : (
                          <Button 
