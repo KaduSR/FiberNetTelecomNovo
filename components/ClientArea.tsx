@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   User, Lock, FileText, Download, Copy, CheckCircle, AlertCircle, Loader2, 
@@ -15,7 +14,7 @@ import { CONTACT_INFO } from '../constants';
 import AIInsights from '../src/components/AIInsights';
 
 // MUDANÇA DE CHAVE PARA FORÇAR LIMPEZA DE CACHE ANTIGO
-const DASH_CACHE_KEY = 'fiber_dashboard_cache_v9_demo_fix';
+const DASH_CACHE_KEY = 'fiber_dashboard_cache_v10_status_col';
 
 // === HELPERS ===
 const formatBytes = (bytes: number | string | undefined, decimals = 2) => {
@@ -1016,7 +1015,17 @@ const ClientArea: React.FC = () => {
                                                 </div>
 
                                                 {/* Detalhamento de Conexão (Grid Melhorado) */}
-                                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 text-sm mb-6 bg-black/20 p-4 rounded-lg">
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-6 bg-black/20 p-4 rounded-lg">
+                                                    
+                                                    {/* NOVA COLUNA: STATUS */}
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-xs text-gray-500 flex items-center gap-1"><Wifi size={12}/> Status</span>
+                                                        <span className={`flex items-center gap-1.5 font-bold ${login.online === 'S' ? 'text-fiber-green' : 'text-gray-500'}`}>
+                                                            <span className={`w-2 h-2 rounded-full ${login.online === 'S' ? 'bg-fiber-green animate-pulse' : 'bg-red-500'}`}></span>
+                                                            {login.online === 'S' ? 'Conectado' : 'Offline'}
+                                                        </span>
+                                                    </div>
+
                                                     {/* Modelo */}
                                                     <div className="flex flex-col gap-1">
                                                         <span className="text-xs text-gray-500 flex items-center gap-1"><Router size={12}/> Modelo (ONU)</span>
@@ -1049,6 +1058,12 @@ const ClientArea: React.FC = () => {
                                                     <div className="flex flex-col gap-1">
                                                          <span className="text-xs text-gray-500 flex items-center gap-1"><Clock size={12}/> Uptime</span>
                                                          <span className="text-white text-xs">{login.tempo_conectado || 'Recente'}</span>
+                                                    </div>
+                                                    
+                                                    {/* IP Privado */}
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-xs text-gray-500 flex items-center gap-1"><Activity size={12}/> IP Privado</span>
+                                                        <span className="text-white font-mono text-xs">{login.ip_privado || '--'}</span>
                                                     </div>
                                                 </div>
 
