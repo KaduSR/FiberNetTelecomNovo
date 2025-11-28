@@ -1,8 +1,20 @@
 
 import React, { useState } from 'react';
-import { Instagram, MapPin, MessageCircle, ChevronRight, Mail, Phone, CheckCircle, AlertCircle, ArrowRight } from 'lucide-react';
+import { Instagram, MapPin, MessageCircle, ChevronRight, Mail, Phone, CheckCircle, AlertCircle, ArrowRight, ExternalLink } from 'lucide-react';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import * as L from 'leaflet';
 import { CONTACT_INFO } from '../constants';
 import FiberNetLogo from './FiberNetLogo';
+
+// Fix for default Leaflet marker icons in React
+const icon = new L.Icon({
+    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+});
 
 interface FooterProps {
   onNavigate?: (page: string) => void;
@@ -138,6 +150,9 @@ const Footer: React.FC<FooterProps> = ({ onNavigate, currentPage, onOpenSupport,
     </li>
   );
 
+  // Fiber.Net Coordinates (Approximate based on provided meta tags)
+  const position: [number, number] = [-22.1696, -43.5873];
+
   return (
     <footer className="bg-fiber-card text-white pt-20 pb-10 border-t border-white/5">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -262,10 +277,10 @@ const Footer: React.FC<FooterProps> = ({ onNavigate, currentPage, onOpenSupport,
             </ul>
           </div>
 
-          {/* Contact Column */}
+          {/* Contact Column with Map */}
           <div>
             <h4 className="text-base font-bold mb-6 text-white">Contato</h4>
-            <ul className="space-y-4 text-gray-400 text-sm">
+            <ul className="space-y-4 text-gray-400 text-sm mb-6">
               <li>
                 <button 
                   className="flex items-center hover:text-fiber-green transition-colors w-full text-left focus:outline-none focus:ring-2 focus:ring-fiber-green rounded px-1 group"
@@ -285,9 +300,42 @@ const Footer: React.FC<FooterProps> = ({ onNavigate, currentPage, onOpenSupport,
                 <div className="w-8 h-8 bg-neutral-800 rounded-lg flex items-center justify-center mr-3 mt-1 group-hover:bg-fiber-orange/20 transition-colors flex-shrink-0">
                     <MapPin className="w-4 h-4 text-fiber-orange" />
                 </div>
-                <span className="group-hover:text-gray-200 transition-colors">{CONTACT_INFO.address}</span>
+                <span className="group-hover:text-gray-200 transition-colors text-xs">{CONTACT_INFO.address}</span>
               </li>
             </ul>
+
+            {/* Interactive Map */}
+            <div className="w-full h-40 rounded-xl overflow-hidden border border-white/10 shadow-lg relative z-0">
+                 <MapContainer 
+                    center={position} 
+                    zoom={15} 
+                    scrollWheelZoom={false} 
+                    className="h-full w-full z-0"
+                    style={{ height: '100%', width: '100%', zIndex: 0 }}
+                 >
+                    <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                    />
+                    <Marker position={position} icon={icon}>
+                        <Popup>
+                            <span className="font-bold text-gray-900">Fiber.Net Telecom</span><br />
+                            <span className="text-xs text-gray-700">Rio das Flores, RJ</span>
+                        </Popup>
+                    </Marker>
+                </MapContainer>
+                
+                {/* Overlay link to Google Maps */}
+                <a 
+                    href={`https://www.google.com/maps/search/?api=1&query=${position[0]},${position[1]}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="absolute bottom-2 right-2 bg-neutral-900/90 hover:bg-fiber-orange text-white text-[10px] px-2 py-1 rounded flex items-center gap-1 transition-colors z-[400] border border-white/20"
+                >
+                    Abrir no Maps <ExternalLink size={10} />
+                </a>
+            </div>
+
             <p className="mt-6 text-red-500 text-xs font-bold uppercase tracking-wider px-1 flex items-center gap-2">
                 <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
                 NÃO ACEITAMOS LIGAÇÕES!!

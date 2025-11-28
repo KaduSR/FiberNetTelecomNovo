@@ -24,9 +24,27 @@ const App: React.FC = () => {
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isSegundaViaModalOpen, setIsSegundaViaModalOpen] = useState(false);
 
-  // === NOVO: Scroll para o topo sempre que a página mudar ===
+  // === NOVO: SEO e Scroll para o topo sempre que a página mudar ===
   useEffect(() => {
+    // Scroll
     window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // SEO: Título Dinâmico
+    const baseTitle = "Fiber.Net Telecom";
+    const titles: Record<string, string> = {
+      'home': `${baseTitle} | Internet Fibra Óptica em Rio das Flores`,
+      'planos': `Planos de Internet | ${baseTitle}`,
+      'client-area': `Área do Cliente | ${baseTitle}`,
+      'news': `Notícias e Tecnologia | ${baseTitle}`,
+      'help': `Central de Ajuda | ${baseTitle}`,
+      'client-guide': `Guia do Cliente | ${baseTitle}`,
+      'ethics': `Código de Ética | ${baseTitle}`,
+      'status': `Status dos Serviços | ${baseTitle}`,
+      'segunda-via': `2ª Via de Boleto | ${baseTitle}`
+    };
+
+    document.title = titles[currentPage] || baseTitle;
+
   }, [currentPage]);
 
   const toggleSupportModal = () => setIsSupportModalOpen(!isSupportModalOpen);
@@ -137,10 +155,10 @@ const App: React.FC = () => {
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="text-center max-w-3xl mx-auto mb-16">
                   <h2 className="text-3xl font-bold text-white sm:text-4xl mb-4">
-                    Nossos Planos
+                    Nossos Planos de Internet
                   </h2>
                   <p className="text-gray-400 text-lg">
-                    Escolha a velocidade ideal para sua necessidade
+                    Escolha a velocidade ideal para sua necessidade em Rio das Flores
                   </p>
                 </div>
 

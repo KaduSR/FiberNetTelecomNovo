@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   User, Lock, FileText, Download, Copy, CheckCircle, AlertCircle, Loader2, 
@@ -14,7 +15,7 @@ import { CONTACT_INFO } from '../constants';
 import AIInsights from '../src/components/AIInsights';
 
 // MUDANÇA DE CHAVE PARA FORÇAR LIMPEZA DE CACHE ANTIGO
-const DASH_CACHE_KEY = 'fiber_dashboard_cache_v10_status_col';
+const DASH_CACHE_KEY = 'fiber_dashboard_cache_v13_height_fix';
 
 // === HELPERS ===
 const formatBytes = (bytes: number | string | undefined, decimals = 2) => {
@@ -649,7 +650,7 @@ const ClientArea: React.FC = () => {
                     </aside>
 
                     <main className="w-full lg:w-3/4">
-                        <div className="bg-fiber-card border border-white/10 rounded-2xl p-6 md:p-8 min-h-[500px] animate-fadeIn">
+                        <div className="bg-fiber-card border border-white/10 rounded-2xl p-6 md:p-8 min-h-[440px] animate-fadeIn">
                             
                             {/* === DASHBOARD COM AGRUPAMENTO POR CONTRATO (LÓGICA CORRIGIDA) === */}
                             {activeTab === 'dashboard' && dashboardData && (
@@ -821,10 +822,10 @@ const ClientArea: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* === NOVA ABA: SUPORTE IA === */}
+                            {/* === NOVA ABA: SUPORTE IA (HEIGHT ADJUSTED TO 440px) === */}
                             {activeTab === 'ai_support' && (
-                                <div className="h-[calc(100vh-140px)] min-h-[500px] flex flex-col">
-                                    <div className="mb-6 flex justify-between items-center">
+                                <div className="h-[440px] flex flex-col">
+                                    <div className="mb-4 flex justify-between items-center">
                                         <div>
                                             <h2 className="text-2xl font-bold text-white flex items-center gap-2">
                                                 <Bot className="text-fiber-orange" /> Suporte Inteligente
@@ -909,7 +910,7 @@ const ClientArea: React.FC = () => {
                                         </div>
 
                                         {/* Input */}
-                                        <form onSubmit={handleSendMessage} className="p-4 bg-neutral-800 border-t border-white/5 flex gap-2">
+                                        <form onSubmit={handleSendMessage} className="p-3 bg-neutral-800 border-t border-white/5 flex gap-2">
                                             <input 
                                                 ref={chatInputRef}
                                                 type="text" 

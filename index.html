@@ -5,23 +5,88 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     
     <!-- Primary Meta Tags -->
-    <title>Fiber.Net - A internet que você precisa!</title>
-    <meta name="title" content="Fiber.Net - A internet que você precisa!">
-    <meta name="description" content="Internet de qualidade com o melhor custo x benefício da região. Fiber.Net - 100% regional, homologada pela ANATEL. Planos a partir de R$ 79,90.">
+    <title>Fiber.Net Telecom | Internet Fibra Óptica em Rio das Flores - RJ</title>
+    <meta name="title" content="Fiber.Net Telecom | Internet Fibra Óptica em Rio das Flores - RJ">
+    <meta name="description" content="A melhor internet fibra óptica de Rio das Flores e região. Planos residenciais e empresariais com ultravelocidade, estabilidade e suporte técnico local especializado. Homologada pela ANATEL.">
+    <meta name="keywords" content="internet fibra, fibra óptica, rio das flores, internet rj, provedor de internet, banda larga, wifi, fiber net, valença, internet rápida, suporte técnico">
+    <meta name="robots" content="index, follow">
+    <meta name="author" content="Fiber.Net Telecom">
+    <link rel="canonical" href="https://fibernettelecom.com/">
+
+    <!-- Geo Tags (Local SEO) -->
+    <meta name="geo.region" content="BR-RJ">
+    <meta name="geo.placename" content="Rio das Flores">
+    <meta name="geo.position" content="-22.1696;-43.5873">
+    <meta name="ICBM" content="-22.1696, -43.5873">
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://fibernettelecom.com/">
-    <meta property="og:title" content="Fiber.Net - A internet que você precisa!">
-    <meta property="og:description" content="Internet de qualidade com o melhor custo x benefício da região. Fiber.Net - 100% regional, homologada pela ANATEL.">
+    <meta property="og:title" content="Fiber.Net - Internet Fibra Óptica em Rio das Flores">
+    <meta property="og:description" content="Conecte-se com ultravelocidade. A Fiber.Net oferece a melhor estabilidade e suporte da região. Confira nossos planos!">
     <meta property="og:image" content="https://fibernettelecom.com/assets/share-image.png">
+    <meta property="og:locale" content="pt_BR">
+    <meta property="og:site_name" content="Fiber.Net Telecom">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://fibernettelecom.com/">
-    <meta property="twitter:title" content="Fiber.Net - A internet que você precisa!">
+    <meta property="twitter:title" content="Fiber.Net - Internet Fibra Óptica em Rio das Flores">
     <meta property="twitter:description" content="Internet de qualidade com o melhor custo x benefício da região. Fiber.Net - 100% regional, homologada pela ANATEL.">
     <meta property="twitter:image" content="https://fibernettelecom.com/assets/share-image.png">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+    <!-- Structured Data (JSON-LD) for Local Business -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "InternetServiceProvider",
+      "name": "Fiber.Net Telecom",
+      "image": "https://res.cloudinary.com/dbblxiya7/image/upload/v1763728839/3_wmk7t6.svg",
+      "url": "https://fibernettelecom.com",
+      "telephone": "(24) 2458-1861",
+      "email": "comercial@fibernettelecom.com",
+      "priceRange": "$$",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "RJ 145, KM 93 - Nº53320, Elizabeth",
+        "addressLocality": "Rio das Flores",
+        "addressRegion": "RJ",
+        "postalCode": "27660-000",
+        "addressCountry": "BR"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": -22.1696,
+        "longitude": -43.5873
+      },
+      "openingHoursSpecification": [
+        {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday"
+          ],
+          "opens": "08:00",
+          "closes": "18:00"
+        },
+        {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": "Saturday",
+          "opens": "08:00",
+          "closes": "12:00"
+        }
+      ],
+      "sameAs": [
+        "https://www.instagram.com/fibernettelecom_"
+      ]
+    }
+    </script>
 
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -93,6 +158,7 @@
     "react/": "https://aistudiocdn.com/react@^19.2.0/",
     "react": "https://aistudiocdn.com/react@^19.2.0",
     "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
+    "react-dom": "https://aistudiocdn.com/react-dom@^19.2.0",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
     "vite": "https://aistudiocdn.com/vite@^7.2.4",
     "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
@@ -105,7 +171,9 @@
     "url": "https://aistudiocdn.com/url@^0.11.4",
     "path": "https://aistudiocdn.com/path@^0.12.7",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
-    "jspdf": "https://aistudiocdn.com/jspdf@^2.5.1/dist/jspdf.es.min.js"
+    "jspdf": "https://aistudiocdn.com/jspdf@^2.5.1/dist/jspdf.es.min.js",
+    "leaflet": "https://unpkg.com/leaflet@1.9.4/dist/leaflet-src.esm.js",
+    "react-leaflet": "https://esm.sh/react-leaflet@4.2.1?external=react,react-dom,leaflet"
   }
 }
 </script>
