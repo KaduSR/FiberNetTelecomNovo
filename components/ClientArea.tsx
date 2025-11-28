@@ -15,7 +15,7 @@ import { CONTACT_INFO } from '../constants';
 import AIInsights from '../src/components/AIInsights';
 
 // MUDANÇA DE CHAVE PARA FORÇAR LIMPEZA DE CACHE ANTIGO
-const DASH_CACHE_KEY = 'fiber_dashboard_cache_v13_height_fix';
+const DASH_CACHE_KEY = 'fiber_dashboard_cache_v13_height_fix_v3_paths';
 
 // === HELPERS ===
 const formatBytes = (bytes: number | string | undefined, decimals = 2) => {
@@ -448,7 +448,8 @@ const ClientArea: React.FC = () => {
         setTimeout(() => {
             if (chatInputRef.current) {
                 chatInputRef.current.focus();
-                chatInputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // REMOVIDO: chatInputRef.current.scrollIntoView(...)
+                // A remoção impede que a tela role até o input, mantendo o layout fixo.
             }
         }, 100);
     };
@@ -798,7 +799,7 @@ const ClientArea: React.FC = () => {
                                                                     <div key={nota.id} className="flex justify-between items-center p-2 hover:bg-white/5 rounded transition-colors border-b border-white/5 last:border-0">
                                                                         <div>
                                                                             <p className="text-xs text-white">NF #{nota.numero_nota}</p>
-                                                                            <p className="text-[10px] text-gray-500">{nota.data_emissao}</p>
+                                                                            <p className="text--[10px] text-gray-500">{nota.data_emissao}</p>
                                                                         </div>
                                                                         <div className="flex items-center gap-3">
                                                                             <span className="text-xs font-mono text-gray-300">R$ {nota.valor}</span>
@@ -822,10 +823,10 @@ const ClientArea: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* === NOVA ABA: SUPORTE IA (HEIGHT ADJUSTED TO 440px) === */}
+                            {/* === NOVA ABA: SUPORTE IA (HEIGHT ADJUSTED TO 440px - NO SCROLL TO INPUT) === */}
                             {activeTab === 'ai_support' && (
-                                <div className="h-[440px] flex flex-col">
-                                    <div className="mb-4 flex justify-between items-center">
+                                <div className="h-[440px] flex flex-col relative">
+                                    <div className="mb-2 flex justify-between items-center shrink-0">
                                         <div>
                                             <h2 className="text-2xl font-bold text-white flex items-center gap-2">
                                                 <Bot className="text-fiber-orange" /> Suporte Inteligente
@@ -842,13 +843,13 @@ const ClientArea: React.FC = () => {
                                         </button>
                                     </div>
                                     
-                                    <div className="flex-grow bg-neutral-900 border border-white/10 rounded-xl overflow-hidden flex flex-col">
-                                        {/* Área de Mensagens */}
+                                    <div className="flex-1 bg-neutral-900 border border-white/10 rounded-xl overflow-hidden flex flex-col min-h-0">
+                                        {/* Área de Mensagens (Ocupa ~70-75% do espaço restante via Flex) */}
                                         <div 
                                             ref={chatContainerRef}
-                                            className="flex-grow p-4 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-fiber-orange/20"
+                                            className="flex-1 p-4 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-fiber-orange/20"
                                         >
-                                            {/* Sugestões Iniciais (só aparecem se chat estiver no estado inicial) */}
+                                            {/* Sugestões Iniciais */}
                                             {chatMessages.length === 1 && (
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
                                                     {CHAT_SUGGESTIONS.map((sug, idx) => (
@@ -909,8 +910,8 @@ const ClientArea: React.FC = () => {
                                             )}
                                         </div>
 
-                                        {/* Input */}
-                                        <form onSubmit={handleSendMessage} className="p-3 bg-neutral-800 border-t border-white/5 flex gap-2">
+                                        {/* Input (Fixo no rodapé via Flex Layout) */}
+                                        <form onSubmit={handleSendMessage} className="p-3 bg-neutral-800 border-t border-white/5 flex gap-2 shrink-0">
                                             <input 
                                                 ref={chatInputRef}
                                                 type="text" 

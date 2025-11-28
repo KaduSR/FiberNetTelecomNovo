@@ -29,18 +29,18 @@ const App: React.FC = () => {
     // Scroll
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    // SEO: Título Dinâmico
+    // SEO: Título Dinâmico Otimizado
     const baseTitle = "Fiber.Net Telecom";
     const titles: Record<string, string> = {
-      'home': `${baseTitle} | Internet Fibra Óptica em Rio das Flores`,
-      'planos': `Planos de Internet | ${baseTitle}`,
-      'client-area': `Área do Cliente | ${baseTitle}`,
-      'news': `Notícias e Tecnologia | ${baseTitle}`,
-      'help': `Central de Ajuda | ${baseTitle}`,
-      'client-guide': `Guia do Cliente | ${baseTitle}`,
-      'ethics': `Código de Ética | ${baseTitle}`,
-      'status': `Status dos Serviços | ${baseTitle}`,
-      'segunda-via': `2ª Via de Boleto | ${baseTitle}`
+      'home': `Internet Fibra Óptica em Rio das Flores | ${baseTitle}`,
+      'planos': `Planos de Internet Residencial e Gamer | ${baseTitle}`,
+      'client-area': `Área do Cliente - 2ª Via e Suporte | ${baseTitle}`,
+      'news': `Notícias de Tecnologia e Conectividade | ${baseTitle}`,
+      'help': `Central de Ajuda e Suporte Técnico | ${baseTitle}`,
+      'client-guide': `Guia do Cliente Fiber.Net | ${baseTitle}`,
+      'ethics': `Código de Ética e Conduta | ${baseTitle}`,
+      'status': `Status dos Serviços em Tempo Real | ${baseTitle}`,
+      'segunda-via': `Emitir 2ª Via de Boleto | ${baseTitle}`
     };
 
     document.title = titles[currentPage] || baseTitle;
@@ -92,7 +92,7 @@ const App: React.FC = () => {
                         <div className="absolute inset-0 bg-blue-500/10 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
                         <img 
                             src="https://res.cloudinary.com/dbblxiya7/image/upload/f_auto,q_auto/v1763993086/Gemini_Generated_Image_6m5kop6m5kop6m5k_urxmoq.png"
-                            alt="Cidade à noite - Fiber.Net"
+                            alt="Cidade de Rio das Flores à noite - Cobertura Fiber.Net"
                             className="relative w-full h-full object-cover rounded-xl shadow-2xl border border-white/10"
                             loading="lazy"
                             width="1000"

@@ -28,6 +28,9 @@ const Features: React.FC = () => {
   return (
     <section className="py-20 bg-fiber-dark">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Título semântico para SEO (visualmente integrado ou oculto se preferir, aqui mantido visível para estrutura) */}
+        <h2 className="sr-only">Nossos Valores e Diferenciais</h2>
+        
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {values.map((v, i) => (
             <div key={i} className="p-8 bg-fiber-card rounded-xl border border-white/5 hover:border-fiber-orange/30 transition-all h-full flex flex-col">
