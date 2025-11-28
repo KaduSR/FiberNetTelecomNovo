@@ -150,8 +150,8 @@ const Footer: React.FC<FooterProps> = ({ onNavigate, currentPage, onOpenSupport,
     </li>
   );
 
-  // Fiber.Net Coordinates (Approximate based on provided meta tags)
-  const position: [number, number] = [-22.1696, -43.5873];
+  // Fiber.Net Coordinates (Updated to exact location)
+  const position: [number, number] = [-22.183377, -43.601004];
 
   return (
     <footer className="bg-fiber-card text-white pt-20 pb-10 border-t border-white/5">
@@ -327,7 +327,7 @@ const Footer: React.FC<FooterProps> = ({ onNavigate, currentPage, onOpenSupport,
                 
                 {/* Overlay link to Google Maps */}
                 <a 
-                    href={`https://www.google.com/maps/search/?api=1&query=${position[0]},${position[1]}`}
+                    href="https://maps.app.goo.gl/VrTauxVymmyycMEL7"
                     target="_blank"
                     rel="noreferrer"
                     className="absolute bottom-2 right-2 bg-neutral-900/90 hover:bg-fiber-orange text-white text-[10px] px-2 py-1 rounded flex items-center gap-1 transition-colors z-[400] border border-white/20"
