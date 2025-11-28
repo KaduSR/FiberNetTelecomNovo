@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Search, FileText, Download, Copy, CheckCircle, AlertCircle, CreditCard, Loader2, QrCode, X } from 'lucide-react';
 import Button from './Button';
@@ -135,15 +136,51 @@ const InvoiceFetcher: React.FC = () => {
               {loading ? <Loader2 className="animate-spin" /> : 'Buscar Faturas'}
             </Button>
           </form>
+          
+          {/* Skeleton Loading State */}
+          {loading && (
+            <div className="space-y-4 animate-fadeIn mt-6">
+                <div className="flex items-center mb-4 opacity-50">
+                    <div className="w-5 h-5 rounded-full bg-white/10 animate-pulse mr-2"></div>
+                    <div className="h-5 w-48 bg-white/10 rounded animate-pulse"></div>
+                </div>
+                
+                {[1, 2].map((i) => (
+                <div key={i} className="bg-fiber-dark border border-white/5 rounded-xl p-6 flex flex-col md:flex-row justify-between items-center gap-6 animate-pulse">
+                    <div className="flex-1 w-full md:w-auto space-y-3">
+                        <div className="flex flex-col md:flex-row gap-3">
+                            <div className="h-5 w-24 bg-white/10 rounded-full"></div>
+                            <div className="h-5 w-48 bg-white/10 rounded"></div>
+                        </div>
+                        <div className="flex flex-col md:flex-row gap-8">
+                            <div>
+                                <div className="h-3 w-20 bg-white/5 rounded mb-1"></div>
+                                <div className="h-6 w-32 bg-white/10 rounded"></div>
+                            </div>
+                            <div>
+                                <div className="h-3 w-20 bg-white/5 rounded mb-1"></div>
+                                <div className="h-6 w-32 bg-white/10 rounded"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex gap-3 w-full md:w-auto justify-center md:justify-end mt-4 md:mt-0">
+                        <div className="h-10 w-28 bg-white/10 rounded-lg"></div>
+                        <div className="h-10 w-28 bg-white/10 rounded-lg"></div>
+                        <div className="h-10 w-28 bg-white/10 rounded-lg"></div>
+                    </div>
+                </div>
+                ))}
+            </div>
+          )}
 
-          {error && (
+          {error && !loading && (
             <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-center text-red-400 animate-fadeIn">
               <AlertCircle className="w-6 h-6 mr-3 flex-shrink-0" />
               {error}
             </div>
           )}
 
-          {invoices && (
+          {invoices && !loading && (
             <div className="space-y-4 animate-fadeIn">
               <h3 className="text-white font-bold text-lg mb-4 flex items-center">
                 <CheckCircle className="text-fiber-green w-5 h-5 mr-2" />

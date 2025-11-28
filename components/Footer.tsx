@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { Instagram, MapPin, MessageCircle, ChevronRight } from 'lucide-react';
+import React, { useState } from 'react';
+import { Instagram, MapPin, MessageCircle, ChevronRight, Mail, Phone, CheckCircle, AlertCircle, ArrowRight } from 'lucide-react';
 import { CONTACT_INFO } from '../constants';
 import FiberNetLogo from './FiberNetLogo';
 
@@ -8,9 +8,96 @@ interface FooterProps {
   onNavigate?: (page: string) => void;
   currentPage?: string;
   onOpenSupport?: () => void;
+  onOpenSegundaVia?: () => void;
 }
 
-const Footer: React.FC<FooterProps> = ({ onNavigate, currentPage, onOpenSupport }) => {
+const Footer: React.FC<FooterProps> = ({ onNavigate, currentPage, onOpenSupport, onOpenSegundaVia }) => {
+  // Form State
+  const [formData, setFormData] = useState({ email: '', phone: '' });
+  const [errors, setErrors] = useState({ email: '', phone: '' });
+  const [success, setSuccess] = useState(false);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    let newValue = value;
+
+    if (name === 'phone') {
+       // Remove tudo que não é dígito
+       const digits = value.replace(/\D/g, '');
+       // Limita a 11 dígitos (DDD + 9 dígitos)
+       const limitedDigits = digits.slice(0, 11);
+
+       // Máscara dinâmica
+       if (limitedDigits.length <= 10) {
+         // Fixo: (DD) XXXX-XXXX
+         newValue = limitedDigits
+           .replace(/^(\d{2})(\d)/, '($1) $2')
+           .replace(/(\d{4})(\d)/, '$1-$2');
+       } else {
+         // Celular: (DD) XXXXX-XXXX
+         newValue = limitedDigits
+           .replace(/^(\d{2})(\d)/, '($1) $2')
+           .replace(/(\d{5})(\d)/, '$1-$2');
+       }
+    }
+
+    setFormData(prev => ({ ...prev, [name]: newValue }));
+    
+    // Clear error on change
+    if (errors[name as keyof typeof errors]) {
+        setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const validateForm = () => {
+      let isValid = true;
+      const newErrors = { email: '', phone: '' };
+
+      // Email Validation (Robust Regex)
+      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      if (!formData.email.trim()) {
+          newErrors.email = 'O e-mail é obrigatório.';
+          isValid = false;
+      } else if (!emailRegex.test(formData.email)) {
+          newErrors.email = 'Digite um e-mail válido (ex: nome@dominio.com).';
+          isValid = false;
+      }
+
+      // Phone Validation (Min 10 digits - Landline or Mobile)
+      const phoneClean = formData.phone.replace(/\D/g, '');
+      const isRepeated = /^(\d)\1+$/.test(phoneClean); // Verifica números repetidos (ex: 11111111111)
+
+      if (!formData.phone.trim()) {
+          newErrors.phone = 'O telefone é obrigatório.';
+          isValid = false;
+      } else if (phoneClean.length < 10 || phoneClean.length > 11) {
+          newErrors.phone = 'Informe o DDD + Número (min. 10 dígitos).';
+          isValid = false;
+      } else if (isRepeated) {
+          newErrors.phone = 'Número de telefone inválido.';
+          isValid = false;
+      } else {
+          // Validação extra para celular (11 dígitos deve começar com 9)
+          if (phoneClean.length === 11 && parseInt(phoneClean[2]) !== 9) {
+               newErrors.phone = 'Celular deve começar com o dígito 9.';
+               isValid = false;
+          }
+      }
+
+      setErrors(newErrors);
+      return isValid;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (validateForm()) {
+          // Simulate API call
+          setSuccess(true);
+          setFormData({ email: '', phone: '' });
+          setTimeout(() => setSuccess(false), 5000);
+      }
+  };
+
   const handleNav = (e: React.MouseEvent, href: string) => {
     e.preventDefault();
     if (!onNavigate) return;
@@ -32,6 +119,11 @@ const Footer: React.FC<FooterProps> = ({ onNavigate, currentPage, onOpenSupport 
     }
   };
 
+  const handleSegundaVia = (e: React.MouseEvent) => {
+      e.preventDefault();
+      if (onOpenSegundaVia) onOpenSegundaVia();
+  };
+
   // Reusable Link Component for animated hover effect
   const FooterLink = ({ href, label, onClick }: { href: string, label: string, onClick?: (e: React.MouseEvent) => void }) => (
     <li>
@@ -51,31 +143,100 @@ const Footer: React.FC<FooterProps> = ({ onNavigate, currentPage, onOpenSupport 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
           
-          {/* Brand Column */}
-          <div>
-            <div 
-              className="mb-6 select-none cursor-pointer inline-block focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded" 
-              onClick={(e) => handleNav(e, 'home')}
-              role="button"
-              tabIndex={0}
-              aria-label="Voltar para página inicial"
-              onKeyDown={(e) => e.key === 'Enter' && handleNav(e as any, 'home')}
-            >
-               <FiberNetLogo className="h-8 sm:h-10" />
+          {/* Brand Column & Newsletter Form */}
+          <div className="space-y-8">
+            <div>
+                <div 
+                  className="mb-6 select-none cursor-pointer inline-block focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded" 
+                  onClick={(e) => handleNav(e, 'home')}
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Voltar para página inicial"
+                  onKeyDown={(e) => e.key === 'Enter' && handleNav(e as any, 'home')}
+                >
+                   <FiberNetLogo className="h-8 sm:h-10" />
+                </div>
+                <p className="text-gray-400 text-sm leading-relaxed mb-6">
+                  Conectando você ao mundo! Internet de qualidade 100% regional, homologada pela ANATEL.
+                </p>
+                <div className="flex space-x-4">
+                  <a 
+                    href="https://www.instagram.com/fibernettelecom_" 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    aria-label="Instagram" 
+                    className="text-gray-400 hover:text-fiber-orange hover:scale-110 transition-all focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded"
+                  >
+                    <Instagram size={20} />
+                  </a>
+                </div>
             </div>
-            <p className="text-gray-400 text-sm leading-relaxed mb-6">
-              Conectando você ao mundo! Internet de qualidade 100% regional, homologada pela ANATEL.
-            </p>
-            <div className="flex space-x-4">
-              <a 
-                href="https://www.instagram.com/fibernettelecom_" 
-                target="_blank" 
-                rel="noreferrer" 
-                aria-label="Instagram" 
-                className="text-gray-400 hover:text-fiber-orange hover:scale-110 transition-all focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded"
-              >
-                <Instagram size={20} />
-              </a>
+
+            {/* Newsletter Form with Validation */}
+            <div className="pt-6 border-t border-white/10">
+                <h5 className="font-bold text-white text-sm mb-4 flex items-center gap-2">
+                    <Mail size={16} className="text-fiber-orange"/> Fique por dentro
+                </h5>
+                
+                {!success ? (
+                    <form onSubmit={handleSubmit} className="space-y-3" noValidate>
+                        <div className="relative">
+                            <div className="absolute left-3 top-3 text-gray-500 pointer-events-none">
+                                <Mail size={14} />
+                            </div>
+                            <input 
+                                type="email" 
+                                name="email"
+                                value={formData.email}
+                                onChange={handleInputChange}
+                                placeholder="Seu e-mail"
+                                className={`w-full bg-neutral-900 border ${errors.email ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-fiber-orange'} rounded-lg py-2.5 pl-9 pr-3 text-xs text-white placeholder-gray-500 focus:outline-none focus:ring-1 ${errors.email ? 'focus:ring-red-500' : 'focus:ring-fiber-orange'} transition-all`}
+                                aria-label="Endereço de e-mail para newsletter"
+                            />
+                            {errors.email && (
+                                <p className="text-red-400 text-[10px] mt-1 flex items-center gap-1 animate-fadeIn">
+                                    <AlertCircle size={10} /> {errors.email}
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="relative">
+                            <div className="absolute left-3 top-3 text-gray-500 pointer-events-none">
+                                <Phone size={14} />
+                            </div>
+                            <input 
+                                type="text" 
+                                name="phone"
+                                value={formData.phone}
+                                onChange={handleInputChange}
+                                placeholder="WhatsApp / Telefone"
+                                maxLength={15}
+                                className={`w-full bg-neutral-900 border ${errors.phone ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-fiber-orange'} rounded-lg py-2.5 pl-9 pr-3 text-xs text-white placeholder-gray-500 focus:outline-none focus:ring-1 ${errors.phone ? 'focus:ring-red-500' : 'focus:ring-fiber-orange'} transition-all`}
+                                aria-label="Número de telefone para contato"
+                            />
+                             {errors.phone && (
+                                <p className="text-red-400 text-[10px] mt-1 flex items-center gap-1 animate-fadeIn">
+                                    <AlertCircle size={10} /> {errors.phone}
+                                </p>
+                            )}
+                        </div>
+
+                        <button 
+                            type="submit" 
+                            className="w-full bg-fiber-orange hover:bg-orange-600 text-white font-bold py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-2 shadow-lg hover:shadow-orange-900/20"
+                        >
+                            Cadastrar <ArrowRight size={14} />
+                        </button>
+                    </form>
+                ) : (
+                    <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 text-center animate-fadeIn">
+                        <div className="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-2">
+                            <CheckCircle size={16} className="text-green-500" />
+                        </div>
+                        <p className="text-green-400 text-xs font-bold">Cadastro realizado!</p>
+                        <p className="text-gray-400 text-[10px] mt-1">Em breve entraremos em contato com novidades.</p>
+                    </div>
+                )}
             </div>
           </div>
 
@@ -85,6 +246,7 @@ const Footer: React.FC<FooterProps> = ({ onNavigate, currentPage, onOpenSupport 
             <ul className="space-y-2 text-sm">
               <FooterLink href="home" label="Início" onClick={(e) => handleNav(e, 'home')} />
               <FooterLink href="#planos" label="Serviços" onClick={(e) => handleNav(e, '#planos')} />
+              <FooterLink href="#" label="2ª Via de Boleto" onClick={handleSegundaVia} />
               <FooterLink href="help" label="Central de Ajuda" onClick={(e) => handleNav(e, 'help')} />
               <FooterLink href="client-guide" label="Guia do Cliente" onClick={(e) => handleNav(e, 'client-guide')} />
             </ul>

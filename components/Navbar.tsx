@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Menu, X, Headphones } from 'lucide-react';
+import { Menu, X, Headphones, FileText } from 'lucide-react';
 import { NAV_ITEMS } from '../constants';
 import Button from './Button';
 import FiberNetLogo from './FiberNetLogo';
@@ -9,9 +9,10 @@ interface NavbarProps {
   onNavigate: (page: string) => void;
   currentPage: string;
   onOpenSupport?: () => void;
+  onOpenSegundaVia?: () => void;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, onOpenSupport }) => {
+const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, onOpenSupport, onOpenSegundaVia }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -26,6 +27,12 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, onOpenSupport 
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     e.preventDefault();
     
+    if (href === 'segunda-via') {
+      if (onOpenSegundaVia) onOpenSegundaVia();
+      setIsOpen(false);
+      return;
+    }
+
     // Handle external links
     if (href.startsWith('http')) {
         window.open(href, '_blank');
@@ -52,7 +59,7 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, onOpenSupport 
   };
 
   const isLinkActive = (href: string) => {
-    if (href.startsWith('#') || href.startsWith('http')) return false; 
+    if (href.startsWith('#') || href.startsWith('http') || href === 'segunda-via') return false; 
     return currentPage === href;
   };
 
@@ -80,9 +87,9 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage, onOpenSupport 
           </button>
 
           {/* Desktop Menu - Cleaner Look */}
-          <div className="hidden lg:flex items-center gap-8">
+          <div className="hidden lg:flex items-center gap-6">
             {/* Navigation Links */}
-            <div className="flex items-center space-x-6">
+            <div className="flex items-center space-x-5">
               {NAV_ITEMS.map((item) => (
                 <a 
                   key={item.label} 

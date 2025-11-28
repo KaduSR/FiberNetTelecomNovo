@@ -15,7 +15,7 @@ import { CONTACT_INFO } from '../constants';
 import AIInsights from '../src/components/AIInsights';
 
 // MUDANÇA DE CHAVE PARA FORÇAR LIMPEZA DE CACHE ANTIGO
-const DASH_CACHE_KEY = 'fiber_dashboard_cache_v8_status_fix';
+const DASH_CACHE_KEY = 'fiber_dashboard_cache_v9_demo_fix';
 
 // === HELPERS ===
 const formatBytes = (bytes: number | string | undefined, decimals = 2) => {
@@ -175,6 +175,9 @@ const ClientArea: React.FC = () => {
     const [recoveryMessage, setRecoveryMessage] = useState('');
     const [loadingPix, setLoadingPix] = useState<{[key: string]: boolean}>({});
 
+    // Demo Mode State
+    const [isDemo, setIsDemo] = useState(false);
+
     // Chat AI State
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
         { id: '1', sender: 'bot', text: 'Olá! Sou a IA da Fiber.Net. Como posso ajudar você hoje?', timestamp: new Date() }
@@ -200,6 +203,7 @@ const ClientArea: React.FC = () => {
             const data = await apiService.getDashboard();
             setDashboardData(data);
             setIsAuthenticated(true);
+            setIsDemo(false);
             localStorage.setItem(DASH_CACHE_KEY, JSON.stringify(data));
         } catch (error) {
             console.error("Erro ao atualizar dashboard:", error);
@@ -216,6 +220,7 @@ const ClientArea: React.FC = () => {
         e.preventDefault();
         setIsLoading(true);
         setLoginError('');
+        setIsDemo(false);
         const formData = new FormData(e.currentTarget);
         const password = formData.get('password') as string;
         const email = emailInput;
@@ -243,14 +248,66 @@ const ClientArea: React.FC = () => {
         }
     };
 
+    // FUNÇÃO PARA ACESSO DEMO
+    const handleDemoLogin = () => {
+        setIsLoading(true);
+        setLoginError('');
+        setTimeout(() => {
+            const mockData: DashboardResponse = {
+                clientes: [{ id: 1, nome: 'Usuário Demonstração', email: 'demo@fiber.net' }],
+                contratos: [{ id: 100, id_cliente: 1, login: 'demo.fiber', plano: 'FIBER GAMER 600M', status: 'A', desbloqueio_confianca: 'N', endereco: 'Rua das Flores, 123', cidade: 'Rio das Flores', descricao_aux_plano_venda: 'Plano Fiber Gamer' }],
+                faturas: [
+                    { id: 501, id_cliente: 1, documento: '000', data_vencimento: '10/11/2025', valor: '99,90', status: 'A', linha_digitavel: '84670000001-4 99900094000-2 00123456789-1 20251110001-1' },
+                    { id: 500, id_cliente: 1, documento: '000', data_vencimento: '10/10/2025', valor: '99,90', status: 'C', linha_digitavel: '' }
+                ],
+                logins: [{ id: 1, login: 'demo.fiber', id_cliente: 1, contrato_id: 100, online: 'S', sinal_ultimo_atendimento: '-19.5 dBm', tempo_conectado: '5d 12h', ont_modelo: 'Huawei HG8145V5', ip_privado: '100.64.10.55', ont_sinal_rx: '-19.5', ont_temperatura: '42' }],
+                notas: [],
+                ordensServico: [],
+                ontInfo: [],
+                consumo: {
+                    total_download_bytes: 50000000000,
+                    total_upload_bytes: 20000000000,
+                    total_download: '50 GB',
+                    total_upload: '20 GB',
+                    history: { 
+                        daily: Array.from({length: 7}, (_, i) => ({
+                            data: new Date(Date.now() - i * 86400000).toLocaleDateString('pt-BR').slice(0,5),
+                            download_bytes: Math.random() * 50 * 1024 * 1024 * 1024,
+                            upload_bytes: Math.random() * 20 * 1024 * 1024 * 1024
+                        })).reverse(), 
+                        weekly: [], 
+                        monthly: [] 
+                    }
+                },
+                ai_analysis: { summary: 'Sua conexão está excelente. O consumo está dentro da média. Nenhuma anomalia detectada.', insights: [{ type: 'positive', title: 'Sinal Óptico Perfeito', message: 'Seu equipamento está recebendo sinal ideal (-19.5dBm).' }] }
+            };
+            setDashboardData(mockData);
+            setIsAuthenticated(true);
+            setIsDemo(true);
+            setActiveTab('dashboard');
+            setIsLoading(false);
+        }, 1000);
+    };
+
     const handleLogout = () => {
         localStorage.removeItem('authToken');
         setIsAuthenticated(false);
         setDashboardData(null);
         setLoginView('login');
+        setIsDemo(false);
     };
 
     const performLoginAction = async (loginId: string | number, action: 'limpar-mac' | 'desconectar' | 'diagnostico') => {
+        if (isDemo) {
+            setActionStatus(prev => ({ ...prev, [loginId]: { status: 'loading' as const } }));
+            setTimeout(() => {
+                setActionStatus(prev => ({ ...prev, [loginId]: { status: 'success' as const, message: 'Ação simulada com sucesso (Modo Demo)' } }));
+                if (action === 'diagnostico') setDiagResult({ download: '600 Mbps', upload: '300 Mbps' });
+                setTimeout(() => setActionStatus(prev => ({ ...prev, [loginId]: { status: 'idle' as const } })), 3000);
+            }, 1500);
+            return;
+        }
+
         const id = Number(loginId);
         setActionStatus(prev => ({ ...prev, [loginId]: { status: 'loading' as const } }));
         setDiagResult(null);
@@ -269,6 +326,13 @@ const ClientArea: React.FC = () => {
     const handlePasswordChange = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setPasswordChangeStatus(null);
+        
+        if (isDemo) {
+            setPasswordChangeStatus({ type: 'success', message: 'Senha alterada com sucesso (Simulação)' });
+            e.currentTarget.reset();
+            return;
+        }
+
         const formData = new FormData(e.currentTarget);
         const newPassword = formData.get('novaSenha') as string;
 
@@ -398,7 +462,7 @@ const ClientArea: React.FC = () => {
     useEffect(() => {
         const saved = localStorage.getItem('fiber_saved_email');
         if (saved) { setEmailInput(saved); setRememberMe(true); }
-        if (isAuthenticated) {
+        if (isAuthenticated && !isDemo) {
             fetchDashboardData();
         }
     }, []);
@@ -441,6 +505,16 @@ const ClientArea: React.FC = () => {
     // Nova função para buscar PIX dinamicamente com suporte a objeto
     const fetchPixCode = async (faturaId: number) => {
         if (loadingPix[faturaId]) return;
+
+        if (isDemo) {
+            setLoadingPix(prev => ({ ...prev, [faturaId]: true }));
+            setTimeout(() => {
+                setActivePixCode('00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-426614174000520400005303986540599.905802BR5913Fiber.Net Telecom6008Rio das Flores62070503***6304ABCD');
+                setPixModalOpen(true);
+                setLoadingPix(prev => ({ ...prev, [faturaId]: false }));
+            }, 1000);
+            return;
+        }
       
         setLoadingPix(prev => ({ ...prev, [faturaId]: true }));
       
@@ -508,6 +582,16 @@ const ClientArea: React.FC = () => {
                                     <button type="button" onClick={() => setLoginView('forgot')} className="text-fiber-orange hover:underline">Esqueci a senha</button>
                                 </div>
                                 <Button type="submit" variant="primary" fullWidth disabled={isLoading}>{isLoading ? <Loader2 className="animate-spin mx-auto" /> : 'Acessar'}</Button>
+                                
+                                <div className="relative flex py-2 items-center">
+                                    <div className="flex-grow border-t border-white/10"></div>
+                                    <span className="flex-shrink-0 mx-4 text-gray-500 text-xs">OU</span>
+                                    <div className="flex-grow border-t border-white/10"></div>
+                                </div>
+                                
+                                <Button type="button" variant="outline" fullWidth onClick={handleDemoLogin} className="border-dashed border-fiber-orange/50 text-fiber-orange hover:bg-fiber-orange/10">
+                                    <LayoutDashboard size={18} className="mr-2"/> Acessar Demonstração
+                                </Button>
                             </form>
                         </>
                     ) : (
@@ -537,6 +621,7 @@ const ClientArea: React.FC = () => {
                     <div>
                         <h1 className="text-3xl font-bold text-white flex items-center gap-2">
                             Olá, {dashboardData?.clientes[0]?.nome?.split(' ')[0]}!
+                            {isDemo && <span className="bg-fiber-orange text-white text-xs px-2 py-0.5 rounded font-bold uppercase">Modo Demo</span>}
                             {isRefetching && <Loader2 size={16} className="text-fiber-orange animate-spin" />}
                         </h1>
                         <p className="text-gray-400">Bem-vindo(a) à sua central de controle unificada.</p>
@@ -691,7 +776,7 @@ const ClientArea: React.FC = () => {
                                                                             <p className="text-[10px] text-gray-400">Venc: {fatura.data_vencimento}</p>
                                                                         </div>
                                                                         <div className="flex gap-2">
-                                                                            {fatura.pix_txid && <button onClick={() => handleOpenPixModal(fatura.pix_txid!)} className="text-[10px] bg-fiber-green/20 text-fiber-green px-2 py-1 rounded hover:bg-fiber-green/30 transition font-bold flex items-center gap-1"><QrCode size={10}/> PIX</button>}
+                                                                            {fatura.pix_txid || isDemo ? <button onClick={() => fetchPixCode(fatura.id)} className="text-[10px] bg-fiber-green/20 text-fiber-green px-2 py-1 rounded hover:bg-fiber-green/30 transition font-bold flex items-center gap-1"><QrCode size={10}/> PIX</button> : null}
                                                                             {fatura.linha_digitavel && <button onClick={() => handleCopy(fatura.linha_digitavel!, String(fatura.id))} className="text-[10px] bg-white/10 text-white px-2 py-1 rounded hover:bg-white/20 transition flex items-center gap-1"><Copy size={10}/> Código</button>}
                                                                         </div>
                                                                     </div>
@@ -739,7 +824,7 @@ const ClientArea: React.FC = () => {
 
                             {/* === NOVA ABA: SUPORTE IA === */}
                             {activeTab === 'ai_support' && (
-                                <div className="h-[600px] flex flex-col">
+                                <div className="h-[calc(100vh-140px)] min-h-[500px] flex flex-col">
                                     <div className="mb-6 flex justify-between items-center">
                                         <div>
                                             <h2 className="text-2xl font-bold text-white flex items-center gap-2">

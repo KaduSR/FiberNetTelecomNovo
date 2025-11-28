@@ -108,8 +108,9 @@ const PlanCard: React.FC<PlanCardProps> = ({ plan }) => {
         fullWidth 
         onClick={() => window.open(`https://wa.me/552424581861?text=Olá, gostaria de saber mais sobre o plano de ${plan.speed}`, '_blank')}
         aria-label={`Assinar plano de ${plan.speed} agora via WhatsApp`}
+        className={plan.highlight ? 'animate-subtle-bounce hover:animate-none' : ''}
       >
-        Assinar Agora
+        Quero este plano
       </Button>
     </div>
   );

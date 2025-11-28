@@ -1,27 +1,28 @@
-
 import React, { useState, Suspense, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import Features from './components/Features';
 import Footer from './components/Footer';
 import SupportModal from './components/SupportModal';
-import SpeedTestSection from './components/SpeedTestSection';
 import ClientArea from './components/ClientArea';
 import NewsSection from './components/NewsSection';
 import { PLANS, HISTORY_TEXT } from './constants';
 import { Loader2, Headphones } from 'lucide-react';
 import FiberNetTextLogo from './components/FiberNetTextLogo';
 import PlanCard from './components/PlanCard';
+import SegundaViaModal from './components/SegundaViaModal';
 
 // Lazy load heavier components
 const Ethics = React.lazy(() => import('./components/Ethics'));
 const HelpCenter = React.lazy(() => import('./components/HelpCenter'));
 const ClientGuide = React.lazy(() => import('./components/ClientGuide'));
 const CodeOfEthicsDocument = React.lazy(() => import('./components/CodeOfEthicsDocument'));
+const ServiceStatus = React.lazy(() => import('./components/ServiceStatus'));
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState('home');
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+  const [isSegundaViaModalOpen, setIsSegundaViaModalOpen] = useState(false);
 
   // === NOVO: Scroll para o topo sempre que a página mudar ===
   useEffect(() => {
@@ -41,6 +42,7 @@ const App: React.FC = () => {
         onNavigate={handleNavigate} 
         currentPage={currentPage} 
         onOpenSupport={() => setIsSupportModalOpen(true)}
+        onOpenSegundaVia={() => setIsSegundaViaModalOpen(true)}
       />
       
       <main className="flex-grow">
@@ -157,27 +159,33 @@ const App: React.FC = () => {
         {/* Lazy Loaded Components with Suspense Fallback */}
         <Suspense fallback={<div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="w-12 h-12 text-fiber-orange animate-spin" /></div>}>
             {currentPage === 'ethics' && <Ethics />}
-            {currentPage === 'help' && <HelpCenter onNavigate={handleNavigate} />}
+            {currentPage === 'help' && <HelpCenter onNavigate={handleNavigate} onOpenSegundaVia={() => setIsSegundaViaModalOpen(true)} />}
             {currentPage === 'client-guide' && <ClientGuide />}
-            {currentPage === 'code-of-ethics' && <CodeOfEthicsDocument />}
+            {currentPage === 'code-of-ethics' && <CodeOfEthicsDocument onNavigate={handleNavigate} />}
+            {currentPage === 'status' && <ServiceStatus onNavigate={handleNavigate} />}
         </Suspense>
         
         {currentPage === 'news' && <NewsSection />}
         
-        {currentPage === 'speedtest' && <SpeedTestSection />}
-
       </main>
 
       <Footer 
         onNavigate={handleNavigate}
         currentPage={currentPage}
         onOpenSupport={() => setIsSupportModalOpen(true)}
+        onOpenSegundaVia={() => setIsSegundaViaModalOpen(true)}
       />
       
       <SupportModal 
         isOpen={isSupportModalOpen} 
         onClose={() => setIsSupportModalOpen(false)} 
         onNavigate={handleNavigate}
+        onOpenSegundaVia={() => setIsSegundaViaModalOpen(true)}
+      />
+
+      <SegundaViaModal 
+        isOpen={isSegundaViaModalOpen}
+        onClose={() => setIsSegundaViaModalOpen(false)}
       />
 
       {/* Floating Support Button */}

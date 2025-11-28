@@ -1,6 +1,6 @@
 
 import React, { useEffect } from 'react';
-import { X, MessageCircle, ExternalLink, Headphones } from 'lucide-react';
+import { X, MessageCircle, ExternalLink, Headphones, FileText } from 'lucide-react';
 import Button from './Button';
 import { CONTACT_INFO } from '../constants';
 import FiberNetTextLogo from './FiberNetTextLogo';
@@ -9,9 +9,10 @@ interface SupportModalProps {
   isOpen: boolean;
   onClose: () => void;
   onNavigate?: (page: string) => void;
+  onOpenSegundaVia?: () => void;
 }
 
-const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose, onNavigate }) => {
+const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose, onNavigate, onOpenSegundaVia }) => {
   // Close on Escape key
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -26,6 +27,13 @@ const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose, onNavigate
   const handleClientAreaClick = () => {
       if (onNavigate) {
           onNavigate('client-area');
+      }
+      onClose();
+  };
+
+  const handleSegundaViaClick = () => {
+      if (onOpenSegundaVia) {
+          onOpenSegundaVia();
       }
       onClose();
   };
@@ -86,6 +94,24 @@ const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose, onNavigate
               </div>
             </div>
             <ExternalLink size={16} className="text-gray-500 group-hover:text-fiber-green" aria-hidden="true" />
+          </button>
+
+          {/* 2ª Via Rápida Option */}
+          <button 
+            onClick={handleSegundaViaClick}
+            className="w-full flex items-center justify-between p-4 bg-neutral-800 hover:bg-fiber-orange/10 border border-white/5 hover:border-fiber-orange/50 rounded-xl group transition-all focus:outline-none focus:ring-2 focus:ring-fiber-orange"
+            aria-label="Acessar 2ª Via de Boleto"
+          >
+            <div className="flex items-center gap-4">
+              <div className="bg-fiber-orange/20 p-3 rounded-full text-fiber-orange group-hover:scale-110 transition-transform">
+                <FileText size={24} aria-hidden="true" />
+              </div>
+              <div className="text-left">
+                <div className="text-white font-bold">2ª Via de Boleto</div>
+                <div className="text-xs text-gray-400">Acesso rápido por CPF/CNPJ</div>
+              </div>
+            </div>
+            <ExternalLink size={16} className="text-gray-500 group-hover:text-fiber-orange" aria-hidden="true" />
           </button>
         </div>
 
