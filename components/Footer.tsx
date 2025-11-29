@@ -290,9 +290,9 @@ const Footer: React.FC<FooterProps> = ({ onNavigate, currentPage, onOpenSupport,
            <div>
             <h4 className="text-base font-bold mb-6 text-white">Legal</h4>
             <ul className="space-y-2 text-sm">
-              <FooterLink href="#" label="Política de Privacidade" />
+              <FooterLink href="legal" label="Política de Privacidade" onClick={(e) => handleNav(e, 'legal')} />
               <FooterLink href="ethics" label="Código de Ética" onClick={(e) => handleNav(e, 'ethics')} />
-              <FooterLink href="#" label="Termos de Uso" />
+              <FooterLink href="legal" label="Termos de Uso" onClick={(e) => handleNav(e, 'legal')} />
             </ul>
           </div>
 

@@ -1,3 +1,4 @@
+
 import React, { useState, Suspense, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
@@ -18,6 +19,7 @@ const HelpCenter = React.lazy(() => import('./components/HelpCenter'));
 const ClientGuide = React.lazy(() => import('./components/ClientGuide'));
 const CodeOfEthicsDocument = React.lazy(() => import('./components/CodeOfEthicsDocument'));
 const ServiceStatus = React.lazy(() => import('./components/ServiceStatus'));
+const LegalCompliance = React.lazy(() => import('./components/LegalCompliance'));
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState('home');
@@ -40,7 +42,8 @@ const App: React.FC = () => {
       'client-guide': `Guia do Cliente Fiber.Net | ${baseTitle}`,
       'ethics': `Código de Ética e Conduta | ${baseTitle}`,
       'status': `Status dos Serviços em Tempo Real | ${baseTitle}`,
-      'segunda-via': `Emitir 2ª Via de Boleto - Banda Larga | ${baseTitle}`
+      'segunda-via': `Emitir 2ª Via de Boleto - Banda Larga | ${baseTitle}`,
+      'legal': `Privacidade, LGPD e Conformidade Legal | ${baseTitle}`
     };
 
     document.title = titles[currentPage] || baseTitle;
@@ -181,6 +184,7 @@ const App: React.FC = () => {
             {currentPage === 'client-guide' && <ClientGuide />}
             {currentPage === 'code-of-ethics' && <CodeOfEthicsDocument onNavigate={handleNavigate} />}
             {currentPage === 'status' && <ServiceStatus onNavigate={handleNavigate} />}
+            {currentPage === 'legal' && <LegalCompliance />}
         </Suspense>
         
         {currentPage === 'news' && <NewsSection />}

@@ -15,7 +15,7 @@ import { CONTACT_INFO } from '../constants';
 import AIInsights from '../src/components/AIInsights';
 
 // MUDANÇA DE CHAVE PARA FORÇAR LIMPEZA DE CACHE ANTIGO
-const DASH_CACHE_KEY = 'fiber_dashboard_cache_v14_fixed_imports';
+const DASH_CACHE_KEY = 'fiber_dashboard_cache_v5_forced';
 
 // === HELPERS ===
 const formatBytes = (bytes: number | string | undefined, decimals = 2) => {
@@ -173,10 +173,6 @@ const ClientArea: React.FC = () => {
     const [emailInput, setEmailInput] = useState('');
     const [recoveryStatus, setRecoveryStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
     const [recoveryMessage, setRecoveryMessage] = useState('');
-    const [loadingPix, setLoadingPix] = useState<{[key: string]: boolean}>({});
-
-    // Demo Mode State
-    const [isDemo, setIsDemo] = useState(false);
 
     // Chat AI State
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
@@ -184,21 +180,7 @@ const ClientArea: React.FC = () => {
     ]);
     const [chatInput, setChatInput] = useState('');
     const [isChatTyping, setIsChatTyping] = useState(false);
-    
-    // REFS
-    const chatContainerRef = useRef<HTMLDivElement>(null); // Ref para o container de mensagens (scroll)
-    const chatInputRef = useRef<HTMLInputElement>(null); // Ref para o input de texto
-    
-    // Ref para o conteúdo principal para scroll suave
-    const contentTopRef = useRef<HTMLDivElement>(null);
-
-    const CHAT_SUGGESTIONS = [
-        { label: "Minha fatura vence quando?", icon: FileText },
-        { label: "O WhatsApp caiu?", icon: Globe },
-        { label: "Instagram com problemas?", icon: Activity },
-        { label: "Minha conexão está lenta", icon: Wifi },
-        { label: "Quero a 2ª via do boleto", icon: QrCode },
-    ];
+    const chatEndRef = useRef<HTMLDivElement>(null);
 
     const fetchDashboardData = async () => {
         setIsRefetching(true);
@@ -206,7 +188,6 @@ const ClientArea: React.FC = () => {
             const data = await apiService.getDashboard();
             setDashboardData(data);
             setIsAuthenticated(true);
-            setIsDemo(false);
             localStorage.setItem(DASH_CACHE_KEY, JSON.stringify(data));
         } catch (error) {
             console.error("Erro ao atualizar dashboard:", error);
@@ -223,7 +204,6 @@ const ClientArea: React.FC = () => {
         e.preventDefault();
         setIsLoading(true);
         setLoginError('');
-        setIsDemo(false);
         const formData = new FormData(e.currentTarget);
         const password = formData.get('password') as string;
         const email = emailInput;
@@ -241,7 +221,7 @@ const ClientArea: React.FC = () => {
 
             setIsAuthenticated(true);
             setActiveTab('dashboard');
-            window.scrollTo({ top: 0, behavior: 'auto' });
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         } catch (error: any) {
             setLoginError(error.message || 'Falha na autenticação.');
             localStorage.removeItem('authToken');
@@ -256,20 +236,9 @@ const ClientArea: React.FC = () => {
         setIsAuthenticated(false);
         setDashboardData(null);
         setLoginView('login');
-        setIsDemo(false);
     };
 
     const performLoginAction = async (loginId: string | number, action: 'limpar-mac' | 'desconectar' | 'diagnostico') => {
-        if (isDemo) {
-            setActionStatus(prev => ({ ...prev, [loginId]: { status: 'loading' as const } }));
-            setTimeout(() => {
-                setActionStatus(prev => ({ ...prev, [loginId]: { status: 'success' as const, message: 'Ação simulada com sucesso (Modo Demo)' } }));
-                if (action === 'diagnostico') setDiagResult({ download: '600 Mbps', upload: '300 Mbps' });
-                setTimeout(() => setActionStatus(prev => ({ ...prev, [loginId]: { status: 'idle' as const } })), 3000);
-            }, 1500);
-            return;
-        }
-
         const id = Number(loginId);
         setActionStatus(prev => ({ ...prev, [loginId]: { status: 'loading' as const } }));
         setDiagResult(null);
@@ -288,13 +257,6 @@ const ClientArea: React.FC = () => {
     const handlePasswordChange = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setPasswordChangeStatus(null);
-        
-        if (isDemo) {
-            setPasswordChangeStatus({ type: 'success', message: 'Senha alterada com sucesso (Simulação)' });
-            e.currentTarget.reset();
-            return;
-        }
-
         const formData = new FormData(e.currentTarget);
         const newPassword = formData.get('novaSenha') as string;
 
@@ -321,11 +283,13 @@ const ClientArea: React.FC = () => {
         }
     }
 
-    const processMessage = async (text: string) => {
-        if (!text.trim()) return;
+    const handleSendMessage = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!chatInput.trim()) return;
 
-        const userMsg: ChatMessage = { id: Date.now().toString(), sender: 'user', text: text, timestamp: new Date() };
+        const userMsg: ChatMessage = { id: Date.now().toString(), sender: 'user', text: chatInput, timestamp: new Date() };
         setChatMessages(prev => [...prev, userMsg]);
+        setChatInput('');
         setIsChatTyping(true);
 
         try {
@@ -338,21 +302,13 @@ const ClientArea: React.FC = () => {
             const ai = new GoogleGenAI({ apiKey });
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
-                contents: text,
+                contents: chatInput, // Use the original input text
                 config: {
                     systemInstruction: `Você é o assistente virtual da Fiber.Net Telecom. 
                     Seu nome é Fiber.IA.
                     Você deve ser educado, prestativo e focar em suporte técnico de internet e questões financeiras básicas.
-                    A empresa oferece planos de fibra óptica.
-                    
-                    IMPORTANTE: Se o usuário perguntar se um aplicativo ou serviço (como WhatsApp, Instagram, Facebook, Bancos, etc) caiu ou está fora do ar, VOCÊ DEVE usar a ferramenta de busca do Google para verificar sites como DownDetector, G1, TechTudo ou notícias recentes.
-                    Responda com base no que encontrar na busca. Se encontrar relatos de queda, informe ao usuário e forneça as fontes.
-                    
-                    Se o usuário relatar lentidão, sugira reiniciar o modem e testar via cabo.
-                    Se perguntar sobre faturas, oriente a baixar na aba Faturas.
-                    
-                    Não invente dados de clientes.
-                    Se não souber responder, sugira contato via WhatsApp ${CONTACT_INFO.whatsapp}.`,
+                    IMPORTANTE: Se o usuário perguntar se um aplicativo ou serviço (como WhatsApp, Instagram, Facebook, Bancos, etc) caiu, use a ferramenta de busca do Google.
+                    Não invente dados de clientes.`,
                     tools: [{ googleSearch: {} }],
                 }
             });
@@ -383,8 +339,8 @@ const ClientArea: React.FC = () => {
         } catch (error: any) {
             console.error("Gemini AI Error:", error);
             const errorText = error.message?.includes("API Key") 
-                ? "O serviço de IA está temporariamente indisponível. Por favor, tente novamente mais tarde." 
-                : "Desculpe, estou enfrentando instabilidade técnica. Por favor, tente novamente mais tarde ou contate o suporte humano.";
+                ? "O serviço de IA está temporariamente indisponível. (API Key Missing)" 
+                : "Desculpe, estou enfrentando instabilidade técnica.";
                 
             const errorMsg: ChatMessage = { 
                 id: (Date.now() + 1).toString(), 
@@ -398,61 +354,20 @@ const ClientArea: React.FC = () => {
         }
     };
 
-    const handleSendMessage = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const text = chatInput;
-        setChatInput(''); 
-        await processMessage(text);
-    };
-
-    const handleSuggestionClick = (suggestion: string) => {
-        // Just set the input and focus, do NOT scroll page
-        setChatInput(suggestion);
-        if (chatInputRef.current) {
-            chatInputRef.current.focus();
-        }
-    };
-
-    const handleClearChat = () => {
-        setChatMessages([
-            { id: Date.now().toString(), sender: 'bot', text: 'Olá! Sou a IA da Fiber.Net. Como posso ajudar você hoje?', timestamp: new Date() }
-        ]);
-    };
-
     useEffect(() => {
         const saved = localStorage.getItem('fiber_saved_email');
         if (saved) { setEmailInput(saved); setRememberMe(true); }
-        if (isAuthenticated && !isDemo) {
+        if (isAuthenticated) {
+            // Removida busca de IP Público conforme solicitado
             fetchDashboardData();
         }
     }, []);
 
-    // SCROLL LOGIC
-    // 1. Scroll window to content top when tab changes
     useEffect(() => {
-        if (contentTopRef.current) {
-            // Offset para o navbar fixo (aprox 120px)
-            const yOffset = -120; 
-            const element = contentTopRef.current;
-            const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
-            
-            window.scrollTo({ top: y, behavior: 'smooth' });
-        } else {
-            // Fallback
-             window.scrollTo({ top: 0, behavior: 'smooth' });
+        if (activeTab === 'ai_support' && chatEndRef.current) {
+            chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
         }
-    }, [activeTab]);
-
-    // 2. Scroll chat container to bottom when messages change (Internal Scroll Only)
-    useEffect(() => {
-        if (activeTab === 'ai_support' && chatContainerRef.current) {
-            const container = chatContainerRef.current;
-            // Delay slightly to allow DOM update
-            setTimeout(() => {
-                container.scrollTop = container.scrollHeight;
-            }, 100);
-        }
-    }, [chatMessages, activeTab, isChatTyping]);
+    }, [chatMessages, activeTab]);
 
     const handleCopy = (text: string, id: string) => {
         navigator.clipboard.writeText(text);
@@ -470,51 +385,9 @@ const ClientArea: React.FC = () => {
         setTimeout(() => setIsPixCopied(false), 2000);
     };
 
-    // Nova função para buscar PIX dinamicamente com suporte a objeto
-    const fetchPixCode = async (faturaId: number) => {
-        if (loadingPix[faturaId]) return;
-
-        if (isDemo) {
-            setLoadingPix(prev => ({ ...prev, [faturaId]: true }));
-            setTimeout(() => {
-                setActivePixCode('00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-426614174000520400005303986540599.905802BR5913Fiber.Net Telecom6008Rio das Flores62070503***6304ABCD');
-                setPixModalOpen(true);
-                setLoadingPix(prev => ({ ...prev, [faturaId]: false }));
-            }, 1000);
-            return;
-        }
-      
-        setLoadingPix(prev => ({ ...prev, [faturaId]: true }));
-      
-        try {
-          const response = await apiService.getPixCode(faturaId);
-          const pixCode = response.qrcode; // Agora extraímos do objeto
-          
-          if (pixCode) {
-            // Atualizar estado local para manter consistência
-            setDashboardData(prev => {
-                if (!prev) return prev;
-                return {
-                    ...prev,
-                    faturas: prev.faturas.map(f => Number(f.id) === Number(faturaId) ? { ...f, pix_qrcode: pixCode } : f)
-                };
-            });
-            setActivePixCode(pixCode);
-            setPixModalOpen(true);
-          } else {
-             alert('Código PIX não disponível para esta fatura no momento.');
-          }
-        } catch (error) {
-          console.error('Erro ao buscar PIX:', error);
-          alert('Erro ao buscar o código PIX. Tente novamente ou use o código de barras.');
-        } finally {
-          setLoadingPix(prev => ({ ...prev, [faturaId]: false }));
-        }
-    };
-
     const TABS = [
       { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
-      { id: 'ai_support', label: 'Suporte IA', icon: Bot, badge: 'NOVO' }, 
+      { id: 'ai_support', label: 'Suporte IA', icon: Bot, badge: 'NOVO' }, // ABA SUPORTE IA COM BADGE
       { id: 'invoices', label: 'Faturas', icon: FileText },
       { id: 'connections', label: 'Conexões', icon: Wifi },
       { id: 'consumption', label: 'Extrato', icon: BarChart3 },
@@ -553,7 +426,7 @@ const ClientArea: React.FC = () => {
                             </form>
                         </>
                     ) : (
-                         <>
+                        <>
                              <button onClick={() => setLoginView('login')} className="mb-6 text-gray-400 hover:text-white flex items-center gap-2 text-sm"><ArrowLeft size={16} /> Voltar</button>
                              <h2 className="text-2xl font-bold text-white text-center mb-8">Recuperar Senha</h2>
                              {recoveryStatus !== 'success' ? (
@@ -579,7 +452,6 @@ const ClientArea: React.FC = () => {
                     <div>
                         <h1 className="text-3xl font-bold text-white flex items-center gap-2">
                             Olá, {dashboardData?.clientes[0]?.nome?.split(' ')[0]}!
-                            {isDemo && <span className="bg-fiber-orange text-white text-xs px-2 py-0.5 rounded font-bold uppercase">Modo Demo</span>}
                             {isRefetching && <Loader2 size={16} className="text-fiber-orange animate-spin" />}
                         </h1>
                         <p className="text-gray-400">Bem-vindo(a) à sua central de controle unificada.</p>
@@ -608,10 +480,7 @@ const ClientArea: React.FC = () => {
                     </aside>
 
                     <main className="w-full lg:w-3/4">
-                        <div 
-                            ref={contentTopRef}
-                            className="bg-fiber-card border border-white/10 rounded-2xl p-6 md:p-8 min-h-[440px] animate-fadeIn"
-                        >
+                        <div className="bg-fiber-card border border-white/10 rounded-2xl p-6 md:p-8 min-h-[500px] animate-fadeIn">
                             
                             {/* === DASHBOARD COM AGRUPAMENTO POR CONTRATO (LÓGICA CORRIGIDA) === */}
                             {activeTab === 'dashboard' && dashboardData && (
@@ -665,7 +534,7 @@ const ClientArea: React.FC = () => {
                                                         <div className="grid grid-cols-1 gap-4">
                                                             {loginsDoContrato.map(login => (
                                                                 <div key={login.id} className="bg-black/40 border border-white/5 rounded-lg p-4 flex flex-col md:flex-row justify-between items-center gap-4">
-                                                                    <div className="flex items-center gap-4 min-w-[200px]">
+                                                                    <div className="flex items-center gap-4">
                                                                          <div className={`w-3 h-3 rounded-full ${login.online === 'S' ? 'bg-fiber-green animate-pulse' : 'bg-gray-500'}`}></div>
                                                                          <div>
                                                                              <p className="font-bold text-white text-sm">{login.login}</p>
@@ -673,39 +542,19 @@ const ClientArea: React.FC = () => {
                                                                          </div>
                                                                     </div>
                                                                     
-                                                                    {/* DETALHES COMPLETOS DA ONT */}
-                                                                    <div className="flex flex-wrap items-center gap-4 md:gap-6 text-xs text-gray-400 mt-2 md:mt-0">
-                                                                        {/* Modelo/Tipo */}
-                                                                        <div className="flex items-center gap-1.5" title="Modelo da ONU">
-                                                                            <Router size={14} className="text-fiber-blue"/> 
-                                                                            <span className="text-white">{login.ont_modelo || 'ONU Padrão'}</span>
+                                                                    <div className="flex items-center gap-6 text-xs text-gray-400">
+                                                                        <div className="flex items-center gap-2" title="Modelo da ONU">
+                                                                            <Router size={14}/> {login.ont_modelo || 'ONU Padrão'}
                                                                         </div>
-
-                                                                        {/* Sinal RX */}
-                                                                        <div className="flex items-center gap-1.5" title="Sinal de Recepção (RX)">
-                                                                            <ArrowDown size={14} className="text-fiber-orange"/> 
-                                                                            <span className={parseFloat(login.ont_sinal_rx || login.sinal_ultimo_atendimento) < -27 ? 'text-red-400 font-bold' : 'text-fiber-green font-bold'}>
-                                                                                RX: {login.ont_sinal_rx || login.sinal_ultimo_atendimento || '-'}
+                                                                        <div className="flex items-center gap-2" title="Sinal Óptico">
+                                                                            <Activity size={14}/> 
+                                                                            <span className={parseFloat(login.sinal_ultimo_atendimento) < -27 ? 'text-red-400' : 'text-fiber-green'}>
+                                                                                {login.sinal_ultimo_atendimento || '- dBm'}
                                                                             </span>
                                                                         </div>
-
-                                                                        {/* Sinal TX */}
-                                                                        {login.ont_sinal_tx && (
-                                                                            <div className="flex items-center gap-1.5" title="Sinal de Transmissão (TX)">
-                                                                                <ArrowUp size={14} className="text-fiber-blue"/> 
-                                                                                <span className="text-gray-300">TX: {login.ont_sinal_tx}</span>
-                                                                            </div>
-                                                                        )}
-
-                                                                        {/* Temperatura */}
-                                                                        {login.ont_temperatura && (
-                                                                            <div className="flex items-center gap-1.5" title="Temperatura da ONU">
-                                                                                <Activity size={14} className={parseFloat(login.ont_temperatura) > 60 ? 'text-red-400' : 'text-gray-400'}/> 
-                                                                                <span className={parseFloat(login.ont_temperatura) > 60 ? 'text-red-400 font-bold' : 'text-gray-300'}>
-                                                                                    {login.ont_temperatura}°C
-                                                                                </span>
-                                                                            </div>
-                                                                        )}
+                                                                         <div className="flex items-center gap-2" title="Tempo Conectado">
+                                                                            <Clock size={14}/> {login.tempo_conectado || 'Recente'}
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             ))}
@@ -730,7 +579,7 @@ const ClientArea: React.FC = () => {
                                                                             <p className="text-[10px] text-gray-400">Venc: {fatura.data_vencimento}</p>
                                                                         </div>
                                                                         <div className="flex gap-2">
-                                                                            {fatura.pix_txid || isDemo ? <button onClick={() => fetchPixCode(fatura.id)} className="text-[10px] bg-fiber-green/20 text-fiber-green px-2 py-1 rounded hover:bg-fiber-green/30 transition font-bold flex items-center gap-1"><QrCode size={10}/> PIX</button> : null}
+                                                                            {fatura.pix_txid && <button onClick={() => handleOpenPixModal(fatura.pix_txid!)} className="text-[10px] bg-fiber-green/20 text-fiber-green px-2 py-1 rounded hover:bg-fiber-green/30 transition font-bold flex items-center gap-1"><QrCode size={10}/> PIX</button>}
                                                                             {fatura.linha_digitavel && <button onClick={() => handleCopy(fatura.linha_digitavel!, String(fatura.id))} className="text-[10px] bg-white/10 text-white px-2 py-1 rounded hover:bg-white/20 transition flex items-center gap-1"><Copy size={10}/> Código</button>}
                                                                         </div>
                                                                     </div>
@@ -776,50 +625,21 @@ const ClientArea: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* === NOVA ABA: SUPORTE IA (HEIGHT FIXED, NO SCROLL TO INPUT) === */}
+                            {/* === NOVA ABA: SUPORTE IA === */}
                             {activeTab === 'ai_support' && (
-                                <div className="h-[500px] flex flex-col relative">
-                                    <div className="mb-2 flex justify-between items-center shrink-0">
+                                <div className="h-[600px] flex flex-col">
+                                    <div className="mb-6 flex justify-between items-center">
                                         <div>
                                             <h2 className="text-2xl font-bold text-white flex items-center gap-2">
                                                 <Bot className="text-fiber-orange" /> Suporte Inteligente
                                             </h2>
                                             <p className="text-gray-400 text-sm">Tire dúvidas sobre sua fatura, conexão e mais.</p>
                                         </div>
-                                        {/* Botão de Limpar Conversa */}
-                                        <button 
-                                            onClick={handleClearChat}
-                                            className="text-xs flex items-center gap-1 text-gray-400 hover:text-red-400 transition-colors bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg border border-white/5"
-                                            title="Limpar histórico da conversa"
-                                        >
-                                            <Trash2 size={12} /> Limpar Conversa
-                                        </button>
                                     </div>
                                     
-                                    <div className="flex-1 bg-neutral-900 border border-white/10 rounded-xl overflow-hidden flex flex-col min-h-0">
-                                        {/* Área de Mensagens (Ocupa o espaço restante) */}
-                                        <div 
-                                            ref={chatContainerRef}
-                                            className="flex-1 p-4 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-fiber-orange/20"
-                                        >
-                                            {/* Sugestões Iniciais */}
-                                            {chatMessages.length === 1 && (
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-                                                    {CHAT_SUGGESTIONS.map((sug, idx) => (
-                                                        <button 
-                                                            key={idx}
-                                                            onClick={() => handleSuggestionClick(sug.label)}
-                                                            className="flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-left transition-all hover:scale-[1.02] group"
-                                                        >
-                                                            <div className="p-2 bg-neutral-800 rounded-lg text-fiber-orange group-hover:bg-fiber-orange group-hover:text-white transition-colors">
-                                                                <sug.icon size={16} />
-                                                            </div>
-                                                            <span className="text-sm text-gray-300 group-hover:text-white font-medium">{sug.label}</span>
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            )}
-
+                                    <div className="flex-grow bg-neutral-900 border border-white/10 rounded-xl overflow-hidden flex flex-col">
+                                        {/* Área de Mensagens */}
+                                        <div className="flex-grow p-4 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-fiber-orange/20">
                                             {chatMessages.map((msg) => (
                                                 <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                                                     <div className={`max-w-[80%] rounded-2xl p-4 ${
@@ -827,27 +647,7 @@ const ClientArea: React.FC = () => {
                                                             ? 'bg-fiber-orange text-white rounded-br-none' 
                                                             : 'bg-white/10 text-gray-200 rounded-bl-none'
                                                     }`}>
-                                                        <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                                                        {msg.sources && msg.sources.length > 0 && (
-                                                            <div className="mt-3 pt-3 border-t border-white/10">
-                                                                <p className="text-[10px] text-gray-400 font-bold uppercase mb-2 flex items-center gap-1">
-                                                                    <Search size={10} /> Fontes Pesquisadas:
-                                                                </p>
-                                                                <div className="flex flex-wrap gap-2">
-                                                                    {msg.sources.map((source, idx) => (
-                                                                        <a 
-                                                                            key={idx} 
-                                                                            href={source.url} 
-                                                                            target="_blank" 
-                                                                            rel="noopener noreferrer"
-                                                                            className="text-[10px] bg-white/5 hover:bg-white/10 border border-white/10 px-2 py-1 rounded-full text-fiber-blue truncate max-w-[200px] flex items-center gap-1 transition-colors"
-                                                                        >
-                                                                            <Link2 size={8} /> {source.title}
-                                                                        </a>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                        )}
+                                                        <p className="text-sm">{msg.text}</p>
                                                         <span className="text-[10px] opacity-50 mt-1 block text-right">
                                                             {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                         </span>
@@ -861,12 +661,12 @@ const ClientArea: React.FC = () => {
                                                     </div>
                                                 </div>
                                             )}
+                                            <div ref={chatEndRef} />
                                         </div>
 
-                                        {/* Input (Fixo no rodapé via Flex Layout) */}
-                                        <form onSubmit={handleSendMessage} className="p-3 bg-neutral-800 border-t border-white/5 flex gap-2 shrink-0">
+                                        {/* Input */}
+                                        <form onSubmit={handleSendMessage} className="p-4 bg-neutral-800 border-t border-white/5 flex gap-2">
                                             <input 
-                                                ref={chatInputRef}
                                                 type="text" 
                                                 value={chatInput}
                                                 onChange={(e) => setChatInput(e.target.value)}
@@ -968,60 +768,17 @@ const ClientArea: React.FC = () => {
                                                         {login.online === 'S' ? 'Online' : 'Offline'}
                                                     </div>
                                                 </div>
-
-                                                {/* Detalhamento de Conexão (Grid Melhorado) */}
-                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-6 bg-black/20 p-4 rounded-lg">
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-6">
+                                                    <div className="flex items-center gap-2 text-gray-400"><Server size={14}/> <strong>ONT:</strong> <span className="text-white">{login.sinal_ultimo_atendimento || 'N/A'}</span></div>
+                                                    <div className="flex items-center gap-2 text-gray-400"><Clock size={14}/> <strong>Uptime:</strong> <span className="text-white">{login.tempo_conectado || 'N/A'}</span></div>
                                                     
-                                                    {/* NOVA COLUNA: STATUS */}
-                                                    <div className="flex flex-col gap-1">
-                                                        <span className="text-xs text-gray-500 flex items-center gap-1"><Wifi size={12}/> Status</span>
-                                                        <span className={`flex items-center gap-1.5 font-bold ${login.online === 'S' ? 'text-fiber-green' : 'text-gray-500'}`}>
-                                                            <span className={`w-2 h-2 rounded-full ${login.online === 'S' ? 'bg-fiber-green animate-pulse' : 'bg-red-500'}`}></span>
-                                                            {login.online === 'S' ? 'Conectado' : 'Offline'}
-                                                        </span>
-                                                    </div>
-
-                                                    {/* Modelo */}
-                                                    <div className="flex flex-col gap-1">
-                                                        <span className="text-xs text-gray-500 flex items-center gap-1"><Router size={12}/> Modelo (ONU)</span>
-                                                        <span className="text-white font-medium">{login.ont_modelo || 'Padrão'}</span>
-                                                    </div>
-
-                                                    {/* RX */}
-                                                    <div className="flex flex-col gap-1">
-                                                        <span className="text-xs text-gray-500 flex items-center gap-1"><ArrowDown size={12}/> Sinal RX</span>
-                                                        <span className={`font-bold ${parseFloat(login.ont_sinal_rx || login.sinal_ultimo_atendimento || '0') < -27 ? 'text-red-400' : 'text-fiber-green'}`}>
-                                                            {login.ont_sinal_rx || login.sinal_ultimo_atendimento || 'N/A'}
-                                                        </span>
-                                                    </div>
-
-                                                    {/* TX */}
-                                                    <div className="flex flex-col gap-1">
-                                                        <span className="text-xs text-gray-500 flex items-center gap-1"><ArrowUp size={12}/> Sinal TX</span>
-                                                        <span className="text-white font-medium">{login.ont_sinal_tx || 'N/A'}</span>
-                                                    </div>
-                                                    
-                                                    {/* Temperatura */}
-                                                    <div className="flex flex-col gap-1">
-                                                        <span className="text-xs text-gray-500 flex items-center gap-1"><Activity size={12}/> Temp.</span>
-                                                        <span className={`font-medium ${parseFloat(login.ont_temperatura || '0') > 65 ? 'text-red-400' : 'text-white'}`}>
-                                                            {login.ont_temperatura ? `${login.ont_temperatura}°C` : 'N/A'}
-                                                        </span>
-                                                    </div>
-
-                                                    {/* Uptime */}
-                                                    <div className="flex flex-col gap-1">
-                                                         <span className="text-xs text-gray-500 flex items-center gap-1"><Clock size={12}/> Uptime</span>
-                                                         <span className="text-white text-xs">{login.tempo_conectado || 'Recente'}</span>
-                                                    </div>
-                                                    
-                                                    {/* IP Privado */}
-                                                    <div className="flex flex-col gap-1">
-                                                        <span className="text-xs text-gray-500 flex items-center gap-1"><Activity size={12}/> IP Privado</span>
+                                                    {/* --- IP Privado Mantido, IP Público Removido --- */}
+                                                    <div className="flex items-center gap-2 text-gray-400">
+                                                        <Activity size={14}/> <strong>IP Privado:</strong> 
                                                         <span className="text-white font-mono text-xs">{login.ip_privado || '--'}</span>
                                                     </div>
+                                                    {/* ------------------------- */}
                                                 </div>
-
                                                 <div className="flex flex-col sm:flex-row gap-3">
                                                     <Button onClick={() => performLoginAction(login.id, 'limpar-mac')} variant="secondary" className="!text-xs !py-2 !px-4 gap-2" disabled={actionStatus[login.id]?.status === 'loading'}>{actionStatus[login.id]?.status === 'loading' ? <Loader2 size={14} className="animate-spin" /> : <X size={14}/>} Limpar MAC</Button>
                                                     <Button onClick={() => performLoginAction(login.id, 'desconectar')} variant="secondary" className="!text-xs !py-2 !px-4 gap-2" disabled={actionStatus[login.id]?.status === 'loading'}>{actionStatus[login.id]?.status === 'loading' ? <Loader2 size={14} className="animate-spin" /> : <Power size={14}/>} Desconectar</Button>

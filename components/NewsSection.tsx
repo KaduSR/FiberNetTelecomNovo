@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { ExternalLink, Newspaper, RefreshCw, Search, X, Wifi, Image as ImageIcon } from 'lucide-react';
 import Button from './Button';
@@ -30,7 +29,8 @@ const RSS_SOURCES = [
     { url: 'https://adrenaline.com.br/rss', name: 'Adrenaline' }
 ];
 
-const CACHE_KEY = 'fiber_news_cache_v3'; 
+// CACHE KEY ATUALIZADA (Limpeza de Cache)
+const CACHE_KEY = 'fiber_news_v2025_mascot_restore'; 
 
 // === SUB-COMPONENT PARA IMAGEM OTIMIZADA ===
 const NewsImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
