@@ -15,7 +15,7 @@ import { CONTACT_INFO } from '../constants';
 import AIInsights from '../src/components/AIInsights';
 
 // MUDANÇA DE CHAVE PARA FORÇAR LIMPEZA DE CACHE ANTIGO
-const DASH_CACHE_KEY = 'fiber_dashboard_cache_v13_height_fix_v3_paths';
+const DASH_CACHE_KEY = 'fiber_dashboard_cache_v14_fixed_imports';
 
 // === HELPERS ===
 const formatBytes = (bytes: number | string | undefined, decimals = 2) => {
@@ -188,6 +188,9 @@ const ClientArea: React.FC = () => {
     // REFS
     const chatContainerRef = useRef<HTMLDivElement>(null); // Ref para o container de mensagens (scroll)
     const chatInputRef = useRef<HTMLInputElement>(null); // Ref para o input de texto
+    
+    // Ref para o conteúdo principal para scroll suave
+    const contentTopRef = useRef<HTMLDivElement>(null);
 
     const CHAT_SUGGESTIONS = [
         { label: "Minha fatura vence quando?", icon: FileText },
@@ -246,47 +249,6 @@ const ClientArea: React.FC = () => {
         } finally {
             setIsLoading(false);
         }
-    };
-
-    // FUNÇÃO PARA ACESSO DEMO
-    const handleDemoLogin = () => {
-        setIsLoading(true);
-        setLoginError('');
-        setTimeout(() => {
-            const mockData: DashboardResponse = {
-                clientes: [{ id: 1, nome: 'Usuário Demonstração', email: 'demo@fiber.net' }],
-                contratos: [{ id: 100, id_cliente: 1, login: 'demo.fiber', plano: 'FIBER GAMER 600M', status: 'A', desbloqueio_confianca: 'N', endereco: 'Rua das Flores, 123', cidade: 'Rio das Flores', descricao_aux_plano_venda: 'Plano Fiber Gamer' }],
-                faturas: [
-                    { id: 501, id_cliente: 1, documento: '000', data_vencimento: '10/11/2025', valor: '99,90', status: 'A', linha_digitavel: '84670000001-4 99900094000-2 00123456789-1 20251110001-1' },
-                    { id: 500, id_cliente: 1, documento: '000', data_vencimento: '10/10/2025', valor: '99,90', status: 'C', linha_digitavel: '' }
-                ],
-                logins: [{ id: 1, login: 'demo.fiber', id_cliente: 1, contrato_id: 100, online: 'S', sinal_ultimo_atendimento: '-19.5 dBm', tempo_conectado: '5d 12h', ont_modelo: 'Huawei HG8145V5', ip_privado: '100.64.10.55', ont_sinal_rx: '-19.5', ont_temperatura: '42' }],
-                notas: [],
-                ordensServico: [],
-                ontInfo: [],
-                consumo: {
-                    total_download_bytes: 50000000000,
-                    total_upload_bytes: 20000000000,
-                    total_download: '50 GB',
-                    total_upload: '20 GB',
-                    history: { 
-                        daily: Array.from({length: 7}, (_, i) => ({
-                            data: new Date(Date.now() - i * 86400000).toLocaleDateString('pt-BR').slice(0,5),
-                            download_bytes: Math.random() * 50 * 1024 * 1024 * 1024,
-                            upload_bytes: Math.random() * 20 * 1024 * 1024 * 1024
-                        })).reverse(), 
-                        weekly: [], 
-                        monthly: [] 
-                    }
-                },
-                ai_analysis: { summary: 'Sua conexão está excelente. O consumo está dentro da média. Nenhuma anomalia detectada.', insights: [{ type: 'positive', title: 'Sinal Óptico Perfeito', message: 'Seu equipamento está recebendo sinal ideal (-19.5dBm).' }] }
-            };
-            setDashboardData(mockData);
-            setIsAuthenticated(true);
-            setIsDemo(true);
-            setActiveTab('dashboard');
-            setIsLoading(false);
-        }, 1000);
     };
 
     const handleLogout = () => {
@@ -448,8 +410,7 @@ const ClientArea: React.FC = () => {
         setTimeout(() => {
             if (chatInputRef.current) {
                 chatInputRef.current.focus();
-                // REMOVIDO: chatInputRef.current.scrollIntoView(...)
-                // A remoção impede que a tela role até o input, mantendo o layout fixo.
+                // Avoid scrolling the screen to the input
             }
         }, 100);
     };
@@ -469,12 +430,22 @@ const ClientArea: React.FC = () => {
     }, []);
 
     // SCROLL LOGIC
-    // 1. Scroll window to top when tab changes
+    // 1. Scroll window to content top when tab changes
     useEffect(() => {
-        window.scrollTo({ top: 0, behavior: 'auto' });
+        if (contentTopRef.current) {
+            // Offset para o navbar fixo (aprox 120px)
+            const yOffset = -120; 
+            const element = contentTopRef.current;
+            const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+            
+            window.scrollTo({ top: y, behavior: 'smooth' });
+        } else {
+            // Fallback
+             window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
     }, [activeTab]);
 
-    // 2. Scroll chat container to bottom when messages change
+    // 2. Scroll chat container to bottom when messages change (Internal Scroll Only)
     useEffect(() => {
         if (activeTab === 'ai_support' && chatContainerRef.current) {
             const container = chatContainerRef.current;
@@ -583,16 +554,6 @@ const ClientArea: React.FC = () => {
                                     <button type="button" onClick={() => setLoginView('forgot')} className="text-fiber-orange hover:underline">Esqueci a senha</button>
                                 </div>
                                 <Button type="submit" variant="primary" fullWidth disabled={isLoading}>{isLoading ? <Loader2 className="animate-spin mx-auto" /> : 'Acessar'}</Button>
-                                
-                                <div className="relative flex py-2 items-center">
-                                    <div className="flex-grow border-t border-white/10"></div>
-                                    <span className="flex-shrink-0 mx-4 text-gray-500 text-xs">OU</span>
-                                    <div className="flex-grow border-t border-white/10"></div>
-                                </div>
-                                
-                                <Button type="button" variant="outline" fullWidth onClick={handleDemoLogin} className="border-dashed border-fiber-orange/50 text-fiber-orange hover:bg-fiber-orange/10">
-                                    <LayoutDashboard size={18} className="mr-2"/> Acessar Demonstração
-                                </Button>
                             </form>
                         </>
                     ) : (
@@ -651,7 +612,10 @@ const ClientArea: React.FC = () => {
                     </aside>
 
                     <main className="w-full lg:w-3/4">
-                        <div className="bg-fiber-card border border-white/10 rounded-2xl p-6 md:p-8 min-h-[440px] animate-fadeIn">
+                        <div 
+                            ref={contentTopRef}
+                            className="bg-fiber-card border border-white/10 rounded-2xl p-6 md:p-8 min-h-[440px] animate-fadeIn"
+                        >
                             
                             {/* === DASHBOARD COM AGRUPAMENTO POR CONTRATO (LÓGICA CORRIGIDA) === */}
                             {activeTab === 'dashboard' && dashboardData && (
@@ -676,7 +640,7 @@ const ClientArea: React.FC = () => {
                                         return (
                                             <div key={contrato.id} className="bg-neutral-900 border border-white/10 rounded-xl p-6 mb-6 shadow-lg">
                                                 
-                                                {/* CABEÇALHO DO CONTRATO (ENDEREÇO E STATUS) */}
+                                                {/* CABEÇALHO DO CONTRATO (ENDEREÇO) */}
                                                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-white/5 pb-4">
                                                     <div>
                                                         <h3 className="text-xl font-bold text-white flex items-center gap-2">
@@ -690,15 +654,8 @@ const ClientArea: React.FC = () => {
                                                             {contrato.cidade && `, ${contrato.cidade}`}
                                                         </p>
                                                     </div>
-                                                    <span className={`mt-2 md:mt-0 px-3 py-1 rounded-full text-xs font-bold ${
-                                                        contrato.status === 'A' ? 'bg-green-500/20 text-green-400' : 
-                                                        contrato.status === 'S' ? 'bg-yellow-500/20 text-yellow-400' : 
-                                                        contrato.status === 'C' ? 'bg-red-500/20 text-red-400' : 
-                                                        'bg-gray-500/20 text-gray-400'
-                                                    }`}>
-                                                        {contrato.status === 'A' ? 'Ativo' : 
-                                                         contrato.status === 'S' ? 'Suspenso' : 
-                                                         contrato.status === 'C' ? 'Cancelado' : 'Inativo'}
+                                                    <span className={`mt-2 md:mt-0 px-3 py-1 rounded-full text-xs font-bold ${contrato.status === 'A' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                                                        {contrato.status === 'A' ? 'Ativo' : 'Inativo'}
                                                     </span>
                                                 </div>
 
@@ -799,7 +756,7 @@ const ClientArea: React.FC = () => {
                                                                     <div key={nota.id} className="flex justify-between items-center p-2 hover:bg-white/5 rounded transition-colors border-b border-white/5 last:border-0">
                                                                         <div>
                                                                             <p className="text-xs text-white">NF #{nota.numero_nota}</p>
-                                                                            <p className="text--[10px] text-gray-500">{nota.data_emissao}</p>
+                                                                            <p className="text-[10px] text-gray-500">{nota.data_emissao}</p>
                                                                         </div>
                                                                         <div className="flex items-center gap-3">
                                                                             <span className="text-xs font-mono text-gray-300">R$ {nota.valor}</span>
@@ -823,7 +780,7 @@ const ClientArea: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* === NOVA ABA: SUPORTE IA (HEIGHT ADJUSTED TO 440px - NO SCROLL TO INPUT) === */}
+                            {/* === NOVA ABA: SUPORTE IA (HEIGHT FIXED, NO SCROLL TO INPUT) === */}
                             {activeTab === 'ai_support' && (
                                 <div className="h-[440px] flex flex-col relative">
                                     <div className="mb-2 flex justify-between items-center shrink-0">
@@ -844,7 +801,7 @@ const ClientArea: React.FC = () => {
                                     </div>
                                     
                                     <div className="flex-1 bg-neutral-900 border border-white/10 rounded-xl overflow-hidden flex flex-col min-h-0">
-                                        {/* Área de Mensagens (Ocupa ~70-75% do espaço restante via Flex) */}
+                                        {/* Área de Mensagens (Ocupa o espaço restante) */}
                                         <div 
                                             ref={chatContainerRef}
                                             className="flex-1 p-4 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-fiber-orange/20"

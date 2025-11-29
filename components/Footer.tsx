@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Instagram, MapPin, MessageCircle, ChevronRight, Mail, Phone, CheckCircle, AlertCircle, ArrowRight, ExternalLink } from 'lucide-react';
+import { Instagram, MapPin, MessageCircle, ChevronRight, Mail, Phone, CheckCircle, AlertCircle, ArrowRight, ExternalLink, Star } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import * as L from 'leaflet';
 import { CONTACT_INFO } from '../constants';
@@ -174,15 +174,34 @@ const Footer: React.FC<FooterProps> = ({ onNavigate, currentPage, onOpenSupport,
                 <p className="text-gray-400 text-sm leading-relaxed mb-6">
                   Conectando você ao mundo! Internet de qualidade 100% regional, homologada pela ANATEL.
                 </p>
-                <div className="flex space-x-4">
+                <div className="flex flex-col gap-4">
+                  <div className="flex space-x-4 items-center">
+                    <a 
+                        href="https://www.instagram.com/fibernettelecom_" 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        aria-label="Instagram" 
+                        className="text-gray-400 hover:text-fiber-orange hover:scale-110 transition-all focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded"
+                    >
+                        <Instagram size={24} />
+                    </a>
+                  </div>
+                  
+                  {/* Google Reviews Button */}
                   <a 
-                    href="https://www.instagram.com/fibernettelecom_" 
+                    href="https://share.google/rpZywrszedM4tT4fH" 
                     target="_blank" 
                     rel="noreferrer" 
-                    aria-label="Instagram" 
-                    className="text-gray-400 hover:text-fiber-orange hover:scale-110 transition-all focus:outline-none focus:ring-2 focus:ring-fiber-orange rounded"
+                    aria-label="Avalie-nos no Google" 
+                    className="flex items-center gap-3 p-2 bg-neutral-900 border border-white/5 rounded-lg hover:bg-neutral-800 hover:border-fiber-orange/30 transition-all group max-w-fit"
                   >
-                    <Instagram size={20} />
+                    <div className="bg-white p-1.5 rounded-md group-hover:bg-fiber-orange group-hover:text-white transition-colors text-neutral-900">
+                        <Star size={16} fill="currentColor" className="text-yellow-500 group-hover:text-white group-hover:fill-white transition-colors" />
+                    </div>
+                    <div className="flex flex-col">
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-gray-500 group-hover:text-fiber-orange transition-colors">Avalie-nos</span>
+                        <span className="text-xs font-bold text-white group-hover:text-gray-200">Google Reviews</span>
+                    </div>
                   </a>
                 </div>
             </div>

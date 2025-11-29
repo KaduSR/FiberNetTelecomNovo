@@ -18,6 +18,11 @@ export default defineConfig({
   optimizeDeps: {
     include: ['@google/genai']
   },
+  build: {
+    rollupOptions: {
+      external: ['jspdf', 'leaflet', 'react-leaflet']
+    }
+  },
   server: {
     host: true,
     proxy: {
