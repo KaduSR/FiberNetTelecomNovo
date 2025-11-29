@@ -29,18 +29,18 @@ const App: React.FC = () => {
     // Scroll
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    // SEO: Título Dinâmico Otimizado
+    // SEO: Título Dinâmico Otimizado (Fibra Óptica + Banda Larga)
     const baseTitle = "Fiber.Net Telecom";
     const titles: Record<string, string> = {
-      'home': `Internet Fibra Óptica em Rio das Flores | ${baseTitle}`,
-      'planos': `Planos de Internet Residencial e Gamer | ${baseTitle}`,
+      'home': `Internet Fibra Óptica e Banda Larga em Rio das Flores | ${baseTitle}`,
+      'planos': `Planos de Internet Banda Larga e Gamer | ${baseTitle}`,
       'client-area': `Área do Cliente - 2ª Via e Suporte | ${baseTitle}`,
       'news': `Notícias de Tecnologia e Conectividade | ${baseTitle}`,
-      'help': `Central de Ajuda e Suporte Técnico | ${baseTitle}`,
+      'help': `Central de Ajuda e Suporte Técnico Fibra | ${baseTitle}`,
       'client-guide': `Guia do Cliente Fiber.Net | ${baseTitle}`,
       'ethics': `Código de Ética e Conduta | ${baseTitle}`,
       'status': `Status dos Serviços em Tempo Real | ${baseTitle}`,
-      'segunda-via': `Emitir 2ª Via de Boleto | ${baseTitle}`
+      'segunda-via': `Emitir 2ª Via de Boleto - Banda Larga | ${baseTitle}`
     };
 
     document.title = titles[currentPage] || baseTitle;
@@ -140,7 +140,7 @@ const App: React.FC = () => {
             <section className="bg-fiber-orange py-16">
                <div className="max-w-4xl mx-auto px-4 text-center">
                   <h3 className="text-3xl font-bold text-white mb-4">Pronto para ter a melhor internet da região?</h3>
-                  <p className="text-white/90 text-lg mb-8">Entre em contato conosco e descubra nossos planos</p>
+                  <p className="text-white/90 text-lg mb-8">Entre em contato conosco e descubra nossos planos de Banda Larga</p>
                   <button 
                     onClick={() => setIsSupportModalOpen(true)}
                     className="inline-block bg-fiber-card text-fiber-orange font-bold py-4 px-8 rounded-lg shadow-lg hover:bg-neutral-900 transition-colors cursor-pointer"
@@ -158,7 +158,7 @@ const App: React.FC = () => {
                     Nossos Planos de Internet
                   </h2>
                   <p className="text-gray-400 text-lg">
-                    Escolha a velocidade ideal para sua necessidade em Rio das Flores
+                    Escolha a velocidade de Banda Larga ideal para sua necessidade em Rio das Flores
                   </p>
                 </div>
 

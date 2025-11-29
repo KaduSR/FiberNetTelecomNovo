@@ -406,13 +406,11 @@ const ClientArea: React.FC = () => {
     };
 
     const handleSuggestionClick = (suggestion: string) => {
+        // Just set the input and focus, do NOT scroll page
         setChatInput(suggestion);
-        setTimeout(() => {
-            if (chatInputRef.current) {
-                chatInputRef.current.focus();
-                // Avoid scrolling the screen to the input
-            }
-        }, 100);
+        if (chatInputRef.current) {
+            chatInputRef.current.focus();
+        }
     };
 
     const handleClearChat = () => {
@@ -449,14 +447,12 @@ const ClientArea: React.FC = () => {
     useEffect(() => {
         if (activeTab === 'ai_support' && chatContainerRef.current) {
             const container = chatContainerRef.current;
+            // Delay slightly to allow DOM update
             setTimeout(() => {
-                container.scrollTo({
-                    top: container.scrollHeight,
-                    behavior: 'smooth'
-                });
+                container.scrollTop = container.scrollHeight;
             }, 100);
         }
-    }, [chatMessages, activeTab]);
+    }, [chatMessages, activeTab, isChatTyping]);
 
     const handleCopy = (text: string, id: string) => {
         navigator.clipboard.writeText(text);
@@ -782,7 +778,7 @@ const ClientArea: React.FC = () => {
 
                             {/* === NOVA ABA: SUPORTE IA (HEIGHT FIXED, NO SCROLL TO INPUT) === */}
                             {activeTab === 'ai_support' && (
-                                <div className="h-[440px] flex flex-col relative">
+                                <div className="h-[500px] flex flex-col relative">
                                     <div className="mb-2 flex justify-between items-center shrink-0">
                                         <div>
                                             <h2 className="text-2xl font-bold text-white flex items-center gap-2">

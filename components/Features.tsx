@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ThumbsUp, Users, Monitor, RefreshCcw } from 'lucide-react';
 
 const Features: React.FC = () => {
@@ -29,7 +29,7 @@ const Features: React.FC = () => {
     <section className="py-20 bg-fiber-dark">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Título semântico para SEO (visualmente integrado ou oculto se preferir, aqui mantido visível para estrutura) */}
-        <h2 className="sr-only">Nossos Valores e Diferenciais</h2>
+        <h2 className="sr-only">Diferenciais de Banda Larga e Fibra Óptica</h2>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {values.map((v, i) => (

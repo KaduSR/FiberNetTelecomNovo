@@ -5,39 +5,50 @@ export const generateEthicsCodePDF = () => {
   
   // Constants for layout
   const ORANGE = '#FF6B00';
-  const BLACK = '#000000';
-  const GRAY = '#4B5563';
+  const DARK_GREY = '#1F2937'; // gray-800
+  const BODY_GREY = '#4B5563'; // gray-600
   
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 20;
   const contentWidth = pageWidth - (margin * 2);
-  let y = 20;
+  let cursorY = 20;
 
   // Helper to add page if needed
   const checkPageBreak = (heightNeeded: number) => {
-    if (y + heightNeeded > pageHeight - margin) {
+    if (cursorY + heightNeeded > pageHeight - margin) {
       doc.addPage();
-      y = 20;
+      cursorY = 25; // Reset cursor with top margin
+      return true;
     }
+    return false;
   };
 
-  // Header
-  doc.setFontSize(22);
+  // Header Function (to be called if needed on new pages, currently only first page has big header)
+  doc.setFontSize(24);
   doc.setTextColor(ORANGE);
   doc.setFont('helvetica', 'bold');
-  doc.text('Código de Ética e Conduta', pageWidth / 2, y, { align: 'center' });
+  doc.text('CÓDIGO DE ÉTICA E CONDUTA', pageWidth / 2, cursorY, { align: 'center' });
   
-  y += 8;
-  doc.setFontSize(10);
-  doc.setTextColor(GRAY);
+  cursorY += 10;
+  doc.setFontSize(11);
+  doc.setTextColor(DARK_GREY);
   doc.setFont('helvetica', 'normal');
-  doc.text('Fiber.Net Telecom - CNPJ 22.969.088/0001-97', pageWidth / 2, y, { align: 'center' });
+  doc.text('Fiber.Net Telecom - CNPJ 22.969.088/0001-97', pageWidth / 2, cursorY, { align: 'center' });
 
-  y += 5;
-  doc.setDrawColor(200, 200, 200);
-  doc.line(margin, y, pageWidth - margin, y);
-  y += 15;
+  cursorY += 8;
+  doc.setDrawColor(255, 107, 0); // Orange Line
+  doc.setLineWidth(0.5);
+  doc.line(margin, cursorY, pageWidth - margin, cursorY);
+  cursorY += 15;
+
+  // Introduction Text
+  doc.setFontSize(10);
+  doc.setTextColor(BODY_GREY);
+  const introText = "Este documento estabelece as diretrizes fundamentais que orientam a conduta profissional e ética de todos os colaboradores e parceiros da Fiber.Net Telecom.";
+  const splitIntro = doc.splitTextToSize(introText, contentWidth);
+  doc.text(splitIntro, margin, cursorY);
+  cursorY += 15;
 
   // Content Sections
   const sections = [
@@ -68,39 +79,46 @@ export const generateEthicsCodePDF = () => {
   ];
 
   sections.forEach(section => {
-    doc.setFontSize(10); // Reset font size for calculation
+    // Calculate heights first
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'normal');
-    const splitText = doc.splitTextToSize(section.text, contentWidth);
-    const textHeight = splitText.length * 5;
+    const splitBody = doc.splitTextToSize(section.text, contentWidth);
+    const bodyHeight = splitBody.length * 5; // Approx height per line
     const titleHeight = 8;
-    const sectionHeight = titleHeight + textHeight + 10;
+    const totalBlockHeight = titleHeight + bodyHeight + 10; // + padding
 
-    checkPageBreak(sectionHeight);
+    checkPageBreak(totalBlockHeight);
 
-    // Title
+    // Render Title
     doc.setFontSize(12);
     doc.setTextColor(ORANGE);
     doc.setFont('helvetica', 'bold');
-    doc.text(section.title, margin, y);
-    y += 7;
+    doc.text(section.title, margin, cursorY);
+    cursorY += 7;
 
-    // Text
+    // Render Body
     doc.setFontSize(10);
-    doc.setTextColor(BLACK);
+    doc.setTextColor(BODY_GREY);
     doc.setFont('helvetica', 'normal');
-    doc.text(splitText, margin, y);
+    doc.text(splitBody, margin, cursorY);
     
-    y += textHeight + 8; // Spacing after paragraph
+    cursorY += bodyHeight + 8; // Spacing after section
   });
 
   // Footer (Add to all pages)
   const pageCount = doc.getNumberOfPages();
   for(let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
+    
+    // Footer Line
+    doc.setDrawColor(230, 230, 230);
+    doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
+
+    // Footer Text
     doc.setFontSize(8);
     doc.setTextColor(150, 150, 150);
-    doc.text(`Página ${i} de ${pageCount} - Fiber.Net Telecom`, pageWidth / 2, pageHeight - 10, { align: 'center' });
-    doc.text(`Gerado em ${new Date().toLocaleDateString()}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
+    doc.text(`Fiber.Net Telecom - Documento Oficial`, margin, pageHeight - 10);
+    doc.text(`Página ${i} de ${pageCount}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
   }
 
   doc.save('Codigo-Etica-FiberNet.pdf');

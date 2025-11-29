@@ -38,7 +38,7 @@ const Hero: React.FC = () => {
                 </h1>
                 
                 <p className="text-lg sm:text-xl text-gray-400 mb-10 max-w-2xl font-light">
-                Conexão de ultravelocidade com o melhor suporte da região. Empresa 100% local e homologada pela ANATEL.
+                Conexão Banda Larga de ultravelocidade com o melhor suporte da região. Empresa 100% local e homologada pela ANATEL.
                 </p>
                 
                 <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
@@ -78,7 +78,7 @@ const Hero: React.FC = () => {
                 <div className="absolute inset-0 bg-fiber-orange/20 blur-3xl rounded-full transform translate-y-10 opacity-60"></div>
                 <img 
                     src="https://res.cloudinary.com/dbblxiya7/image/upload/v1763728839/3_wmk7t6.svg"
-                    alt="Mascote Fiber.Net - Internet Rápida em Rio das Flores" 
+                    alt="Mascote Fiber.Net - Internet Banda Larga Fibra Óptica em Rio das Flores" 
                     className="relative w-full max-w-[400px] lg:max-w-[500px] mx-auto object-contain drop-shadow-2xl hover:scale-105 transition-transform duration-500 z-10 animate-fly"
                     loading="eager"
                     fetchPriority="high"
