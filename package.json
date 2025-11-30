@@ -18,7 +18,7 @@
     "@google/genai": "^1.30.0",
     "leaflet": "^1.9.4",
     "react-leaflet": "^4.2.1",
-    "jspdf": "^2.5.1"
+    "jspdf": "^3.0.4"
   },
   "devDependencies": {
     "@types/react": "^18.2.64",
